@@ -1,0 +1,36 @@
+{
+  "name": "block-minijava",
+  "version": "0.2.0",
+  "description": "B-MJ: Block-based MiniJava IDE built with TypeScript, npm, webpack, and Blockly.",
+  "private": true,
+  "scripts": {
+    "build": "webpack --mode=production",
+    "serve": "webpack serve --mode=development --open",
+    "dev": "webpack serve --mode=development",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "blockly": "^12.3.1"
+  },
+  "devDependencies": {
+    "copy-webpack-plugin": "^13.0.1",
+    "css-loader": "^7.1.2",
+    "html-webpack-plugin": "^5.6.3",
+    "rimraf": "^6.0.1",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.3",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.1"
+  },
+  "keywords": [
+    "blockly",
+    "minijava",
+    "typescript",
+    "webpack",
+    "visual-programming",
+    "block-based-programming"
+  ],
+  "license": "MIT"
+}

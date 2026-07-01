@@ -13,78 +13,110 @@ export type ToolboxCategory = {
   blocks: ToolboxBlock[];
 };
 
-const C = {
-  program: 220,
-  class: 205,
-  declaration: 190,
-  type: 165,
-  statement: 24,
-  expression: 42,
-  literal: 55,
-  identifier: 285,
-  helper: 250
-};
+export const MINI_JAVA_REQUIRED_BLOCK_TYPES = ['mj_goal', 'mj_main_class'] as const;
+
+export const MINI_JAVA_BLOCK_TYPES = [
+  'mj_goal',
+  'mj_main_class',
+  'mj_class_declaration',
+  'mj_class_extends_declaration',
+  'mj_var_declaration',
+  'mj_method_declaration',
+  'mj_formal_parameter',
+  'mj_type_int_array',
+  'mj_type_boolean',
+  'mj_type_int',
+  'mj_type_identifier',
+  'mj_statement_block',
+  'mj_statement_if',
+  'mj_statement_while',
+  'mj_statement_print',
+  'mj_statement_assign',
+  'mj_statement_array_assign',
+  'mj_expr_and',
+  'mj_expr_less',
+  'mj_expr_plus',
+  'mj_expr_minus',
+  'mj_expr_times',
+  'mj_expr_array_lookup',
+  'mj_expr_array_length',
+  'mj_expr_method_call',
+  'mj_argument_item',
+  'mj_expr_integer',
+  'mj_expr_true',
+  'mj_expr_false',
+  'mj_expr_identifier',
+  'mj_expr_this',
+  'mj_expr_new_int_array',
+  'mj_expr_new_object',
+  'mj_expr_not',
+  'mj_expr_parens'
+] as const;
+
+export type MiniJavaBlockType = typeof MINI_JAVA_BLOCK_TYPES[number];
+
+export function miniJavaBlockStyle(type: MiniJavaBlockType): string {
+  return `${type}_blocks`;
+}
 
 export const MINI_JAVA_CATEGORIES: ToolboxCategory[] = [
   {
     id: 'program',
     label: 'Program',
-    icon: '🏁',
+    icon: 'P',
     blocks: [
-      { type: 'mj_goal', label: 'Goal', icon: '🏁' },
-      { type: 'mj_main_class', label: 'Main Class', icon: '🏠' },
-      { type: 'mj_class_declaration', label: 'Class Declaration', icon: '🧱' },
-      { type: 'mj_class_extends_declaration', label: 'Class Extends Declaration', icon: '🧬' }
+      { type: 'mj_class_declaration', label: 'Class Declaration', icon: 'cls' },
+      { type: 'mj_class_extends_declaration', label: 'Class Extends Declaration', icon: 'ext' }
     ]
   },
   {
     id: 'declarations',
     label: 'Declarations',
-    icon: '📦',
+    icon: 'D',
     blocks: [
-      { type: 'mj_var_declaration', label: 'Variable Declaration', icon: '📌' },
-      { type: 'mj_method_declaration', label: 'Method Declaration', icon: '⚙️' },
-      { type: 'mj_formal_parameter', label: 'Formal Parameter', icon: '🔖' }
+      { type: 'mj_var_declaration', label: 'Variable Declaration', icon: 'var' },
+      { type: 'mj_method_declaration', label: 'Method Declaration', icon: 'fn' },
+      { type: 'mj_formal_parameter', label: 'Formal Parameter', icon: 'arg' }
     ]
   },
   {
     id: 'types',
     label: 'Types',
-    icon: '🏷️',
+    icon: 'T',
     blocks: [
-      { type: 'mj_type_int_array', label: 'int[]', icon: '🔢' },
-      { type: 'mj_type_boolean', label: 'boolean', icon: '☑️' },
-      { type: 'mj_type_int', label: 'int', icon: '🔢' },
-      { type: 'mj_type_identifier', label: 'Identifier Type', icon: '🏷️' }
+      { type: 'mj_type_int_array', label: 'int[]', icon: '[]' },
+      { type: 'mj_type_boolean', label: 'boolean', icon: 'bool' },
+      { type: 'mj_type_int', label: 'int', icon: 'int' },
+      { type: 'mj_type_identifier', label: 'Identifier Type', icon: 'id' }
     ]
   },
   {
     id: 'statements',
     label: 'Statements',
-    icon: '🧾',
+    icon: 'S',
     blocks: [
       { type: 'mj_statement_block', label: 'Block Statement', icon: '▣' },
-      { type: 'mj_statement_if', label: 'if / else', icon: '🔀' },
-      { type: 'mj_statement_while', label: 'while', icon: '🔁' },
-      { type: 'mj_statement_print', label: 'System.out.println', icon: '🖨️' },
-      { type: 'mj_statement_assign', label: 'Assignment', icon: '✍️' },
-      { type: 'mj_statement_array_assign', label: 'Array Assignment', icon: '📚' }
+      { type: 'mj_statement_if', label: 'if / else', icon: 'if' },
+      { type: 'mj_statement_while', label: 'while', icon: 'loop' },
+      { type: 'mj_statement_print', label: 'System.out.println', icon: 'out' },
+      { type: 'mj_statement_assign', label: 'Assignment', icon: '=' },
+      { type: 'mj_statement_array_assign', label: 'Array Assignment', icon: '[]=' }
     ]
   },
   {
     id: 'expressions',
     label: 'Expressions',
-    icon: '🧮',
+    icon: 'E',
     blocks: [
-      { type: 'mj_expr_and', label: '&&', icon: '∧' },
+      { type: 'mj_expr_and', label: '&&', icon: '&&' },
       { type: 'mj_expr_less', label: '<', icon: '<' },
       { type: 'mj_expr_plus', label: '+', icon: '+' },
-      { type: 'mj_expr_minus', label: '-', icon: '−' },
-      { type: 'mj_expr_times', label: '*', icon: '×' },
+      { type: 'mj_expr_minus', label: '-', icon: '-' },
+      { type: 'mj_expr_times', label: '*', icon: '*' },
       { type: 'mj_expr_array_lookup', label: 'Array Lookup', icon: '[]' },
-      { type: 'mj_expr_array_length', label: 'Array Length', icon: '↔' },
-      { type: 'mj_expr_method_call', label: 'Method Call', icon: '☎' },
-      { type: 'mj_argument_item', label: 'Argument Item', icon: '•' },
+      { type: 'mj_expr_array_length', label: 'Array Length', icon: 'len' },
+      { type: 'mj_expr_method_call', label: 'Method Call', icon: 'call' },
+      { type: 'mj_argument_item', label: 'Argument Item', icon: 'arg' },
       { type: 'mj_expr_not', label: 'Not', icon: '!' },
       { type: 'mj_expr_parens', label: 'Parenthesized', icon: '( )' }
     ]
@@ -92,13 +124,13 @@ export const MINI_JAVA_CATEGORIES: ToolboxCategory[] = [
   {
     id: 'values',
     label: 'Values',
-    icon: '💎',
+    icon: 'V',
     blocks: [
       { type: 'mj_expr_integer', label: 'Integer', icon: '123' },
       { type: 'mj_expr_true', label: 'true', icon: 'T' },
       { type: 'mj_expr_false', label: 'false', icon: 'F' },
       { type: 'mj_expr_identifier', label: 'Identifier', icon: 'id' },
-      { type: 'mj_expr_this', label: 'this', icon: '◎' },
+      { type: 'mj_expr_this', label: 'this', icon: 'this' },
       { type: 'mj_expr_new_int_array', label: 'new int[]', icon: 'new[]' },
       { type: 'mj_expr_new_object', label: 'new Object', icon: 'obj' }
     ]
@@ -122,7 +154,7 @@ export function defineMiniJavaBlocks(): void {
         { type: 'input_value', name: 'MAIN', check: 'MainClass' },
         { type: 'input_statement', name: 'CLASSES', check: 'ClassDeclaration' }
       ],
-      colour: C.program,
+      style: miniJavaBlockStyle('mj_goal'),
       tooltip: 'Goal ::= MainClass ClassDeclaration* EOF',
       helpUrl: ''
     },
@@ -136,7 +168,7 @@ export function defineMiniJavaBlocks(): void {
         { type: 'input_statement', name: 'STATEMENT', check: 'Statement' }
       ],
       output: 'MainClass',
-      colour: C.class,
+      style: miniJavaBlockStyle('mj_main_class'),
       tooltip: 'MainClass ::= class Identifier { public static void main ( String [] Identifier ) { Statement } }',
       helpUrl: ''
     },
@@ -151,7 +183,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       previousStatement: 'ClassDeclaration',
       nextStatement: 'ClassDeclaration',
-      colour: C.class,
+      style: miniJavaBlockStyle('mj_class_declaration'),
       tooltip: 'ClassDeclaration ::= class Identifier { VarDeclaration* MethodDeclaration* }',
       helpUrl: ''
     },
@@ -167,7 +199,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       previousStatement: 'ClassDeclaration',
       nextStatement: 'ClassDeclaration',
-      colour: C.class,
+      style: miniJavaBlockStyle('mj_class_extends_declaration'),
       tooltip: 'ClassDeclaration ::= class Identifier extends Identifier { VarDeclaration* MethodDeclaration* }',
       helpUrl: ''
     },
@@ -180,7 +212,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       previousStatement: 'VarDeclaration',
       nextStatement: 'VarDeclaration',
-      colour: C.declaration,
+      style: miniJavaBlockStyle('mj_var_declaration'),
       tooltip: 'VarDeclaration ::= Type Identifier ;',
       helpUrl: ''
     },
@@ -198,7 +230,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       previousStatement: 'MethodDeclaration',
       nextStatement: 'MethodDeclaration',
-      colour: C.declaration,
+      style: miniJavaBlockStyle('mj_method_declaration'),
       tooltip: 'MethodDeclaration ::= public Type Identifier ( parameters ) { VarDeclaration* Statement* return Expression ; }',
       helpUrl: ''
     },
@@ -211,7 +243,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       previousStatement: 'FormalParameter',
       nextStatement: 'FormalParameter',
-      colour: C.helper,
+      style: miniJavaBlockStyle('mj_formal_parameter'),
       tooltip: 'Formal parameter ::= Type Identifier',
       helpUrl: ''
     },
@@ -219,7 +251,7 @@ export function defineMiniJavaBlocks(): void {
       type: 'mj_type_int_array',
       message0: 'int [ ]',
       output: 'Type',
-      colour: C.type,
+      style: miniJavaBlockStyle('mj_type_int_array'),
       tooltip: 'Type ::= int[]',
       helpUrl: ''
     },
@@ -227,7 +259,7 @@ export function defineMiniJavaBlocks(): void {
       type: 'mj_type_boolean',
       message0: 'boolean',
       output: 'Type',
-      colour: C.type,
+      style: miniJavaBlockStyle('mj_type_boolean'),
       tooltip: 'Type ::= boolean',
       helpUrl: ''
     },
@@ -235,7 +267,7 @@ export function defineMiniJavaBlocks(): void {
       type: 'mj_type_int',
       message0: 'int',
       output: 'Type',
-      colour: C.type,
+      style: miniJavaBlockStyle('mj_type_int'),
       tooltip: 'Type ::= int',
       helpUrl: ''
     },
@@ -244,7 +276,7 @@ export function defineMiniJavaBlocks(): void {
       message0: 'type %1',
       args0: [{ type: 'field_input', name: 'NAME', text: 'ClassName' }],
       output: 'Type',
-      colour: C.type,
+      style: miniJavaBlockStyle('mj_type_identifier'),
       tooltip: 'Type ::= Identifier',
       helpUrl: ''
     },
@@ -254,7 +286,7 @@ export function defineMiniJavaBlocks(): void {
       args0: [{ type: 'input_statement', name: 'STATEMENTS', check: 'Statement' }],
       previousStatement: 'Statement',
       nextStatement: 'Statement',
-      colour: C.statement,
+      style: miniJavaBlockStyle('mj_statement_block'),
       tooltip: 'Statement ::= { Statement* }',
       helpUrl: ''
     },
@@ -268,7 +300,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       previousStatement: 'Statement',
       nextStatement: 'Statement',
-      colour: C.statement,
+      style: miniJavaBlockStyle('mj_statement_if'),
       tooltip: 'Statement ::= if ( Expression ) Statement else Statement',
       helpUrl: ''
     },
@@ -281,7 +313,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       previousStatement: 'Statement',
       nextStatement: 'Statement',
-      colour: C.statement,
+      style: miniJavaBlockStyle('mj_statement_while'),
       tooltip: 'Statement ::= while ( Expression ) Statement',
       helpUrl: ''
     },
@@ -291,7 +323,7 @@ export function defineMiniJavaBlocks(): void {
       args0: [{ type: 'input_value', name: 'VALUE', check: 'Expression' }],
       previousStatement: 'Statement',
       nextStatement: 'Statement',
-      colour: C.statement,
+      style: miniJavaBlockStyle('mj_statement_print'),
       tooltip: 'Statement ::= System.out.println ( Expression ) ;',
       helpUrl: ''
     },
@@ -304,7 +336,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       previousStatement: 'Statement',
       nextStatement: 'Statement',
-      colour: C.statement,
+      style: miniJavaBlockStyle('mj_statement_assign'),
       tooltip: 'Statement ::= Identifier = Expression ;',
       helpUrl: ''
     },
@@ -318,7 +350,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       previousStatement: 'Statement',
       nextStatement: 'Statement',
-      colour: C.statement,
+      style: miniJavaBlockStyle('mj_statement_array_assign'),
       tooltip: 'Statement ::= Identifier [ Expression ] = Expression ;',
       helpUrl: ''
     },
@@ -331,7 +363,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       inputsInline: true,
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_and'),
       tooltip: 'Expression ::= Expression && Expression',
       helpUrl: ''
     },
@@ -344,7 +376,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       inputsInline: true,
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_less'),
       tooltip: 'Expression ::= Expression < Expression',
       helpUrl: ''
     },
@@ -357,7 +389,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       inputsInline: true,
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_plus'),
       tooltip: 'Expression ::= Expression + Expression',
       helpUrl: ''
     },
@@ -370,7 +402,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       inputsInline: true,
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_minus'),
       tooltip: 'Expression ::= Expression - Expression',
       helpUrl: ''
     },
@@ -383,7 +415,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       inputsInline: true,
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_times'),
       tooltip: 'Expression ::= Expression * Expression',
       helpUrl: ''
     },
@@ -396,7 +428,7 @@ export function defineMiniJavaBlocks(): void {
       ],
       inputsInline: true,
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_array_lookup'),
       tooltip: 'Expression ::= Expression [ Expression ]',
       helpUrl: ''
     },
@@ -405,7 +437,7 @@ export function defineMiniJavaBlocks(): void {
       message0: '%1 . length',
       args0: [{ type: 'input_value', name: 'ARRAY', check: 'Expression' }],
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_array_length'),
       tooltip: 'Expression ::= Expression . length',
       helpUrl: ''
     },
@@ -418,7 +450,7 @@ export function defineMiniJavaBlocks(): void {
         { type: 'input_statement', name: 'ARGS', check: 'ExpressionArg' }
       ],
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_method_call'),
       tooltip: 'Expression ::= Expression . Identifier ( Expression (, Expression)* )',
       helpUrl: ''
     },
@@ -428,7 +460,7 @@ export function defineMiniJavaBlocks(): void {
       args0: [{ type: 'input_value', name: 'EXPR', check: 'Expression' }],
       previousStatement: 'ExpressionArg',
       nextStatement: 'ExpressionArg',
-      colour: C.helper,
+      style: miniJavaBlockStyle('mj_argument_item'),
       tooltip: 'Expression argument item',
       helpUrl: ''
     },
@@ -437,7 +469,7 @@ export function defineMiniJavaBlocks(): void {
       message0: 'int literal %1',
       args0: [{ type: 'field_number', name: 'VALUE', value: 0, precision: 1 }],
       output: 'Expression',
-      colour: C.literal,
+      style: miniJavaBlockStyle('mj_expr_integer'),
       tooltip: 'Expression ::= IntegerLiteral',
       helpUrl: ''
     },
@@ -445,7 +477,7 @@ export function defineMiniJavaBlocks(): void {
       type: 'mj_expr_true',
       message0: 'true',
       output: 'Expression',
-      colour: C.literal,
+      style: miniJavaBlockStyle('mj_expr_true'),
       tooltip: 'Expression ::= true',
       helpUrl: ''
     },
@@ -453,7 +485,7 @@ export function defineMiniJavaBlocks(): void {
       type: 'mj_expr_false',
       message0: 'false',
       output: 'Expression',
-      colour: C.literal,
+      style: miniJavaBlockStyle('mj_expr_false'),
       tooltip: 'Expression ::= false',
       helpUrl: ''
     },
@@ -462,7 +494,7 @@ export function defineMiniJavaBlocks(): void {
       message0: 'identifier %1',
       args0: [{ type: 'field_input', name: 'NAME', text: 'x' }],
       output: 'Expression',
-      colour: C.identifier,
+      style: miniJavaBlockStyle('mj_expr_identifier'),
       tooltip: 'Expression ::= Identifier',
       helpUrl: ''
     },
@@ -470,7 +502,7 @@ export function defineMiniJavaBlocks(): void {
       type: 'mj_expr_this',
       message0: 'this',
       output: 'Expression',
-      colour: C.identifier,
+      style: miniJavaBlockStyle('mj_expr_this'),
       tooltip: 'Expression ::= this',
       helpUrl: ''
     },
@@ -479,7 +511,7 @@ export function defineMiniJavaBlocks(): void {
       message0: 'new int [ %1 ]',
       args0: [{ type: 'input_value', name: 'SIZE', check: 'Expression' }],
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_new_int_array'),
       tooltip: 'Expression ::= new int [ Expression ]',
       helpUrl: ''
     },
@@ -488,7 +520,7 @@ export function defineMiniJavaBlocks(): void {
       message0: 'new %1 ( )',
       args0: [{ type: 'field_input', name: 'CLASS', text: 'ClassName' }],
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_new_object'),
       tooltip: 'Expression ::= new Identifier ( )',
       helpUrl: ''
     },
@@ -497,7 +529,7 @@ export function defineMiniJavaBlocks(): void {
       message0: '! %1',
       args0: [{ type: 'input_value', name: 'EXPR', check: 'Expression' }],
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_not'),
       tooltip: 'Expression ::= ! Expression',
       helpUrl: ''
     },
@@ -506,7 +538,7 @@ export function defineMiniJavaBlocks(): void {
       message0: '( %1 )',
       args0: [{ type: 'input_value', name: 'EXPR', check: 'Expression' }],
       output: 'Expression',
-      colour: C.expression,
+      style: miniJavaBlockStyle('mj_expr_parens'),
       tooltip: 'Expression ::= ( Expression )',
       helpUrl: ''
     }

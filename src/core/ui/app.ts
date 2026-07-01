@@ -1,5 +1,5 @@
 import * as Blockly from 'blockly';
-import { defineMiniJavaBlocks, MINI_JAVA_CATEGORIES } from '../blocks/minijavaBlocks';
+import { defineMiniJavaBlocks, MINI_JAVA_CATEGORIES, MINI_JAVA_REQUIRED_BLOCK_TYPES } from '../blocks/minijavaBlocks';
 import { generateMiniJava } from '../generator/minijavaGenerator';
 import { highlightMiniJava } from '../generator/highlighter';
 import { BLOCKLY_RENDERER, createBlocklyTheme } from '../renderer/theme';
@@ -12,13 +12,17 @@ const CODE_WIDTH_KEY = 'block-minijava.code.width';
 
 let workspace: Blockly.WorkspaceSvg | null = null;
 let autosaveTimer: number | null = null;
+let requiredBlockTimer: number | null = null;
 let latestCode = '';
 let codeHidden = false;
 let toolboxHidden = false;
 let currentTheme: 'dark' | 'light' = 'dark';
 let clickAddOffset = 0;
+let enforcingRequiredBlocks = false;
 
 const TOOLBOX_BLOCK_MIME = 'application/x-block-minijava-block';
+const [GOAL_BLOCK_TYPE, MAIN_BLOCK_TYPE] = MINI_JAVA_REQUIRED_BLOCK_TYPES;
+type InspectorPanel = 'code' | 'output';
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -93,6 +97,10 @@ function activeWorkspaceInsertionPoint(): { x: number; y: number } {
 
 function createBlockInWorkspace(type: string, position: { x: number; y: number }): void {
   if (!workspace) return;
+  if (type === GOAL_BLOCK_TYPE || type === MAIN_BLOCK_TYPE) {
+    ensureRequiredBlocks(workspace);
+    return;
+  }
   const block = workspace.newBlock(type);
   block.initSvg();
   block.render();
@@ -111,6 +119,106 @@ function updateCode(): void {
   if (!workspace) return;
   latestCode = generateMiniJava(workspace);
   byId<HTMLElement>('generated-code').innerHTML = highlightMiniJava(latestCode);
+}
+
+function lockRequiredBlock(block: Blockly.Block): void {
+  block.setDeletable(false);
+  block.setMovable(false);
+  block.setCollapsed(false);
+}
+
+function createRequiredBlock(ws: Blockly.WorkspaceSvg, type: string, x: number, y: number): Blockly.BlockSvg {
+  const block = ws.newBlock(type) as Blockly.BlockSvg;
+  block.initSvg();
+  block.render();
+  block.moveBy(x, y);
+  return block;
+}
+
+function removeDuplicateRequiredBlock(block: Blockly.Block): void {
+  block.setDeletable(true);
+  block.dispose(false);
+}
+
+function ensureRequiredBlocks(ws: Blockly.WorkspaceSvg): boolean {
+  if (enforcingRequiredBlocks) return false;
+  enforcingRequiredBlocks = true;
+
+  try {
+    let changed = false;
+    let allBlocks = ws.getAllBlocks(false);
+    let goals = allBlocks.filter((block) => block.type === GOAL_BLOCK_TYPE);
+    let goal = goals[0] as Blockly.BlockSvg | undefined;
+
+    if (!goal) {
+      goal = createRequiredBlock(ws, GOAL_BLOCK_TYPE, 48, 48);
+      goals = [goal];
+      changed = true;
+    }
+
+    for (const duplicate of goals.slice(1)) {
+      removeDuplicateRequiredBlock(duplicate);
+      changed = true;
+    }
+
+    allBlocks = ws.getAllBlocks(false);
+    let mains = allBlocks.filter((block) => block.type === MAIN_BLOCK_TYPE);
+    const connectedMain = goal.getInputTargetBlock('MAIN');
+    let main = (connectedMain?.type === MAIN_BLOCK_TYPE ? connectedMain : mains[0]) as Blockly.BlockSvg | undefined;
+
+    if (!main) {
+      main = createRequiredBlock(ws, MAIN_BLOCK_TYPE, 260, 64);
+      mains = [main];
+      changed = true;
+    }
+
+    for (const duplicate of mains) {
+      if (duplicate.id === main.id) continue;
+      removeDuplicateRequiredBlock(duplicate);
+      changed = true;
+    }
+
+    const goalConnection = goal.getInput('MAIN')?.connection;
+    const mainConnection = main.outputConnection;
+    if (goalConnection && mainConnection && goal.getInputTargetBlock('MAIN')?.id !== main.id) {
+      goalConnection.targetConnection?.disconnect();
+      mainConnection.targetConnection?.disconnect();
+      goalConnection.connect(mainConnection);
+      changed = true;
+    }
+
+    lockRequiredBlock(goal);
+    lockRequiredBlock(main);
+    return changed;
+  } finally {
+    enforcingRequiredBlocks = false;
+  }
+}
+
+function scheduleRequiredBlockEnforcement(): void {
+  if (requiredBlockTimer !== null) window.clearTimeout(requiredBlockTimer);
+  requiredBlockTimer = window.setTimeout(() => {
+    requiredBlockTimer = null;
+    if (!workspace) return;
+    if (ensureRequiredBlocks(workspace)) updateCode();
+  }, 0);
+}
+
+function appendConsoleOutput(message: string): void {
+  const output = byId<HTMLPreElement>('program-output');
+  const current = output.textContent?.trim();
+  output.textContent = current && current !== 'No run yet.' ? `${current}\n${message}` : message;
+}
+
+function selectInspectorPanel(panel: InspectorPanel): void {
+  for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('.inspector-tab'))) {
+    const isActive = tab.dataset.panel === panel;
+    tab.classList.toggle('is-active', isActive);
+    tab.setAttribute('aria-selected', String(isActive));
+  }
+  for (const section of Array.from(document.querySelectorAll<HTMLElement>('.inspector-panel'))) {
+    section.classList.toggle('is-active', section.id === `panel-${panel}`);
+  }
 }
 
 function scheduleAutosaveStatus(message: string): void {
@@ -153,6 +261,7 @@ function loadAutosave(): void {
     const payload = JSON.parse(raw) as { savedAt?: string; state: unknown };
     workspace.clear();
     Blockly.serialization.workspaces.load(payload.state as { [key: string]: unknown }, workspace);
+    ensureRequiredBlocks(workspace);
     byId<HTMLDivElement>('loaded-file-label').textContent = payload.savedAt
       ? `Autosave · ${new Date(payload.savedAt).toLocaleString()}`
       : 'Autosave loaded';
@@ -236,6 +345,31 @@ function downloadWorkspace(): void {
   byId<HTMLDivElement>('loaded-file-label').textContent = fileName;
 }
 
+function normalizeJavaFileName(value: string): string {
+  const cleaned = value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-');
+  const fallback = cleaned || workspaceFileDisplayName() || 'Project';
+  return fallback.toLowerCase().endsWith('.java') ? fallback : `${fallback.replace(/\.bml$/i, '')}.java`;
+}
+
+function exportGeneratedCode(): void {
+  const requestedName = window.prompt('Java file name', `${workspaceFileDisplayName()}.java`);
+  if (requestedName === null) return;
+
+  const fileName = normalizeJavaFileName(requestedName);
+  const blob = new Blob([latestCode], { type: 'text/x-java-source;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  scheduleAutosaveStatus(`Exported ${fileName}`);
+  appendConsoleOutput(`Exported ${fileName}`);
+  selectInspectorPanel('output');
+}
+
 
 function loadWorkspaceFile(file: File): void {
   if (!workspace) return;
@@ -247,6 +381,7 @@ function loadWorkspaceFile(file: File): void {
       const state = parsed.state ?? parsed;
       ws.clear();
       Blockly.serialization.workspaces.load(state as { [key: string]: unknown }, ws);
+      ensureRequiredBlocks(ws);
       byId<HTMLDivElement>('loaded-file-label').textContent = file.name;
       updateCode();
       saveAutosave();
@@ -270,8 +405,14 @@ function newWorkspace(): void {
 function copyCode(): void {
   navigator.clipboard
     .writeText(latestCode)
-    .then(() => scheduleAutosaveStatus('Code copied'))
-    .catch(() => scheduleAutosaveStatus('Copy failed'));
+    .then(() => {
+      scheduleAutosaveStatus('Code copied');
+      appendConsoleOutput('Generated MiniJava copied to clipboard.');
+    })
+    .catch(() => {
+      scheduleAutosaveStatus('Copy failed');
+      appendConsoleOutput('Clipboard copy failed.');
+    });
 }
 
 function renderToolbox(): void {
@@ -442,6 +583,7 @@ function loadInitialSample(ws: Blockly.WorkspaceSvg): void {
   main.render();
   print.render();
   value.render();
+  ensureRequiredBlocks(ws);
   ws.centerOnBlock(goal.id);
 }
 
@@ -477,12 +619,17 @@ function initBlockly(): void {
   });
 
   loadInitialSample(workspace);
+  ensureRequiredBlocks(workspace);
   workspace.addChangeListener((event) => {
-    if (event.type === Blockly.Events.FINISHED_LOADING) return;
+    if (event.type === Blockly.Events.FINISHED_LOADING) {
+      scheduleRequiredBlockEnforcement();
+      return;
+    }
     if (event.type === Blockly.Events.VIEWPORT_CHANGE) {
       updateZoomIndicator();
       return;
     }
+    scheduleRequiredBlockEnforcement();
     updateCode();
   });
 
@@ -494,9 +641,12 @@ function initBlockly(): void {
 
 function updateMenuToggle(open: boolean): void {
   const button = byId<HTMLButtonElement>('menu-toggle');
-  const icon = button.querySelector<HTMLElement>('.menu-icon');
+  const icon = button.querySelector<HTMLElement>('.icon');
   const label = button.querySelector<HTMLElement>('.menu-label');
-  if (icon) icon.textContent = open ? '✕' : '☰';
+  if (icon) {
+    icon.classList.toggle('icon-close', open);
+    icon.classList.toggle('icon-menu', !open);
+  }
   if (label) label.textContent = open ? 'Close' : 'Menu';
   button.title = open ? 'Close menu' : 'Menu';
   button.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
@@ -508,6 +658,7 @@ function wireEvents(): void {
   byId<HTMLButtonElement>('new-workspace').addEventListener('click', newWorkspace);
   byId<HTMLButtonElement>('save-workspace').addEventListener('click', downloadWorkspace);
   byId<HTMLButtonElement>('load-workspace').addEventListener('click', () => byId<HTMLInputElement>('load-file-input').click());
+  byId<HTMLButtonElement>('export-code').addEventListener('click', exportGeneratedCode);
   byId<HTMLInputElement>('load-file-input').addEventListener('change', (event) => {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
@@ -520,6 +671,9 @@ function wireEvents(): void {
   byId<HTMLButtonElement>('show-code-button').addEventListener('click', () => setCodeHidden(false));
   byId<HTMLButtonElement>('show-toolbox-button').addEventListener('click', () => setToolboxHidden(false));
   byId<HTMLButtonElement>('copy-code').addEventListener('click', copyCode);
+  for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('.inspector-tab'))) {
+    tab.addEventListener('click', () => selectInspectorPanel((tab.dataset.panel ?? 'code') as InspectorPanel));
+  }
   byId<HTMLInputElement>('theme-toggle').addEventListener('change', (event) => {
     const isDark = (event.currentTarget as HTMLInputElement).checked;
     applyTheme(isDark ? 'dark' : 'light');

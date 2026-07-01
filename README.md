@@ -17,10 +17,13 @@ src/
     ui/          current IDE bootstrap and integrated prototype logic
 ```
 
+## Grammar
+
+The BNF source: https://courses.cs.washington.edu/courses/cse401/22au/project/BNF-for-MiniJava.html
 
 ## Grammar-aware renderer
 
-The project uses the custom Blockly renderer `bmj-thrasos`. It subclasses Blockly Thrasos and restores the previous grammar-aware connector behavior:
+The project uses the custom Blockly renderer `BMJ-Thrasos`. It subclasses Blockly Thrasos and restores the previous grammar-aware connector behavior:
 
 - 10 horizontal connector shapes for MiniJava value/non-terminal inputs: `Goal`, `MainClass`, `ClassDeclaration`, `VarDeclaration`, `MethodDeclaration`, `FormalParameter`, `Type`, `Statement`, `Expression`, and `Identifier`.
 - 5 vertical connector families for MiniJava sequence/statement stacks: class declarations, variable declarations, method declarations, statements, and parameter/argument lists.

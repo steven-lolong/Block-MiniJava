@@ -4,6 +4,8 @@ import { generateMiniJava } from '../generator/minijavaGenerator';
 import { highlightMiniJava } from '../generator/highlighter';
 import { BLOCKLY_RENDERER, createBlocklyTheme } from '../renderer/theme';
 import { registerMiniJavaRenderer } from '../renderer/minijavaRenderer';
+import { registerMiniJavaContextMenus } from './contextMenus';
+import { disposeVizWorkspaces, initVisualizationPanel, setVizOpen } from './visualizationPanel';
 
 const AUTOSAVE_KEY = 'block-minijava.autosave.v2';
 const THEME_KEY = 'block-minijava.theme';
@@ -282,6 +284,7 @@ function applyTheme(theme: 'dark' | 'light'): void {
   input.checked = theme === 'dark';
   input.setAttribute('aria-label', theme === 'dark' ? 'Dark theme on' : 'Light theme on');
   if (workspace) workspace.setTheme(createBlocklyTheme(theme));
+  disposeVizWorkspaces();
 }
 
 function setCodeHidden(next: boolean): void {
@@ -395,6 +398,7 @@ function loadWorkspaceFile(file: File): void {
 
 function newWorkspace(): void {
   if (!workspace) return;
+  setVizOpen(false);
   workspace.clear();
   loadInitialSample(workspace);
   byId<HTMLDivElement>('loaded-file-label').textContent = '';
@@ -721,11 +725,13 @@ function restorePreferences(): void {
 export function startBlockMiniJava(): void {
   registerMiniJavaRenderer();
   defineMiniJavaBlocks();
+  registerMiniJavaContextMenus();
   renderToolbox();
   restorePreferences();
   wireEvents();
   initToolboxDragAndDrop();
   initCodeResizer();
   initBlockly();
+  initVisualizationPanel(syncBlocklySize);
   restartAutosaveTimer();
 }

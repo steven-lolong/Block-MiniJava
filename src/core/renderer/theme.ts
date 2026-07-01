@@ -66,7 +66,8 @@ const DARK_BLOCK_COLOURS: Record<MiniJavaBlockType, string> = {
   mj_expr_new_int_array: '#6ee7b7',
   mj_expr_new_object: '#f0abfc',
   mj_expr_not: '#f43f5e',
-  mj_expr_parens: '#cbd5e1'
+  mj_expr_parens: '#cbd5e1',
+  mj_viz_description: '#64748b'
 };
 
 const LIGHT_BLOCK_COLOURS: Record<MiniJavaBlockType, string> = {
@@ -104,7 +105,8 @@ const LIGHT_BLOCK_COLOURS: Record<MiniJavaBlockType, string> = {
   mj_expr_new_int_array: '#059669',
   mj_expr_new_object: '#a21caf',
   mj_expr_not: '#be123c',
-  mj_expr_parens: '#475569'
+  mj_expr_parens: '#475569',
+  mj_viz_description: '#64748b'
 };
 
 function miniJavaBlockStyles(mode: 'dark' | 'light'): Record<string, Blockly.Theme.BlockStyle> {

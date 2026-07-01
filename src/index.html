@@ -83,6 +83,9 @@
               <button id="zoom-indicator" class="zoom-pill" type="button" title="Reset Blockly zoom to 100%" aria-label="Current Blockly zoom level">
                 <span class="icon icon-search" aria-hidden="true"></span><span id="zoom-size">100%</span>
               </button>
+              <button id="toggle-viz-dock" class="icon-button" type="button" aria-label="Toggle visualization panel" title="Program Visualization" aria-pressed="false">
+                <span class="icon icon-viz" aria-hidden="true"></span>
+              </button>
               <button id="show-code-button" class="icon-button visibility-toggle workspace-reveal-button" type="button" aria-label="Show MiniJava code" title="Show MiniJava">
                 <span class="eye-symbol" aria-hidden="true"></span>
               </button>
@@ -135,6 +138,33 @@
           </div>
         </aside>
       </main>
+
+      <section id="viz-dock" class="viz-dock" aria-label="Program visualization" data-open="false">
+        <div id="viz-resizer" class="viz-resizer" role="separator" aria-orientation="horizontal" tabindex="0" aria-label="Resize visualization panel" title="Drag to resize"></div>
+        <div class="viz-dock-panel panel-card">
+          <div class="viz-dock-header">
+            <div class="viz-dock-tabs" role="tablist" aria-label="Visualization views">
+              <button class="viz-tab" data-kind="structure" role="tab" type="button" aria-selected="false" title="Call-by-Structure">
+                <span class="viz-tab-icon" aria-hidden="true">S</span><span class="viz-tab-label">Call-by-Structure</span>
+              </button>
+              <button class="viz-tab" data-kind="value" role="tab" type="button" aria-selected="false" title="Call-by-Value">
+                <span class="viz-tab-icon" aria-hidden="true">V</span><span class="viz-tab-label">Call-by-Value</span>
+              </button>
+            </div>
+            <div id="viz-dock-info" class="viz-dock-info" aria-live="polite"></div>
+            <div class="viz-dock-tools" aria-label="Visualization tools">
+              <button id="viz-rerun" class="icon-button" type="button" title="Re-run" aria-label="Re-run visualization"><span class="icon icon-restore" aria-hidden="true"></span></button>
+              <button id="viz-arrange" class="icon-button" type="button" title="Arrange by evaluation steps" aria-label="Arrange"><span class="icon icon-arrange" aria-hidden="true"></span></button>
+              <button id="viz-collapse" class="icon-button" type="button" title="Hide visualization" aria-label="Hide visualization panel"><span class="icon icon-collapse" aria-hidden="true"></span></button>
+            </div>
+          </div>
+          <div class="viz-dock-body">
+            <div class="viz-host" data-kind="structure"></div>
+            <div class="viz-host" data-kind="value"></div>
+            <div id="viz-empty" class="viz-empty">No visualization selected.</div>
+          </div>
+        </div>
+      </section>
 
     </div>
 

@@ -50,7 +50,8 @@ export const MINI_JAVA_BLOCK_TYPES = [
   'mj_expr_new_int_array',
   'mj_expr_new_object',
   'mj_expr_not',
-  'mj_expr_parens'
+  'mj_expr_parens',
+  'mj_viz_description'
 ] as const;
 
 export type MiniJavaBlockType = typeof MINI_JAVA_BLOCK_TYPES[number];
@@ -540,6 +541,14 @@ export function defineMiniJavaBlocks(): void {
       output: 'Expression',
       style: miniJavaBlockStyle('mj_expr_parens'),
       tooltip: 'Expression ::= ( Expression )',
+      helpUrl: ''
+    },
+    {
+      type: 'mj_viz_description',
+      message0: '%1',
+      args0: [{ type: 'field_input', name: 'TEXT', text: 'Reduction step' }],
+      style: miniJavaBlockStyle('mj_viz_description'),
+      tooltip: 'Reduction visualization label',
       helpUrl: ''
     }
   ]);

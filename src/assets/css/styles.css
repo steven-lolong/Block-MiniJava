@@ -169,6 +169,11 @@ button {
   flex-wrap: wrap;
 }
 
+.examples-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
 .menu-button,
 .icon-button,
 .zoom-pill,
@@ -210,6 +215,7 @@ button {
 .icon-button:focus-visible,
 .zoom-pill:focus-visible,
 .theme-switch:focus-within,
+.examples-item:focus-visible,
 .toolbox-block-button:focus-visible,
 .toolbox-category-header:focus-visible,
 .code-resizer:focus-visible,
@@ -218,6 +224,74 @@ button {
 .viz-tab:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--aquamarine) 55%, transparent);
   outline-offset: 2px;
+}
+
+.examples-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  min-width: 220px;
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--panel);
+  box-shadow: var(--shadow-panel);
+  z-index: 50;
+  padding: 7px 0;
+}
+
+.examples-panel.examples-open {
+  display: block;
+}
+
+.examples-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px 5px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.examples-group-icon,
+.examples-item-icon {
+  flex: none;
+  font-size: 0.78rem;
+  font-weight: 860;
+}
+
+.examples-item {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  padding: 8px 15px;
+  text-align: left;
+  transition: background var(--transition), color var(--transition);
+}
+
+.examples-item:hover,
+.examples-item:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.examples-item-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.84rem;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .icon,
@@ -238,6 +312,7 @@ button {
 .icon-folder::before { content: "□"; }
 .icon-export::before { content: "⇩"; }
 .icon-restore::before { content: "↺"; }
+.icon-examples::before { content: "◇"; }
 .icon-info::before { content: "i"; font-weight: 900; }
 .icon-sun::before { content: "☼"; }
 .icon-moon::before { content: "◐"; }
@@ -1099,6 +1174,16 @@ body.code-hidden .code-column {
   .theme-switch {
     width: 100%;
     justify-content: center;
+  }
+
+  .examples-menu-wrapper {
+    display: flex;
+    width: 100%;
+  }
+
+  .examples-panel {
+    right: 0;
+    left: auto;
   }
 
   .ide-layout,

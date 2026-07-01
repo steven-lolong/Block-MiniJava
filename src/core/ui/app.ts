@@ -6,6 +6,8 @@ import { BLOCKLY_RENDERER, createBlocklyTheme } from '../renderer/theme';
 import { registerMiniJavaRenderer } from '../renderer/minijavaRenderer';
 import { registerMiniJavaContextMenus } from './contextMenus';
 import { disposeVizWorkspaces, initVisualizationPanel, setVizOpen } from './visualizationPanel';
+import { initExamplesMenu } from './examplesMenu';
+import type { MiniJavaExample } from '../examples';
 
 const AUTOSAVE_KEY = 'block-minijava.autosave.v2';
 const THEME_KEY = 'block-minijava.theme';
@@ -419,6 +421,16 @@ function copyCode(): void {
     });
 }
 
+function onExampleLoaded(example: MiniJavaExample): void {
+  if (!workspace) return;
+  ensureRequiredBlocks(workspace);
+  byId<HTMLDivElement>('loaded-file-label').textContent = `${example.label}.bml`;
+  scheduleAutosaveStatus(`Loaded ${example.label}`);
+  updateCode();
+  updateZoomIndicator();
+  saveAutosave();
+}
+
 function renderToolbox(): void {
   const root = byId<HTMLDivElement>('toolbox-content');
   root.innerHTML = '';
@@ -733,5 +745,9 @@ export function startBlockMiniJava(): void {
   initCodeResizer();
   initBlockly();
   initVisualizationPanel(syncBlocklySize);
+  initExamplesMenu(
+    () => workspace,
+    onExampleLoaded
+  );
   restartAutosaveTimer();
 }

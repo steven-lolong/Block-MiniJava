@@ -16,8 +16,10 @@ let suppressWorkspaceSyncUntil = 0;
 function getWorkspace(): Blockly.WorkspaceSvg | null {
   const maybeGetMainWorkspace = (Blockly as unknown as { getMainWorkspace?: () => Blockly.WorkspaceSvg }).getMainWorkspace;
   if (typeof maybeGetMainWorkspace === 'function') return maybeGetMainWorkspace.call(Blockly);
-  const workspaces = Blockly.common.getAllWorkspaces?.() ?? [];
-  return (workspaces.find((workspace) => workspace instanceof Blockly.WorkspaceSvg) as Blockly.WorkspaceSvg | undefined) ?? null;
+
+  const maybeCommon = Blockly.common as unknown as { getAllWorkspaces?: () => Blockly.Workspace[] };
+  const workspaces = maybeCommon.getAllWorkspaces?.() ?? [];
+  return (workspaces.find((candidate) => candidate instanceof Blockly.WorkspaceSvg) as Blockly.WorkspaceSvg | undefined) ?? null;
 }
 
 function setStatus(message: string, state: EditorStatus = 'idle'): void {

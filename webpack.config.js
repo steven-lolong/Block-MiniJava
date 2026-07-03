@@ -6,7 +6,7 @@ module.exports = {
   entry: path.resolve(__dirname, 'src/assets/js/block_minijava.ts'),
   output: {
     filename: 'block_minijava.js',
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, 'docs'),
     clean: true,
     publicPath: ''
   },
@@ -44,7 +44,7 @@ module.exports = {
   ],
   devServer: {
     static: {
-      directory: path.resolve(__dirname, 'dist')
+      directory: path.resolve(__dirname, 'docs')
     },
     hot: true,
     open: true

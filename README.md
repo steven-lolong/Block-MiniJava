@@ -9,7 +9,7 @@ src/
   assets/
     images/      logo, favicon, PWA icons
     css/         Ayu Mirage UI theme
-    js/          webpack entry: block_minijava.ts -> dist/block_minijava.js
+    js/          webpack entry: block_minijava.ts -> docs/block_minijava.js
   core/
     blocks/      MiniJava block module area
     generator/   MiniJava code-generation module area
@@ -40,7 +40,7 @@ npm run serve
 The webpack bundle is emitted as:
 
 ```text
-dist/block_minijava.js
+docs/block_minijava.js
 ```
 
 ## Logo

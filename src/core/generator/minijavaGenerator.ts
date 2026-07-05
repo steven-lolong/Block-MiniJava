@@ -29,6 +29,16 @@ function expr(block: Blockly.Block, inputName: string, fallback = '0'): string {
   return child ? generateBlock(child) : fallback;
 }
 
+// The head of a postfix expression (`x[i]`, `x.length`, `x.m()`). A bare `!`
+// child must be parenthesized or the text re-parses with `!` outermost:
+// `!x[0]` means `!(x[0])`, not `(!x)[0]`.
+function postfixHead(block: Blockly.Block, inputName: string, fallback: string): string {
+  const child = target(block, inputName);
+  if (!child) return fallback;
+  const code = generateBlock(child);
+  return child.type === 'mj_expr_not' ? `(${code})` : code;
+}
+
 function typeCode(block: Blockly.Block, inputName: string, fallback = 'int'): string {
   const child = target(block, inputName);
   return child ? generateBlock(child) : fallback;
@@ -152,9 +162,9 @@ const GEN: Record<string, GenFn> = {
   },
   mj_statement_if(block) {
     const cond = expr(block, 'COND', 'true');
-    const thenCode = stack(block, 'THEN', 1) || `${INDENT}{}`;
-    const elseCode = stack(block, 'ELSE', 1) || `${INDENT}{}`;
-    return `if (${cond}) {\n${thenCode}\n} else {\n${elseCode}\n}`;
+    const thenCode = stack(block, 'THEN', 1);
+    const elseCode = stack(block, 'ELSE', 1);
+    return `if (${cond}) {${thenCode ? `\n${thenCode}\n` : '\n'}} else {${elseCode ? `\n${elseCode}\n` : '\n'}}`;
   },
   mj_statement_while(block) {
     const cond = expr(block, 'COND', 'true');
@@ -187,13 +197,13 @@ const GEN: Record<string, GenFn> = {
     return `(${expr(block, 'LEFT', '0')} * ${expr(block, 'RIGHT', '0')})`;
   },
   mj_expr_array_lookup(block) {
-    return `${expr(block, 'ARRAY', 'array')}[${expr(block, 'INDEX', '0')}]`;
+    return `${postfixHead(block, 'ARRAY', 'array')}[${expr(block, 'INDEX', '0')}]`;
   },
   mj_expr_array_length(block) {
-    return `${expr(block, 'ARRAY', 'array')}.length`;
+    return `${postfixHead(block, 'ARRAY', 'array')}.length`;
   },
   mj_expr_method_call(block) {
-    return `${expr(block, 'OBJECT', 'this')}.${field(block, 'METHOD', 'method')}(${args(target(block, 'ARGS'))})`;
+    return `${postfixHead(block, 'OBJECT', 'this')}.${field(block, 'METHOD', 'method')}(${args(target(block, 'ARGS'))})`;
   },
   mj_argument_item(block) {
     return expr(block, 'EXPR', '0');

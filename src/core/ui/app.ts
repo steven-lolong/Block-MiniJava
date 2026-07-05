@@ -143,7 +143,20 @@ function currentCodeText(): string {
 }
 
 function isBlockWorkspaceMutation(event: { type: string }): boolean {
-  return BLOCK_WORKSPACE_MUTATION_EVENTS.has(event.type);
+  if (!BLOCK_WORKSPACE_MUTATION_EVENTS.has(event.type)) return false;
+  // A move only changes the program when a connection changes; dragging a
+  // block to a new position keeps the generated code identical, so skip the
+  // regeneration and required-block sweep entirely.
+  if (event.type === Blockly.Events.BLOCK_MOVE) {
+    const move = event as {
+      oldParentId?: string;
+      newParentId?: string;
+      oldInputName?: string;
+      newInputName?: string;
+    };
+    return move.oldParentId !== move.newParentId || move.oldInputName !== move.newInputName;
+  }
+  return true;
 }
 
 function lockRequiredBlock(block: Blockly.Block): void {

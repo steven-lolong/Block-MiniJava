@@ -40,6 +40,10 @@ const CASES = [
   ['and less chain', inMain('b = x < y && y < z && b;')],
   ['not and parens', inMain('b = !(x < y) && !b;')],
   ['parens around identifier', inMain('x = (y);')],
+  ['not under array lookup', inMain('b = (!x)[0];')],
+  ['not under array length', inMain('x = (!a).length;')],
+  ['not under method call', inMain('x = (!o).run(1);')],
+  ['double not', inMain('b = !!b;')],
   ['true false this', inMain('b = true;\nc = false;\nt = this;')],
   ['negative integer literal', inMain('x = -5;\ny = x * -3;')],
   ['big integer', inMain('x = 1000000;')],
@@ -217,6 +221,29 @@ function fail(name, message, detail) {
   if (detail) console.log(detail.split('\n').map((line) => `      ${line}`).join('\n'));
 }
 
+/**
+ * Canonical form for structural comparison: sorted keys, positions dropped.
+ * Both states come from the parser, so identical programs must be identical
+ * structures — this catches bugs where the regenerated text is string-stable
+ * but reshapes the blocks (e.g. `!x[0]` flipping lookup(not(x)) to not(lookup(x))).
+ */
+function canonical(value) {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const key of Object.keys(value).sort()) {
+      if (key === 'x' || key === 'y') continue;
+      out[key] = canonical(value[key]);
+    }
+    return out;
+  }
+  return value;
+}
+
+function structure(state) {
+  return JSON.stringify(canonical(state.blocks.blocks));
+}
+
 /** Run fn while capturing Blockly's console warnings; they signal bad states. */
 function withCapturedWarnings(fn) {
   const warnings = [];
@@ -240,8 +267,9 @@ for (const [name, source] of CASES) {
       const unregistered = findUnregisteredType(state1);
       if (unregistered) throw new Error(`parser produced unregistered block type '${unregistered}'`);
       const first = stateToCode(state1);
-      const second = stateToCode(parseMiniJavaTextToWorkspaceState(first.code));
-      return { first, second };
+      const state2 = parseMiniJavaTextToWorkspaceState(first.code);
+      const second = stateToCode(state2);
+      return { first, second, state1, state2 };
     });
 
     if (warnings.length > 0) {
@@ -253,6 +281,14 @@ for (const [name, source] of CASES) {
         name,
         'regenerated MiniJava is not stable',
         `--- first ---\n${result.first.code}\n--- second ---\n${result.second.code}`
+      );
+      continue;
+    }
+    if (structure(result.state2) !== structure(result.state1)) {
+      fail(
+        name,
+        'text -> blocks -> text -> blocks changed the block structure',
+        `--- generated ---\n${result.first.code}`
       );
       continue;
     }

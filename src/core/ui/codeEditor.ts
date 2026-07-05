@@ -26,9 +26,11 @@ export type EditableMiniJavaCodeEditor = {
 
 let editor: HTMLTextAreaElement | null = null;
 let highlight: HTMLElement | null = null;
+let highlightView: HTMLElement | null = null;
 let status: HTMLElement | null = null;
 let parseTimer: number | null = null;
 let suppressWorkspaceSyncUntil = 0;
+let highlightDirty = false;
 
 function setStatus(message: string, state: EditorStatus = 'idle'): void {
   if (!status) return;
@@ -48,10 +50,42 @@ function syncHighlightScroll(): void {
   highlight.style.transform = `translate(${-editor.scrollLeft}px, ${-editor.scrollTop}px)`;
 }
 
-function renderHighlight(): void {
+// The highlight layer must wrap at exactly the textarea's content width, so
+// mirror the space a (non-overlay) scrollbar takes out of the textarea.
+function syncHighlightMetrics(): void {
+  if (!editor || !highlightView) return;
+  const scrollbarWidth = editor.offsetWidth - editor.clientWidth;
+  highlightView.style.right = scrollbarWidth > 0 ? `${scrollbarWidth}px` : '0px';
+}
+
+function renderHighlight(force = false): void {
   if (!editor || !highlight) return;
-  highlight.innerHTML = highlightMiniJava(editor.value) || '&nbsp;';
+  // While the editor is focused it renders its own plain text and covers the
+  // highlight layer entirely, so defer the rebuild until it loses focus.
+  if (!force && document.activeElement === editor) {
+    highlightDirty = true;
+    return;
+  }
+  const code = editor.value;
+  // A trailing newline needs a placeholder or the highlight drops the empty
+  // last line the textarea still shows.
+  highlight.innerHTML = highlightMiniJava(code.endsWith('\n') ? `${code} ` : code) || '&nbsp;';
+  highlightDirty = false;
+  syncHighlightMetrics();
   syncHighlightScroll();
+}
+
+// When typing at the very end of the document, the browser's minimal
+// auto-scroll leaves the caret line partially clipped at the pane edge.
+// Pin the view to the bottom so the line being edited stays fully visible.
+function keepEndOfTextVisible(): void {
+  if (!editor) return;
+  if (editor.selectionStart !== editor.value.length || editor.selectionEnd !== editor.value.length) return;
+  const maxScroll = editor.scrollHeight - editor.clientHeight;
+  if (maxScroll > 0 && editor.scrollTop < maxScroll) {
+    editor.scrollTop = maxScroll;
+    syncHighlightScroll();
+  }
 }
 
 function syncEditorFromWorkspace(
@@ -65,18 +99,45 @@ function syncEditorFromWorkspace(
   // mutation may be unrelated (block drag, required-block enforcement)
   // and would otherwise wipe an in-progress edit.
   if (document.activeElement === editor) return;
-  editor.value = code;
-  renderHighlight();
+  // Keep the user's wording when it still describes the same blocks —
+  // replacing it would drop their comments and formatting.
+  if (!editorTextMatchesCode(editor.value, code)) {
+    editor.value = code;
+    renderHighlight();
+  }
   setStatus(message, 'idle');
+}
+
+// Structural signature of the current workspace, obtained by re-parsing its
+// own generated code so both sides of a comparison normalize identically.
+function workspaceStructureSignature(workspace: Blockly.WorkspaceSvg): string | null {
+  try {
+    return JSON.stringify(parseMiniJavaTextToWorkspaceState(generateMiniJava(workspace)));
+  } catch {
+    return null;
+  }
+}
+
+// True when the editor text parses to the same block structure as the
+// canonical code, i.e. it differs only in comments, whitespace, or
+// formatting. Such text must never be replaced — that would silently
+// delete the characters the user last typed.
+function editorTextMatchesCode(currentText: string, code: string): boolean {
+  if (currentText === code) return true;
+  try {
+    return JSON.stringify(parseMiniJavaTextToWorkspaceState(currentText))
+      === JSON.stringify(parseMiniJavaTextToWorkspaceState(code));
+  } catch {
+    return false;
+  }
 }
 
 function importEditorTextToWorkspace(
   workspace: Blockly.WorkspaceSvg,
-  source: string,
+  state: ReturnType<typeof parseMiniJavaTextToWorkspaceState>,
   label: string,
   options: MiniJavaCodeEditorOptions
 ): number {
-  const state = parseMiniJavaTextToWorkspaceState(source);
   const topBlockCount = state.blocks.blocks.length;
 
   suppressWorkspaceSyncUntil = Date.now() + 1500;
@@ -93,7 +154,8 @@ function importEditorTextToWorkspace(
 function applyEditorTextToWorkspace(
   workspace: Blockly.WorkspaceSvg,
   options: MiniJavaCodeEditorOptions,
-  label = 'minijava-text.java'
+  label = 'minijava-text.java',
+  allowSkipWhenUnchanged = true
 ): void {
   if (!editor) return;
   const source = editor.value.trim();
@@ -104,7 +166,16 @@ function applyEditorTextToWorkspace(
   }
 
   try {
-    const topBlockCount = importEditorTextToWorkspace(workspace, source, label, options);
+    const state = parseMiniJavaTextToWorkspaceState(source);
+
+    // Whitespace, comment, or formatting edits parse to the same structure;
+    // skip the rebuild to keep block ids, undo history, and layout intact.
+    if (allowSkipWhenUnchanged && JSON.stringify(state) === workspaceStructureSignature(workspace)) {
+      setStatus('MiniJava code already matches the blocks.', 'ok');
+      return;
+    }
+
+    const topBlockCount = importEditorTextToWorkspace(workspace, state, label, options);
     const blockLabel = topBlockCount === 1 ? 'top-level block' : 'top-level blocks';
     setStatus(`Converted MiniJava text to ${topBlockCount} ${blockLabel}.`, 'ok');
   } catch (error) {
@@ -117,6 +188,7 @@ function applyEditorTextToWorkspace(
 function scheduleEditorImport(workspace: Blockly.WorkspaceSvg, options: MiniJavaCodeEditorOptions): void {
   if (parseTimer !== null) window.clearTimeout(parseTimer);
   renderHighlight();
+  keepEndOfTextVisible();
   setStatus(hasMiniJavaSource(editor?.value ?? '') ? 'Parsing MiniJava...' : '', 'idle');
   parseTimer = window.setTimeout(() => {
     parseTimer = null;
@@ -147,6 +219,7 @@ function createEditorDom(): boolean {
   const codeView = generatedCode?.closest<HTMLPreElement>('.code-view');
   const panel = document.getElementById('panel-code');
   if (!generatedCode || !codeView || !panel) return false;
+  highlightView = codeView;
 
   const pane = document.createElement('div');
   pane.className = 'code-editor-pane';
@@ -186,6 +259,19 @@ export function installEditableMiniJavaCodeEditor(
   editor.addEventListener('input', () => scheduleEditorImport(workspace, options));
   editor.addEventListener('scroll', syncHighlightScroll);
   editor.addEventListener('keydown', (event) => handleEditorKeydown(workspace, options, event));
+  // Returning to read mode: rebuild the highlight for whatever was typed.
+  editor.addEventListener('blur', () => {
+    if (highlightDirty) renderHighlight(true);
+    else syncHighlightScroll();
+  });
+
+  // Panel resizes change the wrap width and can add/remove the scrollbar.
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(() => {
+      syncHighlightMetrics();
+      syncHighlightScroll();
+    }).observe(editor);
+  }
 
   const loadInput = document.getElementById('load-file-input');
   if (loadInput instanceof HTMLInputElement) {
@@ -203,7 +289,9 @@ export function installEditableMiniJavaCodeEditor(
       if (!editor) return;
       editor.value = source;
       renderHighlight();
-      applyEditorTextToWorkspace(workspace, options, label);
+      // A file load must always import, so the file label and autosave update
+      // even when the program matches the current blocks.
+      applyEditorTextToWorkspace(workspace, options, label, false);
     }
   };
 

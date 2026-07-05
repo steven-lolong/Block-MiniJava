@@ -38,6 +38,9 @@ body[data-theme="dark"] {
   --token-identifier: #eee6dc;
   --token-operator: #8ac7ff;
   --token-comment: #82948e;
+  --token-builtin: #d9b8f5;
+  --token-method: #a8d1ff;
+  --token-punctuation: #9aa8a3;
 }
 
 body[data-theme="light"] {
@@ -67,6 +70,9 @@ body[data-theme="light"] {
   --token-identifier: #2b2926;
   --token-operator: #236c9d;
   --token-comment: #7b756e;
+  --token-builtin: #7d4bb0;
+  --token-method: #1a5fa8;
+  --token-punctuation: #8b8177;
 }
 
 * { box-sizing: border-box; }
@@ -884,8 +890,10 @@ body.code-hidden .code-column {
 .tok-type { color: var(--token-type); font-weight: 800; }
 .tok-number { color: var(--token-number); }
 .tok-identifier { color: var(--token-identifier); }
-.tok-operator,
-.tok-punctuation { color: var(--token-operator); font-weight: 760; }
+.tok-builtin { color: var(--token-builtin); font-weight: 780; }
+.tok-method { color: var(--token-method); }
+.tok-operator { color: var(--token-operator); font-weight: 760; }
+.tok-punctuation { color: var(--token-punctuation); }
 .tok-comment { color: var(--token-comment); font-style: italic; }
 
 .about-modal {

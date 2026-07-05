@@ -1,4 +1,5 @@
 import * as Blockly from 'blockly';
+import { MINI_JAVA_RESERVED_WORDS } from '../parser/minijavaTextParser';
 
 export type ToolboxBlock = {
   type: string;
@@ -142,6 +143,8 @@ const textValidator = (fallback: string) => (value: string | null): string => {
   const clean = (value ?? '').trim().replace(/[^A-Za-z0-9_]/g, '');
   if (!clean) return fallback;
   if (/^[0-9]/.test(clean)) return `${fallback}${clean}`;
+  // Reserved words would make the generated MiniJava unparseable.
+  if (MINI_JAVA_RESERVED_WORDS.has(clean)) return fallback;
   return clean;
 };
 

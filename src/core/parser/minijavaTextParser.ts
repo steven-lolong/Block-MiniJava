@@ -58,8 +58,7 @@ type MiniJavaExpressionAst =
   | { kind: 'this' }
   | { kind: 'newIntArray'; size: MiniJavaExpressionAst }
   | { kind: 'newObject'; className: string }
-  | { kind: 'not'; expr: MiniJavaExpressionAst }
-  | { kind: 'parens'; expr: MiniJavaExpressionAst };
+  | { kind: 'not'; expr: MiniJavaExpressionAst };
 
 export type MiniJavaBlockState = {
   type: string;
@@ -96,6 +95,15 @@ const KEYWORDS = new Set([
   'int', 'boolean', 'if', 'else', 'while', 'true', 'false', 'this', 'new'
 ]);
 
+// Words that can never be used as identifiers; block name fields validate
+// against this so every block program stays convertible to text and back.
+export const MINI_JAVA_RESERVED_WORDS: ReadonlySet<string> = KEYWORDS;
+
+const WHITESPACE_PATTERN = /\s/;
+const IDENTIFIER_START_PATTERN = /[A-Za-z_]/;
+const IDENTIFIER_PART_PATTERN = /[A-Za-z0-9_]/;
+const DIGIT_PATTERN = /\d/;
+
 export class MiniJavaTextParseError extends Error {
   constructor(message: string, readonly index: number) {
     super(message);
@@ -116,7 +124,7 @@ function tokenize(source: string): Token[] {
   while (index < source.length) {
     const char = source[index];
 
-    if (/\s/.test(char)) {
+    if (WHITESPACE_PATTERN.test(char)) {
       index += 1;
       continue;
     }
@@ -136,19 +144,19 @@ function tokenize(source: string): Token[] {
       continue;
     }
 
-    if (/[A-Za-z_]/.test(char)) {
+    if (IDENTIFIER_START_PATTERN.test(char)) {
       const start = index;
       index += 1;
-      while (index < source.length && /[A-Za-z0-9_]/.test(source[index])) index += 1;
+      while (index < source.length && IDENTIFIER_PART_PATTERN.test(source[index])) index += 1;
       const value = source.slice(start, index);
       tokens.push({ kind: KEYWORDS.has(value) ? 'keyword' : 'identifier', value, index: start });
       continue;
     }
 
-    if (/\d/.test(char)) {
+    if (DIGIT_PATTERN.test(char)) {
       const start = index;
       index += 1;
-      while (index < source.length && /\d/.test(source[index])) index += 1;
+      while (index < source.length && DIGIT_PATTERN.test(source[index])) index += 1;
       tokens.push({ kind: 'number', value: source.slice(start, index), index: start });
       continue;
     }
@@ -517,10 +525,12 @@ class Parser {
     }
 
     if (this.consume('(')) {
+      // Parentheses are purely syntactic: the block structure carries the
+      // grouping, so redundant parens (including the generator's own
+      // parenthesization) always normalize away on import.
       const expr = this.parseExpression();
       this.expectValue(')', 'Expected ")" after parenthesized expression.');
-      if (expr.kind === 'binary') return expr;
-      return { kind: 'parens', expr };
+      return expr;
     }
 
     if (token.kind === 'identifier') {
@@ -690,11 +700,6 @@ function expressionState(expression: MiniJavaExpressionAst): MiniJavaBlockState 
       return { type: 'mj_expr_new_object', fields: { CLASS: expression.className } };
     case 'not': {
       const state: MiniJavaBlockState = { type: 'mj_expr_not' };
-      setInput(state, 'EXPR', expressionState(expression.expr));
-      return state;
-    }
-    case 'parens': {
-      const state: MiniJavaBlockState = { type: 'mj_expr_parens' };
       setInput(state, 'EXPR', expressionState(expression.expr));
       return state;
     }

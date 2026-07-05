@@ -11,5 +11,5 @@
     "resolveJsonModule": true,
     "outDir": "docs"
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }

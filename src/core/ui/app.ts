@@ -8,6 +8,7 @@ import { registerMiniJavaContextMenus } from './contextMenus';
 import { disposeVizWorkspaces, initVisualizationPanel, setVizOpen } from './visualizationPanel';
 import { initExamplesMenu } from './examplesMenu';
 import type { MiniJavaExample } from '../examples';
+import { installEditableMiniJavaCodeEditor, type EditableMiniJavaCodeEditor } from './codeEditor';
 
 const AUTOSAVE_KEY = 'block-minijava.autosave.v2';
 const THEME_KEY = 'block-minijava.theme';
@@ -15,6 +16,7 @@ const AUTOSAVE_INTERVAL_KEY = 'block-minijava.autosave.interval';
 const CODE_WIDTH_KEY = 'block-minijava.code.width';
 
 let workspace: Blockly.WorkspaceSvg | null = null;
+let codeEditor: EditableMiniJavaCodeEditor | null = null;
 let autosaveTimer: number | null = null;
 let requiredBlockTimer: number | null = null;
 let latestCode = '';
@@ -26,6 +28,13 @@ let enforcingRequiredBlocks = false;
 
 const TOOLBOX_BLOCK_MIME = 'application/x-block-minijava-block';
 const [GOAL_BLOCK_TYPE, MAIN_BLOCK_TYPE] = MINI_JAVA_REQUIRED_BLOCK_TYPES;
+const BLOCK_WORKSPACE_MUTATION_EVENTS = new Set<string>([
+  Blockly.Events.BLOCK_CREATE,
+  Blockly.Events.BLOCK_DELETE,
+  Blockly.Events.BLOCK_CHANGE,
+  Blockly.Events.BLOCK_FIELD_INTERMEDIATE_CHANGE,
+  Blockly.Events.BLOCK_MOVE
+]);
 type InspectorPanel = 'code' | 'output';
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -122,7 +131,19 @@ function updateZoomIndicator(): void {
 function updateCode(): void {
   if (!workspace) return;
   latestCode = generateMiniJava(workspace);
-  byId<HTMLElement>('generated-code').innerHTML = highlightMiniJava(latestCode);
+  if (codeEditor) {
+    codeEditor.syncFromWorkspace(latestCode);
+  } else {
+    byId<HTMLElement>('generated-code').innerHTML = highlightMiniJava(latestCode);
+  }
+}
+
+function currentCodeText(): string {
+  return codeEditor?.currentText() ?? latestCode;
+}
+
+function isBlockWorkspaceMutation(event: { type: string }): boolean {
+  return BLOCK_WORKSPACE_MUTATION_EVENTS.has(event.type);
 }
 
 function lockRequiredBlock(block: Blockly.Block): void {
@@ -361,7 +382,7 @@ function exportGeneratedCode(): void {
   if (requestedName === null) return;
 
   const fileName = normalizeJavaFileName(requestedName);
-  const blob = new Blob([latestCode], { type: 'text/x-java-source;charset=utf-8' });
+  const blob = new Blob([currentCodeText()], { type: 'text/x-java-source;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -375,6 +396,20 @@ function exportGeneratedCode(): void {
   selectInspectorPanel('output');
 }
 
+
+function loadJavaSourceFile(file: File): void {
+  file.text()
+    .then((source) => {
+      if (!codeEditor) throw new Error('Editable code editor is not ready');
+      selectInspectorPanel('code');
+      setCodeHidden(false);
+      codeEditor.loadText(source, file.name);
+    })
+    .catch((error) => {
+      console.error(error);
+      scheduleAutosaveStatus(`Could not load ${file.name}`);
+    });
+}
 
 function loadWorkspaceFile(file: File): void {
   if (!workspace) return;
@@ -410,10 +445,10 @@ function newWorkspace(): void {
 
 function copyCode(): void {
   navigator.clipboard
-    .writeText(latestCode)
+    .writeText(currentCodeText())
     .then(() => {
       scheduleAutosaveStatus('Code copied');
-      appendConsoleOutput('Generated MiniJava copied to clipboard.');
+      appendConsoleOutput('MiniJava code copied to clipboard.');
     })
     .catch(() => {
       scheduleAutosaveStatus('Copy failed');
@@ -645,6 +680,8 @@ function initBlockly(): void {
       updateZoomIndicator();
       return;
     }
+    if (!isBlockWorkspaceMutation(event)) return;
+
     scheduleRequiredBlockEnforcement();
     updateCode();
   });
@@ -652,6 +689,26 @@ function initBlockly(): void {
   updateCode();
   updateZoomIndicator();
   window.setTimeout(syncBlocklySize, 100);
+}
+
+function installCodeEditor(): void {
+  if (!workspace) return;
+
+  codeEditor = installEditableMiniJavaCodeEditor(workspace, {
+    onBeforeImport: () => setVizOpen(false),
+    onImported: ({ label }) => {
+      if (!workspace) return;
+      ensureRequiredBlocks(workspace);
+      byId<HTMLDivElement>('loaded-file-label').textContent = label;
+      updateCode();
+      updateZoomIndicator();
+      saveAutosave();
+      scheduleAutosaveStatus('Code imported to blocks');
+    },
+    onImportError: () => {
+      scheduleAutosaveStatus('Code import needs valid MiniJava');
+    }
+  });
 }
 
 
@@ -678,7 +735,8 @@ function wireEvents(): void {
   byId<HTMLInputElement>('load-file-input').addEventListener('change', (event) => {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
-    if (file) loadWorkspaceFile(file);
+    if (file && /\.(java|txt)$/i.test(file.name)) loadJavaSourceFile(file);
+    else if (file) loadWorkspaceFile(file);
     input.value = '';
   });
   byId<HTMLButtonElement>('load-autosave').addEventListener('click', loadAutosave);
@@ -744,6 +802,7 @@ export function startBlockMiniJava(): void {
   initToolboxDragAndDrop();
   initCodeResizer();
   initBlockly();
+  installCodeEditor();
   initVisualizationPanel(syncBlocklySize);
   initExamplesMenu(
     () => workspace,

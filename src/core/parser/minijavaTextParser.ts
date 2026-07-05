@@ -38,8 +38,8 @@ type MiniJavaMethodAst = {
 
 type MiniJavaStatementAst =
   | { kind: 'block'; statements: MiniJavaStatementAst[] }
-  | { kind: 'if'; cond: MiniJavaExpressionAst; thenStatement: MiniJavaStatementAst; elseStatement: MiniJavaStatementAst }
-  | { kind: 'while'; cond: MiniJavaExpressionAst; body: MiniJavaStatementAst }
+  | { kind: 'if'; cond: MiniJavaExpressionAst; thenStatements: MiniJavaStatementAst[]; elseStatements: MiniJavaStatementAst[] }
+  | { kind: 'while'; cond: MiniJavaExpressionAst; bodyStatements: MiniJavaStatementAst[] }
   | { kind: 'print'; value: MiniJavaExpressionAst }
   | { kind: 'assign'; name: string; value: MiniJavaExpressionAst }
   | { kind: 'arrayAssign'; name: string; index: MiniJavaExpressionAst; value: MiniJavaExpressionAst };
@@ -87,10 +87,13 @@ type Token = {
   index: number;
 };
 
+// Structurally reserved words only. `main`, `String`, `System`, `out`,
+// `println` and `length` stay ordinary identifiers (they are valid Java
+// names and the generator can emit them); the parser matches them by value
+// in the few positions where they are meaningful.
 const KEYWORDS = new Set([
-  'class', 'public', 'static', 'void', 'main', 'String', 'extends', 'return',
-  'int', 'boolean', 'if', 'else', 'while', 'true', 'false', 'this', 'new',
-  'System', 'out', 'println', 'length'
+  'class', 'public', 'static', 'void', 'extends', 'return',
+  'int', 'boolean', 'if', 'else', 'while', 'true', 'false', 'this', 'new'
 ]);
 
 export class MiniJavaTextParseError extends Error {
@@ -121,6 +124,15 @@ function tokenize(source: string): Token[] {
     if (char === '/' && source[index + 1] === '/') {
       index += 2;
       while (index < source.length && source[index] !== '\n') index += 1;
+      continue;
+    }
+
+    if (char === '/' && source[index + 1] === '*') {
+      const start = index;
+      index += 2;
+      while (index < source.length && !(source[index] === '*' && source[index + 1] === '/')) index += 1;
+      if (index >= source.length) throw new MiniJavaTextParseError('Unterminated block comment.', start);
+      index += 2;
       continue;
     }
 
@@ -333,31 +345,27 @@ class Parser {
   }
 
   private parseStatement(): MiniJavaStatementAst {
-    if (this.consume('{')) {
-      const statements: MiniJavaStatementAst[] = [];
-      while (!this.matches('}')) statements.push(this.parseStatement());
-      this.expectValue('}', 'Expected "}" after block statement.');
-      return { kind: 'block', statements };
-    }
+    if (this.matches('{')) return { kind: 'block', statements: this.parseBracedStatements('Expected "}" after block statement.') };
 
     if (this.consume('if')) {
       this.expectValue('(', 'Expected "(" after if.');
       const cond = this.parseExpression();
       this.expectValue(')', 'Expected ")" after if condition.');
-      const thenStatement = this.parseStatement();
+      const thenStatements = this.parseBranchStatements();
       this.expectValue('else', 'Expected else branch.');
-      const elseStatement = this.parseStatement();
-      return { kind: 'if', cond, thenStatement, elseStatement };
+      const elseStatements = this.parseBranchStatements();
+      return { kind: 'if', cond, thenStatements, elseStatements };
     }
 
     if (this.consume('while')) {
       this.expectValue('(', 'Expected "(" after while.');
       const cond = this.parseExpression();
       this.expectValue(')', 'Expected ")" after while condition.');
-      return { kind: 'while', cond, body: this.parseStatement() };
+      return { kind: 'while', cond, bodyStatements: this.parseBranchStatements() };
     }
 
-    if (this.consume('System')) {
+    if (this.matches('System') && this.peek().value === '.') {
+      this.advance();
       this.expectValue('.', 'Expected "." after System.');
       this.expectValue('out', 'Expected "out" in System.out.println.');
       this.expectValue('.', 'Expected "." after System.out.');
@@ -383,6 +391,19 @@ class Parser {
     const value = this.parseExpression();
     this.expectValue(';', 'Expected ";" after assignment.');
     return { kind: 'assign', name, value };
+  }
+
+  private parseBracedStatements(closeMessage: string): MiniJavaStatementAst[] {
+    this.expectValue('{', 'Expected "{" before statement block.');
+    const statements: MiniJavaStatementAst[] = [];
+    while (!this.matches('}')) statements.push(this.parseStatement());
+    this.expectValue('}', closeMessage);
+    return statements;
+  }
+
+  private parseBranchStatements(): MiniJavaStatementAst[] {
+    if (this.matches('{')) return this.parseBracedStatements('Expected "}" after branch body.');
+    return [this.parseStatement()];
   }
 
   private parseExpression(): MiniJavaExpressionAst {
@@ -439,7 +460,9 @@ class Parser {
       }
 
       if (this.consume('.')) {
-        if (this.consume('length')) {
+        // `.length` is array length unless it is called like a method.
+        if (this.matches('length') && this.peek().value !== '(') {
+          this.advance();
           expression = { kind: 'arrayLength', array: expression };
           continue;
         }
@@ -468,6 +491,13 @@ class Parser {
       return { kind: 'integer', value: Number(token.value) };
     }
 
+    // The integer-literal block accepts negative values, so the generated
+    // text can contain them even though MiniJava has no unary minus.
+    if (token.value === '-' && this.peek().kind === 'number') {
+      this.advance();
+      return { kind: 'integer', value: -Number(this.advance().value) };
+    }
+
     if (this.consume('true')) return { kind: 'true' };
     if (this.consume('false')) return { kind: 'false' };
     if (this.consume('this')) return { kind: 'this' };
@@ -489,6 +519,7 @@ class Parser {
     if (this.consume('(')) {
       const expr = this.parseExpression();
       this.expectValue(')', 'Expected ")" after parenthesized expression.');
+      if (expr.kind === 'binary') return expr;
       return { kind: 'parens', expr };
     }
 
@@ -573,14 +604,14 @@ function statementState(statement: MiniJavaStatementAst): MiniJavaBlockState {
     case 'if': {
       const state: MiniJavaBlockState = { type: 'mj_statement_if' };
       setInput(state, 'COND', expressionState(statement.cond));
-      setInput(state, 'THEN', statementState(statement.thenStatement));
-      setInput(state, 'ELSE', statementState(statement.elseStatement));
+      setInput(state, 'THEN', sequence(statement.thenStatements.map(statementState)));
+      setInput(state, 'ELSE', sequence(statement.elseStatements.map(statementState)));
       return state;
     }
     case 'while': {
       const state: MiniJavaBlockState = { type: 'mj_statement_while' };
       setInput(state, 'COND', expressionState(statement.cond));
-      setInput(state, 'BODY', statementState(statement.body));
+      setInput(state, 'BODY', sequence(statement.bodyStatements.map(statementState)));
       return state;
     }
     case 'print': {

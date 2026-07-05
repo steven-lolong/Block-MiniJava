@@ -7,7 +7,10 @@
     "build": "webpack --mode=production",
     "serve": "webpack serve --mode=development --open",
     "dev": "webpack serve --mode=development",
-    "clean": "rimraf docs"
+    "clean": "rimraf docs",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:roundtrip",
+    "test:roundtrip": "webpack --config webpack.test.config.js && node test/run_roundtrip.js"
   },
   "dependencies": {
     "blockly": "^12.3.1"

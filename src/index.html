@@ -26,7 +26,7 @@
           <button id="save-workspace" class="menu-button" type="button" title="Save workspace">
             <span class="icon icon-save" aria-hidden="true"></span><span class="menu-label">Save</span>
           </button>
-          <button id="load-workspace" class="menu-button" type="button" title="Load .bml workspace">
+          <button id="load-workspace" class="menu-button" type="button" title="Load .bml workspace or MiniJava source">
             <span class="icon icon-folder" aria-hidden="true"></span><span class="menu-label">Load</span>
           </button>
           <button id="export-code" class="menu-button" type="button" title="Export generated Java">
@@ -55,7 +55,7 @@
           <span class="icon icon-menu" aria-hidden="true"></span><span class="menu-label">Menu</span>
         </button>
 
-        <input id="load-file-input" type="file" accept=".bml,.json,application/json" hidden />
+        <input id="load-file-input" type="file" accept=".bml,.json,.java,.txt,application/json,text/x-java-source,text/plain" hidden />
       </header>
 
       <main class="ide-layout" aria-label="Block MiniJava IDE">

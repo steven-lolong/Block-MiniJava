@@ -17,20 +17,27 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
   margin: 0;
   padding: 18px;
   font: 0.9rem/1.5rem var(--font-code);
+  letter-spacing: 0;
   tab-size: 2;
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .code-editor-pane .code-view {
   overflow: hidden;
+  opacity: 0;
   pointer-events: none;
 }
 
 .code-editor-pane .grammar-highlight {
-  min-width: max-content;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .code-editor-input {
@@ -39,16 +46,25 @@
   outline: 0;
   resize: none;
   overflow: auto;
-  background: transparent;
-  color: transparent;
+  background-color: var(--code-bg);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(1.5rem - 1px),
+    var(--code-line) calc(1.5rem - 1px),
+    var(--code-line) 1.5rem
+  );
+  background-origin: content-box;
+  background-attachment: local;
+  color: var(--text);
   caret-color: var(--text);
-  -webkit-text-fill-color: transparent;
+  -webkit-text-fill-color: currentColor;
   scrollbar-color: var(--border-strong) transparent;
 }
 
 .code-editor-input::selection {
   background: color-mix(in srgb, var(--aquamarine) 32%, transparent);
-  color: transparent;
+  color: var(--text);
 }
 
 .code-editor-input:focus {

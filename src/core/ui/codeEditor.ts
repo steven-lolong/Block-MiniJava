@@ -7,36 +7,34 @@ const TEXT_IMPORT_DELAY_MS = 650;
 
 type EditorStatus = 'idle' | 'ok' | 'error';
 
+export type MiniJavaCodeImportDetail = {
+  label: string;
+  topBlockCount: number;
+};
+
+export type MiniJavaCodeEditorOptions = {
+  onBeforeImport?: () => void;
+  onImported?: (detail: MiniJavaCodeImportDetail) => void;
+  onImportError?: (message: string) => void;
+};
+
+export type EditableMiniJavaCodeEditor = {
+  syncFromWorkspace: (code?: string, message?: string) => void;
+  currentText: () => string;
+  loadText: (source: string, label?: string) => void;
+};
+
 let editor: HTMLTextAreaElement | null = null;
 let highlight: HTMLElement | null = null;
 let status: HTMLElement | null = null;
 let parseTimer: number | null = null;
 let suppressWorkspaceSyncUntil = 0;
 
-function getWorkspace(): Blockly.WorkspaceSvg | null {
-  const maybeGetMainWorkspace = (Blockly as unknown as { getMainWorkspace?: () => Blockly.WorkspaceSvg }).getMainWorkspace;
-  if (typeof maybeGetMainWorkspace === 'function') return maybeGetMainWorkspace.call(Blockly);
-
-  const maybeCommon = Blockly.common as unknown as { getAllWorkspaces?: () => Blockly.Workspace[] };
-  const workspaces = maybeCommon.getAllWorkspaces?.() ?? [];
-  return (workspaces.find((candidate) => candidate instanceof Blockly.WorkspaceSvg) as Blockly.WorkspaceSvg | undefined) ?? null;
-}
-
 function setStatus(message: string, state: EditorStatus = 'idle'): void {
   if (!status) return;
   status.textContent = message;
   if (state === 'idle') status.removeAttribute('data-state');
   else status.dataset.state = state;
-}
-
-function setAutosaveStatus(message: string): void {
-  const autosaveStatus = document.getElementById('autosave-status');
-  if (autosaveStatus) autosaveStatus.textContent = message;
-}
-
-function setLoadedFileLabel(label: string): void {
-  const loadedFileLabel = document.getElementById('loaded-file-label');
-  if (loadedFileLabel) loadedFileLabel.textContent = label;
 }
 
 function hasMiniJavaSource(text: string): boolean {
@@ -56,32 +54,47 @@ function renderHighlight(): void {
   syncHighlightScroll();
 }
 
-function syncEditorFromWorkspace(message = 'MiniJava code is synchronized with the workspace.'): void {
-  const workspace = getWorkspace();
+function syncEditorFromWorkspace(
+  workspace: Blockly.WorkspaceSvg,
+  code = generateMiniJava(workspace),
+  message = 'MiniJava code is synchronized with the workspace.'
+): void {
   if (!workspace || !editor) return;
-  editor.value = generateMiniJava(workspace);
+  if (Date.now() < suppressWorkspaceSyncUntil) return;
+  // Never replace the text while the user is editing it; the workspace
+  // mutation may be unrelated (block drag, required-block enforcement)
+  // and would otherwise wipe an in-progress edit.
+  if (document.activeElement === editor) return;
+  editor.value = code;
   renderHighlight();
   setStatus(message, 'idle');
 }
 
-function importEditorTextToWorkspace(source: string, label = 'minijava-text.java'): number {
-  const workspace = getWorkspace();
-  if (!workspace) throw new MiniJavaTextParseError('Blockly workspace is not ready.', 0);
-
+function importEditorTextToWorkspace(
+  workspace: Blockly.WorkspaceSvg,
+  source: string,
+  label: string,
+  options: MiniJavaCodeEditorOptions
+): number {
   const state = parseMiniJavaTextToWorkspaceState(source);
   const topBlockCount = state.blocks.blocks.length;
 
   suppressWorkspaceSyncUntil = Date.now() + 1500;
+  options.onBeforeImport?.();
   workspace.clear();
   Blockly.serialization.workspaces.load(state as unknown as Record<string, unknown>, workspace);
   workspace.cleanUp();
-  setLoadedFileLabel(label);
   renderHighlight();
+  options.onImported?.({ label, topBlockCount });
 
   return topBlockCount;
 }
 
-function applyEditorTextToWorkspace(label?: string): void {
+function applyEditorTextToWorkspace(
+  workspace: Blockly.WorkspaceSvg,
+  options: MiniJavaCodeEditorOptions,
+  label = 'minijava-text.java'
+): void {
   if (!editor) return;
   const source = editor.value.trim();
 
@@ -91,28 +104,31 @@ function applyEditorTextToWorkspace(label?: string): void {
   }
 
   try {
-    const topBlockCount = importEditorTextToWorkspace(source, label);
+    const topBlockCount = importEditorTextToWorkspace(workspace, source, label, options);
     const blockLabel = topBlockCount === 1 ? 'top-level block' : 'top-level blocks';
     setStatus(`Converted MiniJava text to ${topBlockCount} ${blockLabel}.`, 'ok');
-    setAutosaveStatus('Code imported to blocks');
   } catch (error) {
     const message = error instanceof MiniJavaTextParseError ? error.message : 'Could not parse MiniJava text.';
     setStatus(message, 'error');
-    setAutosaveStatus('Code import needs valid MiniJava');
+    options.onImportError?.(message);
   }
 }
 
-function scheduleEditorImport(): void {
+function scheduleEditorImport(workspace: Blockly.WorkspaceSvg, options: MiniJavaCodeEditorOptions): void {
   if (parseTimer !== null) window.clearTimeout(parseTimer);
   renderHighlight();
   setStatus(hasMiniJavaSource(editor?.value ?? '') ? 'Parsing MiniJava...' : '', 'idle');
   parseTimer = window.setTimeout(() => {
     parseTimer = null;
-    applyEditorTextToWorkspace('minijava-text.java');
+    applyEditorTextToWorkspace(workspace, options);
   }, TEXT_IMPORT_DELAY_MS);
 }
 
-function handleEditorKeydown(event: KeyboardEvent): void {
+function handleEditorKeydown(
+  workspace: Blockly.WorkspaceSvg,
+  options: MiniJavaCodeEditorOptions,
+  event: KeyboardEvent
+): void {
   if (!editor || event.key !== 'Tab') return;
 
   event.preventDefault();
@@ -121,36 +137,12 @@ function handleEditorKeydown(event: KeyboardEvent): void {
   editor.value = `${editor.value.slice(0, start)}  ${editor.value.slice(end)}`;
   editor.selectionStart = start + 2;
   editor.selectionEnd = start + 2;
-  scheduleEditorImport();
-}
-
-function installJavaFileImport(input: HTMLInputElement): void {
-  input.accept = '.bml,.json,.java,application/json,text/x-java-source,text/plain';
-  input.addEventListener('change', (event) => {
-    const file = input.files?.[0];
-    if (!file || !/\.(java|txt)$/i.test(file.name)) return;
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-
-    file.text()
-      .then((source) => {
-        if (!editor) return;
-        editor.value = source;
-        renderHighlight();
-        applyEditorTextToWorkspace(file.name);
-      })
-      .catch((error) => {
-        console.error(error);
-        setStatus(`Could not read ${file.name}.`, 'error');
-      })
-      .finally(() => {
-        input.value = '';
-      });
-  }, true);
+  scheduleEditorImport(workspace, options);
 }
 
 function createEditorDom(): boolean {
+  if (editor && highlight && status) return true;
+
   const generatedCode = document.getElementById('generated-code');
   const codeView = generatedCode?.closest<HTMLPreElement>('.code-view');
   const panel = document.getElementById('panel-code');
@@ -167,6 +159,9 @@ function createEditorDom(): boolean {
   editor.id = 'generated-code-editor';
   editor.className = 'code-editor-input';
   editor.spellcheck = false;
+  editor.wrap = 'soft';
+  editor.autocomplete = 'off';
+  editor.setAttribute('autocapitalize', 'off');
   editor.setAttribute('aria-label', 'Editable MiniJava code');
   pane.appendChild(editor);
 
@@ -179,29 +174,39 @@ function createEditorDom(): boolean {
   status.textContent = 'MiniJava code is synchronized with the workspace.';
   panel.appendChild(status);
 
-  editor.addEventListener('input', scheduleEditorImport);
-  editor.addEventListener('scroll', syncHighlightScroll);
-  editor.addEventListener('keydown', handleEditorKeydown);
-
   return true;
 }
 
-export function installEditableMiniJavaCodeEditor(): void {
-  if (!createEditorDom() || !editor) return;
+export function installEditableMiniJavaCodeEditor(
+  workspace: Blockly.WorkspaceSvg,
+  options: MiniJavaCodeEditorOptions = {}
+): EditableMiniJavaCodeEditor | null {
+  if (!createEditorDom() || !editor) return null;
 
-  const workspace = getWorkspace();
-  if (workspace) {
-    workspace.addChangeListener((event) => {
-      if (event.type === Blockly.Events.VIEWPORT_CHANGE) return;
-      if (Date.now() < suppressWorkspaceSyncUntil) return;
-      window.setTimeout(() => {
-        if (Date.now() >= suppressWorkspaceSyncUntil) syncEditorFromWorkspace();
-      }, 0);
-    });
-  }
+  editor.addEventListener('input', () => scheduleEditorImport(workspace, options));
+  editor.addEventListener('scroll', syncHighlightScroll);
+  editor.addEventListener('keydown', (event) => handleEditorKeydown(workspace, options, event));
 
   const loadInput = document.getElementById('load-file-input');
-  if (loadInput instanceof HTMLInputElement) installJavaFileImport(loadInput);
+  if (loadInput instanceof HTMLInputElement) {
+    loadInput.accept = '.bml,.json,.java,.txt,application/json,text/x-java-source,text/plain';
+  }
 
-  syncEditorFromWorkspace();
+  const controller: EditableMiniJavaCodeEditor = {
+    syncFromWorkspace: (code, message) => syncEditorFromWorkspace(workspace, code, message),
+    currentText: () => editor?.value ?? '',
+    loadText: (source, label = 'minijava-text.java') => {
+      if (parseTimer !== null) {
+        window.clearTimeout(parseTimer);
+        parseTimer = null;
+      }
+      if (!editor) return;
+      editor.value = source;
+      renderHighlight();
+      applyEditorTextToWorkspace(workspace, options, label);
+    }
+  };
+
+  controller.syncFromWorkspace();
+  return controller;
 }

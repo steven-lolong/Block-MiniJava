@@ -1499,6 +1499,25 @@ body[data-theme="light"] .stepper-ref {
   }
 }
 
+/* -- Rewrite (substitution) view -------------------------------------------- */
+
+.subst-workspace {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.subst-workspace .injectionDiv {
+  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+}
+
+.subst-correspondence {
+  color: var(--aquamarine);
+  font-size: 0.76rem;
+  font-weight: 720;
+  white-space: nowrap;
+}
+
 /* -- A vs B lockstep view -------------------------------------------------- */
 
 .compare-columns {

@@ -73,6 +73,21 @@ export function runSource(source: string, maxSteps = 100000, model: ValueModel =
   });
 }
 
+/** Ordered rule trace of a full run — for operational-correspondence checks. */
+export function traceSource(source: string, model: ValueModel = 'A', maxSteps = 100000): { rules: string[]; output: string[]; status: string } {
+  return withWorkspace(source, (workspace) => {
+    const initial = injectMachine(workspace, model);
+    if ('injectError' in initial) throw new Error(initial.injectError);
+    let state = initial;
+    const rules: string[] = [];
+    while (state.status === 'running' && state.stepCount < maxSteps) {
+      state = step(state);
+      if (state.lastRule) rules.push(state.lastRule);
+    }
+    return { rules, output: state.output, status: state.status };
+  });
+}
+
 /** Runs after emptying one input socket, to exercise incomplete programs. */
 export function runSourceWithEmptiedInput(
   source: string,

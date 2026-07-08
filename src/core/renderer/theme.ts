@@ -67,6 +67,8 @@ const DARK_BLOCK_COLOURS: Record<MiniJavaBlockType, string> = {
   mj_expr_new_object: '#f0abfc',
   mj_expr_not: '#f43f5e',
   mj_expr_parens: '#cbd5e1',
+  mj_value_object: '#79ead7',
+  mj_value_null: '#94a3b8',
   mj_viz_description: '#64748b'
 };
 
@@ -106,6 +108,8 @@ const LIGHT_BLOCK_COLOURS: Record<MiniJavaBlockType, string> = {
   mj_expr_new_object: '#a21caf',
   mj_expr_not: '#be123c',
   mj_expr_parens: '#475569',
+  mj_value_object: '#0b6f66',
+  mj_value_null: '#64748b',
   mj_viz_description: '#64748b'
 };
 

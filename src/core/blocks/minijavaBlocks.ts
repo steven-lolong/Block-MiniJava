@@ -52,6 +52,8 @@ export const MINI_JAVA_BLOCK_TYPES = [
   'mj_expr_new_object',
   'mj_expr_not',
   'mj_expr_parens',
+  'mj_value_object',
+  'mj_value_null',
   'mj_viz_description'
 ] as const;
 
@@ -547,6 +549,14 @@ export function defineMiniJavaBlocks(): void {
       helpUrl: ''
     },
     {
+      type: 'mj_value_null',
+      message0: 'null',
+      output: 'Expression',
+      style: miniJavaBlockStyle('mj_value_null'),
+      tooltip: 'Structural null value (display only)',
+      helpUrl: ''
+    },
+    {
       type: 'mj_viz_description',
       message0: '%1',
       args0: [{ type: 'field_input', name: 'TEXT', text: 'Reduction step' }],
@@ -555,6 +565,38 @@ export function defineMiniJavaBlocks(): void {
       helpUrl: ''
     }
   ]);
+
+  // Structural object value (Model B display block): `C { f: [v] ... }`.
+  // Its field inputs depend on the class, so it is defined imperatively and
+  // shaped by extraState — it never appears in the toolbox or in programs.
+  Blockly.Blocks['mj_value_object'] = {
+    init(this: Blockly.Block & { fieldNames?: string[]; classNameValue?: string }) {
+      this.setOutput(true, 'Expression');
+      this.setStyle(miniJavaBlockStyle('mj_value_object'));
+      this.setInputsInline(true);
+      this.setTooltip('Structural object value (Model B, display only)');
+      this.appendDummyInput('HEAD').appendField('Object', 'CLASS').appendField('{');
+      this.fieldNames = [];
+      this.classNameValue = 'Object';
+    },
+    saveExtraState(this: Blockly.Block & { fieldNames?: string[]; classNameValue?: string }) {
+      return { className: this.classNameValue ?? 'Object', fields: this.fieldNames ?? [] };
+    },
+    loadExtraState(
+      this: Blockly.Block & { fieldNames?: string[]; classNameValue?: string },
+      state: { className: string; fields: string[] }
+    ) {
+      this.classNameValue = state.className;
+      this.fieldNames = state.fields;
+      this.setFieldValue(state.className, 'CLASS');
+      for (const fieldName of state.fields) {
+        if (!this.getInput(`F_${fieldName}`)) {
+          this.appendValueInput(`F_${fieldName}`).setCheck('Expression').appendField(`${fieldName}:`);
+        }
+      }
+      if (!this.getInput('TAIL')) this.appendDummyInput('TAIL').appendField('}');
+    }
+  };
 
   // Validators must be attached after JSON definition.
   const blockTypesWithIdentifierFields = [

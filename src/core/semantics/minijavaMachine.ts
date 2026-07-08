@@ -469,12 +469,12 @@ function beginExpression(state: MachineState, block: Blockly.Block): MachineStat
       return state;
     case 'mj_expr_not':
       frame.kont.push({ tag: 'KNot' });
-      state.lastRule = 'not';
+      state.lastRule = 'not-operand';
       focusExpr(state, inputTarget(block, 'EXPR'), `'!' has no operand`);
       return state;
     case 'mj_expr_and':
       frame.kont.push({ tag: 'KAnd', rightBlock: inputTarget(block, 'RIGHT') });
-      state.lastRule = 'and';
+      state.lastRule = 'and-left';
       focusExpr(state, inputTarget(block, 'LEFT'), `'&&' has no left operand`);
       return state;
     case 'mj_expr_plus':

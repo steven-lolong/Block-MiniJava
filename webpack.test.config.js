@@ -8,7 +8,8 @@ module.exports = {
   entry: {
     roundtrip: path.resolve(__dirname, 'test/roundtrip.entry.ts'),
     typecheck: path.resolve(__dirname, 'test/typecheck.entry.ts'),
-    machine: path.resolve(__dirname, 'test/machine.entry.ts')
+    machine: path.resolve(__dirname, 'test/machine.entry.ts'),
+    subst: path.resolve(__dirname, 'test/subst.entry.ts')
   },
   output: {
     filename: '[name].bundle.js',

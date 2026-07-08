@@ -166,6 +166,9 @@
               <button class="viz-tab" data-kind="compare" role="tab" type="button" aria-selected="false" title="Step the same program under Model A and Model B in lockstep">
                 <span class="viz-tab-icon" aria-hidden="true">⇄</span><span class="viz-tab-label">A vs B</span>
               </button>
+              <button class="viz-tab" data-kind="subst" role="tab" type="button" aria-selected="false" title="Rewrite the println expression step by step (substitution semantics)">
+                <span class="viz-tab-icon" aria-hidden="true">β</span><span class="viz-tab-label">Rewrite</span>
+              </button>
             </div>
             <div id="viz-dock-info" class="viz-dock-info" aria-live="polite"></div>
             <div class="viz-dock-tools" aria-label="Visualization tools">
@@ -236,6 +239,19 @@
                     </div>
                   </section>
                 </div>
+              </div>
+            </div>
+            <div class="viz-host viz-host-machine" data-kind="subst">
+              <div class="stepper-layout">
+                <div class="stepper-controls" aria-label="Rewrite stepper controls">
+                  <button id="subst-load" class="stepper-button is-primary" type="button" title="Build the rewrite tree from the current blocks">⟲ Load</button>
+                  <button id="subst-back" class="stepper-button" type="button" title="Undo one rewrite">◂ Back</button>
+                  <button id="subst-step" class="stepper-button" type="button" title="One rewrite step">Step ▸</button>
+                  <button id="subst-play" class="stepper-button" type="button" title="Rewrite automatically">⏵ Play</button>
+                  <span id="subst-correspondence" class="subst-correspondence" aria-live="polite"></span>
+                  <span id="subst-status" class="stepper-status" aria-live="polite"></span>
+                </div>
+                <div id="subst-workspace" class="subst-workspace" aria-label="Rewrite tree"></div>
               </div>
             </div>
             <div id="viz-empty" class="viz-empty">No visualization selected.</div>

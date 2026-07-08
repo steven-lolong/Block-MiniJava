@@ -10,16 +10,18 @@ import {
 import type { ReductionKind } from '../semantics/minijavaRuntime';
 import { resetStepperFromDock, setStepperTabVisible } from './stepperPanel';
 import { resetCompareFromDock, setCompareTabVisible } from './comparePanel';
+import { disposeSubstWorkspace, resetSubstFromDock, setSubstTabVisible } from './substPanel';
 
-export type VizKind = ReductionKind | 'machine' | 'compare';
+export type VizKind = ReductionKind | 'machine' | 'compare' | 'subst';
 
 const KINDS: ReductionKind[] = ['structure', 'value'];
-const ALL_KINDS: VizKind[] = ['structure', 'value', 'machine', 'compare'];
+const ALL_KINDS: VizKind[] = ['structure', 'value', 'machine', 'compare', 'subst'];
 const TITLE: Record<VizKind, string> = {
   structure: 'Call-by-Structure',
   value: 'Call-by-Value',
   machine: 'Stepper · Model A (frames & heap)',
-  compare: 'A vs B · one program, two value models, lockstep'
+  compare: 'A vs B · one program, two value models, lockstep',
+  subst: 'Rewrite · substitution semantics (Model B, pure fragment)'
 };
 
 function isWorkspaceKind(kind: VizKind): kind is ReductionKind {
@@ -110,6 +112,7 @@ function setActive(kind: VizKind): void {
   byId<HTMLDivElement>('viz-empty').hidden = isWorkspaceKind(kind) ? !!views[kind].block : true;
   setStepperTabVisible(kind === 'machine');
   setCompareTabVisible(kind === 'compare');
+  setSubstTabVisible(kind === 'subst');
   updateInfo();
   resizeActive(0);
 }
@@ -163,6 +166,7 @@ export function disposeVizWorkspaces(): void {
     }
     hostOf(kind).innerHTML = '';
   }
+  disposeSubstWorkspace();
   if (reopen && isWorkspaceKind(active)) renderView(active);
 }
 
@@ -208,7 +212,8 @@ export function initVisualizationPanel(layoutChange: () => void): void {
   byId<HTMLButtonElement>('viz-rerun').addEventListener('click', () => {
     if (!isWorkspaceKind(active)) {
       if (active === 'machine') resetStepperFromDock();
-      else resetCompareFromDock();
+      else if (active === 'compare') resetCompareFromDock();
+      else resetSubstFromDock();
       return;
     }
     renderView(active);

@@ -152,19 +152,19 @@ export function defineMiniJavaBlocks(): void {
   Blockly.common.defineBlocksWithJsonArray([
     {
       type: 'mj_goal',
-      message0: 'Goal %1 MainClass %2 ClassDeclaration* %3',
+      message0: 'Program %1 Main Class %2 Class %3',
       args0: [
         { type: 'input_dummy' },
         { type: 'input_value', name: 'MAIN', check: 'MainClass' },
         { type: 'input_statement', name: 'CLASSES', check: 'ClassDeclaration' }
       ],
       style: miniJavaBlockStyle('mj_goal'),
-      tooltip: 'Goal ::= MainClass ClassDeclaration* EOF',
+      tooltip: 'Goal ::= MainClass Class Declaration* EOF',
       helpUrl: ''
     },
     {
       type: 'mj_main_class',
-      message0: 'class %1 main argument %2 %3 %4',
+      message0: 'class %1 method main, argument %2 %3 %4',
       args0: [
         { type: 'field_input', name: 'CLASS', text: 'Main' },
         { type: 'field_input', name: 'ARG', text: 'args' },
@@ -222,7 +222,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_method_declaration',
-      message0: 'public %1 %2 ( params %3 ) %4 vars %5 body %6 return %7',
+      message0: 'public %1 %2 params %3 %4 vars %5 body %6 return %7',
       args0: [
         { type: 'input_value', name: 'TYPE', check: 'Type' },
         { type: 'field_input', name: 'NAME', text: 'method' },
@@ -286,7 +286,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_statement_block',
-      message0: '{ statements %1 }',
+      message0: 'Statements %1',
       args0: [{ type: 'input_statement', name: 'STATEMENTS', check: 'Statement' }],
       previousStatement: 'Statement',
       nextStatement: 'Statement',
@@ -296,7 +296,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_statement_if',
-      message0: 'if ( %1 ) then %2 else %3',
+      message0: 'if %1 then %2 else %3',
       args0: [
         { type: 'input_value', name: 'COND', check: 'Expression' },
         { type: 'input_statement', name: 'THEN', check: 'Statement' },
@@ -310,7 +310,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_statement_while',
-      message0: 'while ( %1 ) %2',
+      message0: 'while %1 %2',
       args0: [
         { type: 'input_value', name: 'COND', check: 'Expression' },
         { type: 'input_statement', name: 'BODY', check: 'Statement' }
@@ -323,7 +323,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_statement_print',
-      message0: 'System.out.println ( %1 )',
+      message0: 'System.out.println %1',
       args0: [{ type: 'input_value', name: 'VALUE', check: 'Expression' }],
       previousStatement: 'Statement',
       nextStatement: 'Statement',
@@ -346,7 +346,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_statement_array_assign',
-      message0: '%1 [ %2 ] = %3',
+      message0: '%1 %2 = %3',
       args0: [
         { type: 'field_input', name: 'NAME', text: 'array' },
         { type: 'input_value', name: 'INDEX', check: 'Expression' },

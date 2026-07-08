@@ -9,6 +9,7 @@ import { disposeVizWorkspaces, initVisualizationPanel, setVizOpen } from './visu
 import { initExamplesMenu } from './examplesMenu';
 import type { MiniJavaExample } from '../examples';
 import { installEditableMiniJavaCodeEditor, type EditableMiniJavaCodeEditor } from './codeEditor';
+import { refreshTypeDiagnostics } from './typeDiagnostics';
 
 const AUTOSAVE_KEY = 'block-minijava.autosave.v2';
 const THEME_KEY = 'block-minijava.theme';
@@ -19,6 +20,7 @@ let workspace: Blockly.WorkspaceSvg | null = null;
 let codeEditor: EditableMiniJavaCodeEditor | null = null;
 let autosaveTimer: number | null = null;
 let requiredBlockTimer: number | null = null;
+let typeCheckTimer: number | null = null;
 let latestCode = '';
 let codeHidden = false;
 let toolboxHidden = false;
@@ -35,7 +37,7 @@ const BLOCK_WORKSPACE_MUTATION_EVENTS = new Set<string>([
   Blockly.Events.BLOCK_FIELD_INTERMEDIATE_CHANGE,
   Blockly.Events.BLOCK_MOVE
 ]);
-type InspectorPanel = 'code' | 'output';
+type InspectorPanel = 'code' | 'output' | 'problems';
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -136,6 +138,15 @@ function updateCode(): void {
   } else {
     byId<HTMLElement>('generated-code').innerHTML = highlightMiniJava(latestCode);
   }
+  scheduleTypeCheck();
+}
+
+function scheduleTypeCheck(): void {
+  if (typeCheckTimer !== null) window.clearTimeout(typeCheckTimer);
+  typeCheckTimer = window.setTimeout(() => {
+    typeCheckTimer = null;
+    if (workspace) refreshTypeDiagnostics(workspace);
+  }, 250);
 }
 
 function currentCodeText(): string {

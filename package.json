@@ -9,8 +9,10 @@
     "dev": "webpack serve --mode=development",
     "clean": "rimraf docs",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:roundtrip",
-    "test:roundtrip": "webpack --config webpack.test.config.js && node test/run_roundtrip.js"
+    "test": "npm run test:build && node test/run_roundtrip.js && node test/run_typecheck.js",
+    "test:build": "webpack --config webpack.test.config.js",
+    "test:roundtrip": "npm run test:build && node test/run_roundtrip.js",
+    "test:typecheck": "npm run test:build && node test/run_typecheck.js"
   },
   "dependencies": {
     "blockly": "^12.3.1"

@@ -132,11 +132,15 @@
           </div>
           <div class="inspector-tabs" role="tablist" aria-label="Inspector panels">
             <button id="tab-code" class="inspector-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-code" data-panel="code">Code</button>
+            <button id="tab-problems" class="inspector-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-problems" data-panel="problems">Problems<span id="problems-count" class="problems-count" hidden>0</span></button>
             <button id="tab-output" class="inspector-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-output" data-panel="output">Output</button>
           </div>
           <div class="inspector-body">
             <section id="panel-code" class="inspector-panel is-active" role="tabpanel" aria-labelledby="tab-code">
               <pre class="code-view" aria-label="Generated code"><code id="generated-code" class="grammar-highlight"></code></pre>
+            </section>
+            <section id="panel-problems" class="inspector-panel" role="tabpanel" aria-labelledby="tab-problems">
+              <div id="problems-list" class="problems-list" aria-live="polite"></div>
             </section>
             <section id="panel-output" class="inspector-panel" role="tabpanel" aria-labelledby="tab-output">
               <pre id="program-output" class="console-view" aria-live="polite">No run yet.</pre>

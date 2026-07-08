@@ -1,13 +1,16 @@
 const path = require('path');
 
-/** Node-target bundle of the parser + generator for the headless round-trip tests. */
+/** Node-target bundles of the parser, generator and type checker for the headless tests. */
 module.exports = {
   mode: 'development',
   target: 'node',
   devtool: false,
-  entry: path.resolve(__dirname, 'test/roundtrip.entry.ts'),
+  entry: {
+    roundtrip: path.resolve(__dirname, 'test/roundtrip.entry.ts'),
+    typecheck: path.resolve(__dirname, 'test/typecheck.entry.ts')
+  },
   output: {
-    filename: 'roundtrip.bundle.js',
+    filename: '[name].bundle.js',
     path: path.resolve(__dirname, 'test/dist'),
     library: { type: 'commonjs2' },
     clean: true

@@ -1499,8 +1499,54 @@ body[data-theme="light"] .stepper-ref {
   }
 }
 
+/* -- A vs B lockstep view -------------------------------------------------- */
+
+.compare-columns {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.compare-subhead {
+  margin: 10px 0 4px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 820;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.compare-subhead:first-of-type {
+  margin-top: 6px;
+}
+
+.compare-model-status {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 720;
+}
+
+.compare-model-status[data-state="error"] {
+  color: var(--danger);
+}
+
+.compare-model-status[data-state="done"] {
+  color: var(--aquamarine);
+}
+
+.stepper-struct {
+  color: var(--aquamarine-strong);
+  font-weight: 720;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 920px) {
-  .stepper-panels {
+  .stepper-panels,
+  .compare-columns {
     grid-template-columns: 1fr;
     overflow: auto;
   }

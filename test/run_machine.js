@@ -220,6 +220,125 @@ const CASES = [
   ]
 ];
 
+/** The §8 contrast program: rebind through a mutate-and-return-this method.
+ * Model A: x and y alias one heap object -> 41*100+41 = 4141.
+ * Model B: with() updates its own copy; y rebinds, x untouched -> 0*100+41 = 41. */
+const WITH_PROGRAM = [
+  inMain('System.out.println(new P().go());'),
+  'class P {',
+  '  public int go() {',
+  '    Cell x;',
+  '    Cell y;',
+  '    x = new Cell();',
+  '    y = x;',
+  '    y = y.with(41);',
+  '    return x.get() * 100 + y.get();',
+  '  }',
+  '}',
+  'class Cell {',
+  '  int f;',
+  '  public Cell with(int v) {',
+  '    f = v;',
+  '    return this;',
+  '  }',
+  '  public int get() { return f; }',
+  '}'
+].join('\n');
+
+/** Array passed to a method and written inside.
+ * Model A: the caller's array is mutated -> 9. Model B: only the callee's copy -> 0. */
+const POKE_PROGRAM = [
+  inMain('System.out.println(new C().go());'),
+  'class C {',
+  '  public int poke(int[] a) {',
+  '    a[0] = 9;',
+  '    return a[0];',
+  '  }',
+  '  public int go() {',
+  '    int[] a;',
+  '    int ignore;',
+  '    a = new int[2];',
+  '    ignore = this.poke(a);',
+  '    return a[0];',
+  '  }',
+  '}'
+].join('\n');
+
+/** [name, source, model, expectations] */
+const MODEL_CASES = [
+  ['contrast program under Model A: aliases observe the write', WITH_PROGRAM, 'A', { output: ['4141'], rulesInclude: ['field-write'] }],
+  [
+    'contrast program under Model B: rebind changes y, x stays put',
+    WITH_PROGRAM,
+    'B',
+    { output: ['41'], heapSize: 0, rulesInclude: ['field-update'], rulesExclude: ['field-write'] }
+  ],
+  ['array argument under Model A: callee write reaches the caller', POKE_PROGRAM, 'A', { output: ['9'] }],
+  [
+    'array argument under Model B: callee writes only its copy',
+    POKE_PROGRAM,
+    'B',
+    { output: ['0'], heapSize: 0, rulesInclude: ['array-update'], rulesExclude: ['array-write'] }
+  ],
+  [
+    'method mutation is invisible to the caller under Model B',
+    [
+      inMain('System.out.println(new P().go());'),
+      'class P {',
+      '  public int go() {',
+      '    Cell x;',
+      '    Cell y;',
+      '    int ignore;',
+      '    x = new Cell();',
+      '    y = x;',
+      '    ignore = y.set(41);',
+      '    return x.get() + y.get() + 1;',
+      '  }',
+      '}',
+      'class Cell {',
+      '  int f;',
+      '  public int set(int v) {',
+      '    f = v;',
+      '    return 0;',
+      '  }',
+      '  public int get() { return f; }',
+      '}'
+    ].join('\n'),
+    'B',
+    { output: ['1'], heapSize: 0 }
+  ],
+  [
+    'local array writes stay visible through the same variable under Model B',
+    [
+      inMain('System.out.println(new A().go());'),
+      'class A {',
+      '  public int go() {',
+      '    int[] a;',
+      '    a = new int[3];',
+      '    a[0] = 5;',
+      '    a[1] = a[0] + 2;',
+      '    return a[0] * 10 + a[1] + a.length;',
+      '  }',
+      '}'
+    ].join('\n'),
+    'B',
+    { output: ['60'], heapSize: 0 }
+  ],
+  ['pure programs agree: factorial under Model B', [
+    inMain('System.out.println(new Fac().ComputeFac(10));'),
+    'class Fac {',
+    '  public int ComputeFac(int num) {',
+    '    int num_aux;',
+    '    if (num < 1)',
+    '      num_aux = 1;',
+    '    else',
+    '      num_aux = num * (this.ComputeFac(num - 1));',
+    '    return num_aux;',
+    '  }',
+    '}'
+  ].join('\n'), 'B', { output: ['3628800'], heapSize: 0, maxStackDepth: 12 }]
+];
+
 let failures = 0;
 let passed = 0;
 
@@ -281,6 +400,11 @@ for (const [name, source, expect] of CASES) {
   runCase(name, expect, () => runSource(source));
 }
 
+console.log('\nModel A vs Model B:');
+for (const [name, source, model, expect] of MODEL_CASES) {
+  runCase(name, expect, () => runSource(source, undefined, model));
+}
+
 // Incomplete programs get stuck politely instead of crashing the machine.
 runCase(
   'empty println socket is a stuck state',
@@ -288,6 +412,6 @@ runCase(
   () => runSourceWithEmptiedInput(inMain('System.out.println(42);'), 'mj_statement_print', 'VALUE')
 );
 
-const total = CASES.length + 1;
+const total = CASES.length + MODEL_CASES.length + 1;
 console.log(`\n${passed}/${total} machine cases passed${failures ? `, ${failures} FAILED` : ''}`);
 process.exit(failures ? 1 : 0);

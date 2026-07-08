@@ -10,7 +10,7 @@
 import * as Blockly from 'blockly';
 import { defineMiniJavaBlocks } from '../src/core/blocks/minijavaBlocks';
 import { parseMiniJavaTextToWorkspaceState } from '../src/core/parser/minijavaTextParser';
-import { injectMachine, step, type MachineState } from '../src/core/semantics/minijavaMachine';
+import { injectMachine, step, type MachineState, type ValueModel } from '../src/core/semantics/minijavaMachine';
 
 defineMiniJavaBlocks();
 
@@ -65,9 +65,9 @@ function withWorkspace<T>(source: string, runFn: (workspace: Blockly.Workspace) 
   }
 }
 
-export function runSource(source: string, maxSteps = 100000): RunReport {
+export function runSource(source: string, maxSteps = 100000, model: ValueModel = 'A'): RunReport {
   return withWorkspace(source, (workspace) => {
-    const initial = injectMachine(workspace);
+    const initial = injectMachine(workspace, model);
     if ('injectError' in initial) throw new Error(initial.injectError);
     return runToEnd(initial, maxSteps);
   });

@@ -163,6 +163,9 @@
               <button class="viz-tab" data-kind="machine" role="tab" type="button" aria-selected="false" title="Step the program on the Model A machine (heap and frames)">
                 <span class="viz-tab-icon" aria-hidden="true">A</span><span class="viz-tab-label">Stepper</span>
               </button>
+              <button class="viz-tab" data-kind="compare" role="tab" type="button" aria-selected="false" title="Step the same program under Model A and Model B in lockstep">
+                <span class="viz-tab-icon" aria-hidden="true">⇄</span><span class="viz-tab-label">A vs B</span>
+              </button>
             </div>
             <div id="viz-dock-info" class="viz-dock-info" aria-live="polite"></div>
             <div class="viz-dock-tools" aria-label="Visualization tools">
@@ -196,6 +199,41 @@
                   <section class="stepper-panel" aria-label="Program output">
                     <h3>Output</h3>
                     <div class="stepper-panel-body"><pre id="stepper-output" class="stepper-output-pre"></pre></div>
+                  </section>
+                </div>
+              </div>
+            </div>
+            <div class="viz-host viz-host-machine" data-kind="compare">
+              <div class="stepper-layout">
+                <div class="stepper-controls" aria-label="Lockstep stepper controls">
+                  <button id="compare-load" class="stepper-button is-primary" type="button" title="Build both machines from the current blocks">⟲ Load</button>
+                  <button id="compare-back" class="stepper-button" type="button" title="Undo one lockstep step">◂ Back</button>
+                  <button id="compare-step" class="stepper-button" type="button" title="One step on both machines">Step ▸</button>
+                  <button id="compare-play" class="stepper-button" type="button" title="Step both automatically">⏵ Play</button>
+                  <span id="compare-status" class="stepper-status" aria-live="polite"></span>
+                </div>
+                <div class="compare-columns">
+                  <section class="stepper-panel compare-column" aria-label="Model A state">
+                    <h3>Model A · heap references</h3>
+                    <div class="stepper-panel-body">
+                      <div id="compare-status-a" class="compare-model-status"></div>
+                      <h4 class="compare-subhead">Call stack</h4>
+                      <div id="compare-frames-a"></div>
+                      <h4 class="compare-subhead">Heap</h4>
+                      <div id="compare-heap-a"></div>
+                      <h4 class="compare-subhead">Output</h4>
+                      <pre id="compare-output-a" class="stepper-output-pre"></pre>
+                    </div>
+                  </section>
+                  <section class="stepper-panel compare-column" aria-label="Model B state">
+                    <h3>Model B · structures</h3>
+                    <div class="stepper-panel-body">
+                      <div id="compare-status-b" class="compare-model-status"></div>
+                      <h4 class="compare-subhead">Call stack</h4>
+                      <div id="compare-frames-b"></div>
+                      <h4 class="compare-subhead">Output</h4>
+                      <pre id="compare-output-b" class="stepper-output-pre"></pre>
+                    </div>
                   </section>
                 </div>
               </div>

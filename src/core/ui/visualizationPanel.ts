@@ -9,15 +9,17 @@ import {
 } from '../semantics/minijavaReduction';
 import type { ReductionKind } from '../semantics/minijavaRuntime';
 import { resetStepperFromDock, setStepperTabVisible } from './stepperPanel';
+import { resetCompareFromDock, setCompareTabVisible } from './comparePanel';
 
-export type VizKind = ReductionKind | 'machine';
+export type VizKind = ReductionKind | 'machine' | 'compare';
 
 const KINDS: ReductionKind[] = ['structure', 'value'];
-const ALL_KINDS: VizKind[] = ['structure', 'value', 'machine'];
+const ALL_KINDS: VizKind[] = ['structure', 'value', 'machine', 'compare'];
 const TITLE: Record<VizKind, string> = {
   structure: 'Call-by-Structure',
   value: 'Call-by-Value',
-  machine: 'Stepper · Model A (frames & heap)'
+  machine: 'Stepper · Model A (frames & heap)',
+  compare: 'A vs B · one program, two value models, lockstep'
 };
 
 function isWorkspaceKind(kind: VizKind): kind is ReductionKind {
@@ -107,6 +109,7 @@ function setActive(kind: VizKind): void {
   }
   byId<HTMLDivElement>('viz-empty').hidden = isWorkspaceKind(kind) ? !!views[kind].block : true;
   setStepperTabVisible(kind === 'machine');
+  setCompareTabVisible(kind === 'compare');
   updateInfo();
   resizeActive(0);
 }
@@ -204,7 +207,8 @@ export function initVisualizationPanel(layoutChange: () => void): void {
   for (const kind of ALL_KINDS) tabOf(kind).addEventListener('click', () => setActive(kind));
   byId<HTMLButtonElement>('viz-rerun').addEventListener('click', () => {
     if (!isWorkspaceKind(active)) {
-      resetStepperFromDock();
+      if (active === 'machine') resetStepperFromDock();
+      else resetCompareFromDock();
       return;
     }
     renderView(active);

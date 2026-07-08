@@ -1,15 +1,25 @@
 /**
- * Vehicle 1 stepper: a small-step machine for faithful MiniJava (Value Model A).
+ * A small-step machine for block MiniJava, parameterized by value model.
  *
- * State = { control, stack, heap, output } per the design note (§6):
+ * Model A — faithful MiniJava (design note §6):
  *  - values are flat (Int/Bool/Null/Ref); objects and arrays live ONLY in the
  *    heap behind Locs, so sharing/aliasing exists at object granularity and
  *    nowhere else;
  *  - frames hold `this` (a Loc) and locals BY COPY; copying a Ref copies the
  *    arrow, not the box — that is Java's model and the point of the stepper;
- *  - field write mutates a heap cell, so every alias observes it;
- *  - method calls push a Frame (dynamic dispatch on the heap object's class);
- *    vanilla MiniJava has no closures, so there is no Closure value.
+ *  - field write mutates a heap cell, so every alias observes it.
+ *
+ * Model B — structure-preserving values (design note §3/§7):
+ *  - objects and arrays ARE values, held inline; there is no heap and no Ref;
+ *  - binding copies structure (implemented as sharing of immutable values —
+ *    Model B code NEVER mutates an Obj/Arr in place);
+ *  - a method receives `this` by structure; `f = e` functionally updates the
+ *    frame's own copy, so the caller's value never changes (call-by-structure);
+ *  - `a[i] = e` rebinds the variable to a NEW array value.
+ *
+ * Both models share one control flow (statements, expressions, frames,
+ * continuations), so two machines step in lockstep on the same program —
+ * the §8 side-by-side artifact.
  *
  * `step` is pure: it returns a fresh state (blocks are shared by reference),
  * which makes time-travel (Back) in the UI a plain history stack.
@@ -31,11 +41,17 @@ import type { Ty } from '../types/ty';
 
 export type Loc = number;
 
+export type ValueModel = 'A' | 'B';
+
 export type MachineValue =
   | { tag: 'Int'; n: number }
   | { tag: 'Bool'; b: boolean }
   | { tag: 'Null' }
-  | { tag: 'Ref'; loc: Loc };
+  | { tag: 'Ref'; loc: Loc } // Model A only: the arrow into the heap
+  | { tag: 'Obj'; className: string; fields: Map<string, MachineValue> } // Model B only: inline structure
+  | { tag: 'Arr'; elems: MachineValue[] }; // Model B only: inline structure
+
+export type ObjValue = Extract<MachineValue, { tag: 'Obj' }>;
 
 export type HeapObj =
   | { tag: 'Obj'; className: string; fields: Map<string, MachineValue>; blockId: string }
@@ -67,8 +83,10 @@ export type Kont =
 export interface Frame {
   /** Display label, e.g. `main` or `Fac.ComputeFac`. */
   method: string;
-  /** `this` — a Loc into the heap; null only in main. */
+  /** Model A: `this` — a Loc into the heap; null in main and under Model B. */
   self: Loc | null;
+  /** Model B: `this` — an inline structure; functional updates rebind it. */
+  selfObj: ObjValue | null;
   /** Params + locals, held by copy. */
   locals: Map<string, MachineValue>;
   kont: Kont[];
@@ -94,13 +112,16 @@ export type Effect =
   | { kind: 'field-write'; loc: Loc; field: string }
   | { kind: 'arr-write'; loc: Loc; index: number }
   | { kind: 'local-write'; name: string }
+  | { kind: 'self-write'; field: string } // Model B: functional update of this
   | { kind: 'push-frame' }
   | { kind: 'pop-frame' }
   | { kind: 'output' };
 
 export interface MachineState {
+  model: ValueModel;
   control: Control;
   stack: Frame[];
+  /** Model A only; stays empty under Model B (the "no store" invariant). */
   heap: Map<Loc, HeapObj>;
   output: string[];
   nextLoc: Loc;
@@ -120,7 +141,7 @@ export const BOOL_V = (b: boolean): MachineValue => ({ tag: 'Bool', b });
 export const NULL_V: MachineValue = { tag: 'Null' };
 export const REF_V = (loc: Loc): MachineValue => ({ tag: 'Ref', loc });
 
-export function formatMachineValue(value: MachineValue): string {
+export function formatMachineValue(value: MachineValue, depth = 0): string {
   switch (value.tag) {
     case 'Int':
       return String(value.n);
@@ -130,6 +151,15 @@ export function formatMachineValue(value: MachineValue): string {
       return 'null';
     case 'Ref':
       return `#${value.loc}`;
+    case 'Obj': {
+      if (depth > 4) return `${value.className}{…}`;
+      const fields = [...value.fields]
+        .map(([name, v]) => `${name}: ${formatMachineValue(v, depth + 1)}`)
+        .join(', ');
+      return `${value.className}{${fields}}`;
+    }
+    case 'Arr':
+      return depth > 4 ? '[…]' : `[${value.elems.map((v) => formatMachineValue(v, depth + 1)).join(', ')}]`;
   }
 }
 
@@ -210,15 +240,20 @@ function asBool(value: MachineValue): boolean | null {
   return value.tag === 'Bool' ? value.b : null;
 }
 
-function heapArray(state: MachineState, value: MachineValue): { loc: Loc; arr: Extract<HeapObj, { tag: 'Arr' }> } | string {
+/** Resolves an array value under either model. `loc` is null under Model B. */
+function resolveArray(
+  state: MachineState,
+  value: MachineValue
+): { loc: Loc | null; elems: MachineValue[] } | string {
   if (value.tag === 'Null') return 'null dereference: the array is null';
+  if (value.tag === 'Arr') return { loc: null, elems: value.elems };
   if (value.tag !== 'Ref') return `expected an int[], found ${formatMachineValue(value)}`;
   const obj = state.heap.get(value.loc);
   if (!obj || obj.tag !== 'Arr') return 'expected an int[] in the heap';
-  return { loc: value.loc, arr: obj };
+  return { loc: value.loc, elems: obj.elems };
 }
 
-function allocateObject(state: MachineState, className: string, blockId: string): MachineValue | string {
+function defaultFields(state: MachineState, className: string): Map<string, MachineValue> | string {
   const classSym = state.table.classes.get(className);
   if (!classSym) return `Class '${className}' is not declared`;
   const fields = new Map<string, MachineValue>();
@@ -226,10 +261,27 @@ function allocateObject(state: MachineState, className: string, blockId: string)
   for (const sym of [...classAndAncestors(state.table, classSym)].reverse()) {
     for (const field of sym.fields.values()) fields.set(field.name, defaultValueFor(field.ty));
   }
+  return fields;
+}
+
+function allocateObject(state: MachineState, className: string, blockId: string): MachineValue | string {
+  const fields = defaultFields(state, className);
+  if (typeof fields === 'string') return fields;
+  if (state.model === 'B') {
+    // Model B: the object IS the value — no store, no arrow.
+    return { tag: 'Obj', className, fields };
+  }
   const loc = state.nextLoc++;
   state.heap.set(loc, { tag: 'Obj', className, fields, blockId });
   state.lastEffect = { kind: 'new', loc };
   return REF_V(loc);
+}
+
+/** Model B: functional update of the frame's own `this` structure. */
+function updateSelfField(frame: Frame, name: string, value: MachineValue): void {
+  const fields = new Map(frame.selfObj!.fields);
+  fields.set(name, value);
+  frame.selfObj = { tag: 'Obj', className: frame.selfObj!.className, fields };
 }
 
 function pushFrame(
@@ -239,16 +291,31 @@ function pushFrame(
   args: MachineValue[]
 ): MachineState {
   if (recv.tag === 'Null') return fail(state, 'null dereference: the receiver is null');
-  if (recv.tag !== 'Ref') return fail(state, `cannot call a method on ${formatMachineValue(recv)}`);
-  const heapObj = state.heap.get(recv.loc);
-  if (!heapObj || heapObj.tag !== 'Obj') return fail(state, 'cannot call a method on an int[]');
 
-  // Dynamic dispatch: lookup starts from the heap object's own class.
-  const dynamicClass = state.table.classes.get(heapObj.className);
-  if (!dynamicClass) return fail(state, `Class '${heapObj.className}' is not declared`);
+  // Dynamic dispatch: lookup starts from the receiver's own class — the heap
+  // object's under Model A, the inline structure's under Model B.
+  let dynamicClassName: string;
+  let selfLoc: Loc | null = null;
+  let selfObj: ObjValue | null = null;
+  if (state.model === 'B') {
+    if (recv.tag !== 'Obj') return fail(state, `cannot call a method on ${formatMachineValue(recv)}`);
+    dynamicClassName = recv.className;
+    // Call-by-structure: `this` is the value itself, bound by copy (values
+    // are immutable, so sharing IS copying).
+    selfObj = recv;
+  } else {
+    if (recv.tag !== 'Ref') return fail(state, `cannot call a method on ${formatMachineValue(recv)}`);
+    const heapObj = state.heap.get(recv.loc);
+    if (!heapObj || heapObj.tag !== 'Obj') return fail(state, 'cannot call a method on an int[]');
+    dynamicClassName = heapObj.className;
+    selfLoc = recv.loc;
+  }
+
+  const dynamicClass = state.table.classes.get(dynamicClassName);
+  if (!dynamicClass) return fail(state, `Class '${dynamicClassName}' is not declared`);
   const methodName = fieldValue(callBlock, 'METHOD', 'method');
   const found = findMethod(state.table, dynamicClass, methodName);
-  if (!found) return fail(state, `Method '${methodName}' is not defined in class '${heapObj.className}'`);
+  if (!found) return fail(state, `Method '${methodName}' is not defined in class '${dynamicClassName}'`);
   const { method, owner } = found;
   if (args.length !== method.params.length) {
     return fail(state, `Method '${methodName}' expects ${method.params.length} argument(s), found ${args.length}`);
@@ -263,7 +330,8 @@ function pushFrame(
 
   state.stack.push({
     method: `${owner.name}.${methodName}`,
-    self: recv.loc,
+    self: selfLoc,
+    selfObj,
     locals,
     kont: [],
     blockId: method.block.id,
@@ -360,6 +428,12 @@ function beginExpression(state: MachineState, block: Blockly.Block): MachineStat
       produce(state, BOOL_V(false));
       return state;
     case 'mj_expr_this': {
+      if (state.model === 'B') {
+        if (!frame.selfObj) return fail(state, `'this' cannot be used inside main`);
+        state.lastRule = 'this';
+        produce(state, frame.selfObj);
+        return state;
+      }
       const self = frame.self;
       if (self === null) return fail(state, `'this' cannot be used inside main`);
       state.lastRule = 'this';
@@ -372,6 +446,11 @@ function beginExpression(state: MachineState, block: Blockly.Block): MachineStat
       if (local !== undefined) {
         state.lastRule = 'var';
         produce(state, local);
+        return state;
+      }
+      if (frame.selfObj?.fields.has(name)) {
+        state.lastRule = 'field-read';
+        produce(state, frame.selfObj.fields.get(name)!);
         return state;
       }
       if (frame.self !== null) {
@@ -486,6 +565,16 @@ function writeVariable(state: MachineState, name: string, value: MachineValue, b
     done(state);
     return state;
   }
+  if (frame.selfObj?.fields.has(name)) {
+    // Model B: functional update — the frame's OWN structure is rebuilt;
+    // whatever the caller holds never changes.
+    updateSelfField(frame, name, value);
+    state.lastRule = 'field-update';
+    state.lastEffect = { kind: 'self-write', field: name };
+    state.focusBlockId = block.id;
+    done(state);
+    return state;
+  }
   if (frame.self !== null) {
     const heapObj = state.heap.get(frame.self);
     if (heapObj?.tag === 'Obj' && heapObj.fields.has(name)) {
@@ -589,21 +678,40 @@ function applyKont(state: MachineState, value: MachineValue | null): MachineStat
     }
     case 'KArrAssignVal': {
       if (value === null) return fail(state, 'the array assignment needs a value');
-      const frameLocal = frame.locals.get(kont.name);
-      let arrValue = frameLocal;
+      const isLocal = frame.locals.has(kont.name);
+      const isSelfField = !isLocal && !!frame.selfObj?.fields.has(kont.name);
+      let arrValue = isLocal ? frame.locals.get(kont.name) : undefined;
+      if (arrValue === undefined && isSelfField) arrValue = frame.selfObj!.fields.get(kont.name);
       if (arrValue === undefined && frame.self !== null) {
         const heapObj = state.heap.get(frame.self);
         if (heapObj?.tag === 'Obj') arrValue = heapObj.fields.get(kont.name);
       }
       if (arrValue === undefined) return fail(state, `Variable '${kont.name}' is not declared`);
-      const target = heapArray(state, arrValue);
+      const target = resolveArray(state, arrValue);
       if (typeof target === 'string') return fail(state, target);
       const index = asInt(kont.index);
       if (index === null) return fail(state, 'the array index must be an int');
-      if (index < 0 || index >= target.arr.elems.length) {
-        return fail(state, `array index ${index} out of bounds for length ${target.arr.elems.length}`);
+      if (index < 0 || index >= target.elems.length) {
+        return fail(state, `array index ${index} out of bounds for length ${target.elems.length}`);
       }
-      target.arr.elems[index] = value;
+      if (target.loc === null) {
+        // Model B: build a NEW array and rebind the variable; other copies of
+        // the old array are untouched.
+        const elems = [...target.elems];
+        elems[index] = value;
+        const updated: MachineValue = { tag: 'Arr', elems };
+        if (isLocal) {
+          frame.locals.set(kont.name, updated);
+          state.lastEffect = { kind: 'local-write', name: kont.name };
+        } else {
+          updateSelfField(frame, kont.name, updated);
+          state.lastEffect = { kind: 'self-write', field: kont.name };
+        }
+        state.lastRule = 'array-update';
+        done(state);
+        return state;
+      }
+      target.elems[index] = value;
       state.lastRule = 'array-write';
       state.lastEffect = { kind: 'arr-write', loc: target.loc, index };
       done(state);
@@ -649,31 +757,37 @@ function applyKont(state: MachineState, value: MachineValue | null): MachineStat
     }
     case 'KLookupIdx': {
       if (value === null) return fail(state, 'the array index must be an int');
-      const target = heapArray(state, kont.arr);
+      const target = resolveArray(state, kont.arr);
       if (typeof target === 'string') return fail(state, target);
       const index = asInt(value);
       if (index === null) return fail(state, 'the array index must be an int');
-      if (index < 0 || index >= target.arr.elems.length) {
-        return fail(state, `array index ${index} out of bounds for length ${target.arr.elems.length}`);
+      if (index < 0 || index >= target.elems.length) {
+        return fail(state, `array index ${index} out of bounds for length ${target.elems.length}`);
       }
       state.lastRule = 'array-read';
-      produce(state, target.arr.elems[index]);
+      produce(state, target.elems[index]);
       return state;
     }
     case 'KLength': {
       if (value === null) return fail(state, `'.length' needs an array`);
-      const target = heapArray(state, value);
+      const target = resolveArray(state, value);
       if (typeof target === 'string') return fail(state, target);
       state.lastRule = 'array-length';
-      produce(state, INT_V(target.arr.elems.length));
+      produce(state, INT_V(target.elems.length));
       return state;
     }
     case 'KNewArr': {
       const size = value === null ? null : asInt(value);
       if (size === null) return fail(state, 'the array size must be an int');
       if (size < 0) return fail(state, `negative array size ${size}`);
+      const elems = Array.from({ length: size }, () => INT_V(0));
+      if (state.model === 'B') {
+        state.lastRule = 'new-array';
+        produce(state, { tag: 'Arr', elems });
+        return state;
+      }
       const loc = state.nextLoc++;
-      state.heap.set(loc, { tag: 'Arr', elems: Array.from({ length: size }, () => INT_V(0)), blockId: kont.block.id });
+      state.heap.set(loc, { tag: 'Arr', elems, blockId: kont.block.id });
       state.lastRule = 'new-array';
       state.lastEffect = { kind: 'new', loc };
       produce(state, REF_V(loc));
@@ -721,7 +835,10 @@ export function step(previous: MachineState): MachineState {
 }
 
 /** Builds the initial state from the program under the workspace's goal block. */
-export function injectMachine(workspace: Blockly.Workspace): MachineState | { injectError: string } {
+export function injectMachine(
+  workspace: Blockly.Workspace,
+  model: ValueModel = 'A'
+): MachineState | { injectError: string } {
   const goal = workspace.getTopBlocks(false).find((block) => block.type === 'mj_goal');
   if (!goal) return { injectError: 'No program: the Program block is missing.' };
   const mainBlock = inputTarget(goal, 'MAIN');
@@ -731,11 +848,13 @@ export function injectMachine(workspace: Blockly.Workspace): MachineState | { in
 
   const table = buildClassTable(goal);
   const state: MachineState = {
+    model,
     control: { tag: 'Done' },
     stack: [
       {
         method: 'main',
         self: null,
+        selfObj: null,
         locals: new Map(),
         kont: [],
         blockId: mainBlock.id,

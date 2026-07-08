@@ -1444,6 +1444,21 @@ body[data-theme="light"] .stepper-arrowhead {
   background: hsl(var(--loc-hue) 62% 34%);
   color: #fff;
   font-weight: 800;
+  cursor: pointer;
+}
+
+.stepper-ref:hover {
+  filter: brightness(1.18);
+  box-shadow: 0 0 0 2px hsl(var(--loc-hue) 60% 52% / 0.4);
+}
+
+.stepper-provenance {
+  cursor: pointer;
+}
+
+.stepper-provenance:hover {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
 }
 
 body[data-theme="light"] .stepper-ref {

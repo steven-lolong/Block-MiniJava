@@ -37,7 +37,8 @@ function locateBlock(workspace: Blockly.WorkspaceSvg, blockId: string): void {
   const block = workspace.getBlockById(blockId) as Blockly.BlockSvg | null;
   if (!block) return;
   workspace.centerOnBlock(blockId);
-  block.select();
+  // setSelected (unlike BlockSvg.select) also clears the previous selection.
+  Blockly.common.setSelected(block);
 }
 
 function renderProblemsPanel(workspace: Blockly.WorkspaceSvg, diags: TypeDiagnostic[]): void {

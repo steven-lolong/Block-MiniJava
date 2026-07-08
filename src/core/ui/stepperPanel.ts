@@ -50,11 +50,37 @@ function valueChip(value: MachineValue): HTMLElement {
     chip.style.setProperty('--loc-hue', String(locHue(value.loc)));
     chip.dataset.refLoc = String(value.loc);
     chip.textContent = `#${value.loc}`;
+    chip.title = `Show heap object #${value.loc}`;
+    chip.addEventListener('click', () => revealHeapBox(value.loc));
   } else {
     chip.className = value.tag === 'Null' ? 'stepper-null' : 'stepper-scalar';
     chip.textContent = formatMachineValue(value);
   }
   return chip;
+}
+
+/* -- Provenance: every runtime artifact links back to the block that made it. */
+
+/** Selects and centers a program block in the main workspace. */
+function locateProvenance(blockId: string | null): void {
+  if (!blockId || stale) return;
+  const workspace = getWorkspace();
+  if (!workspace) return;
+  const block = workspace.getBlockById(blockId) as Blockly.BlockSvg | null;
+  if (!block) return;
+  workspace.centerOnBlock(blockId);
+  // setSelected (unlike BlockSvg.select) also clears the previous selection.
+  Blockly.common.setSelected(block);
+}
+
+/** Scrolls the heap panel to a box and flashes it. */
+function revealHeapBox(loc: number): void {
+  const box = document.querySelector<HTMLElement>(`#stepper-heap .stepper-heap-box[data-heap-loc="${loc}"]`);
+  if (!box) return;
+  box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  box.classList.remove('is-changed');
+  void box.offsetWidth; // restart the flash animation
+  box.classList.add('is-changed');
 }
 
 function hint(text: string): HTMLElement {
@@ -164,7 +190,11 @@ function renderFrames(): void {
     const title = document.createElement('div');
     title.className = 'stepper-frame-title';
     const name = document.createElement('span');
+    name.className = 'stepper-provenance';
     name.textContent = frame.method;
+    name.title = frame.callBlockId ? 'Show the call that pushed this frame' : 'Show the main class block';
+    const provenanceId = frame.callBlockId ?? frame.blockId;
+    name.addEventListener('click', () => locateProvenance(provenanceId));
     title.appendChild(name);
     if (frame.self !== null) {
       const self = document.createElement('span');
@@ -212,8 +242,10 @@ function renderHeap(): void {
     }
 
     const title = document.createElement('div');
-    title.className = 'stepper-heap-title';
+    title.className = 'stepper-heap-title stepper-provenance';
     title.textContent = obj.tag === 'Obj' ? `#${loc} · ${obj.className}` : `#${loc} · int[${obj.elems.length}]`;
+    title.title = 'Show the new block that allocated this object';
+    title.addEventListener('click', () => locateProvenance(obj.blockId));
     box.appendChild(title);
 
     const table = document.createElement('table');

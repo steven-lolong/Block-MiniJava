@@ -1190,6 +1190,248 @@ body.code-hidden .code-column {
   display: none;
 }
 
+/* -- Model A stepper ------------------------------------------------------ */
+
+.viz-host-machine[data-active="true"] {
+  display: flex;
+}
+
+.stepper-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+}
+
+.stepper-controls {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.stepper-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 780;
+  white-space: nowrap;
+}
+
+.stepper-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.stepper-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.stepper-button.is-primary {
+  border-color: var(--aquamarine);
+}
+
+.stepper-status {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stepper-status[data-state="error"] {
+  color: var(--danger);
+}
+
+.stepper-status[data-state="stale"] {
+  color: var(--gold);
+}
+
+.stepper-status[data-state="done"] {
+  color: var(--aquamarine);
+}
+
+.stepper-panels {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(250px, 1.2fr) minmax(170px, 0.8fr);
+  gap: 10px;
+  padding: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.stepper-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--panel);
+}
+
+.stepper-panel h3 {
+  flex: none;
+  margin: 0;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 820;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stepper-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.stepper-hint {
+  padding: 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.stepper-frame {
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.stepper-frame.is-top {
+  border-color: var(--aquamarine);
+}
+
+.stepper-frame-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 9px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.stepper-frame-self {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 720;
+}
+
+.stepper-locals {
+  width: 100%;
+  border-collapse: collapse;
+  font: 0.8rem/1.5 var(--font-code);
+}
+
+.stepper-locals td {
+  padding: 3px 9px;
+  border-top: 1px solid var(--border);
+}
+
+.stepper-locals td:last-child {
+  text-align: right;
+}
+
+.stepper-scalar {
+  font-weight: 700;
+}
+
+.stepper-null {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.stepper-ref {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: hsl(var(--loc-hue) 62% 34%);
+  color: #fff;
+  font-weight: 800;
+}
+
+body[data-theme="light"] .stepper-ref {
+  background: hsl(var(--loc-hue) 52% 46%);
+}
+
+.stepper-heap-box {
+  margin-bottom: 8px;
+  border: 1px solid hsl(var(--loc-hue) 55% 45%);
+  border-left-width: 4px;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.stepper-heap-title {
+  padding: 5px 9px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.stepper-output-pre {
+  margin: 0;
+  font: 0.82rem/1.5 var(--font-code);
+  white-space: pre-wrap;
+}
+
+.is-changed {
+  animation: stepper-flash 700ms ease-out;
+}
+
+@keyframes stepper-flash {
+  from {
+    background-color: color-mix(in srgb, var(--gold) 45%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@media (max-width: 920px) {
+  .stepper-panels {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .stepper-panel {
+    min-height: 150px;
+    overflow: visible;
+  }
+
+  .stepper-panel-body {
+    overflow: visible;
+  }
+}
+
 @media (max-width: 1260px) {
   .app-header {
     grid-template-columns: minmax(240px, 330px) minmax(0, 1fr) auto;

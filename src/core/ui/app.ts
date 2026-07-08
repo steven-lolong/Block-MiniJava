@@ -10,6 +10,7 @@ import { initExamplesMenu } from './examplesMenu';
 import type { MiniJavaExample } from '../examples';
 import { installEditableMiniJavaCodeEditor, type EditableMiniJavaCodeEditor } from './codeEditor';
 import { refreshTypeDiagnostics } from './typeDiagnostics';
+import { initStepperPanel } from './stepperPanel';
 
 const AUTOSAVE_KEY = 'block-minijava.autosave.v2';
 const THEME_KEY = 'block-minijava.theme';
@@ -828,6 +829,7 @@ export function startBlockMiniJava(): void {
   initBlockly();
   installCodeEditor();
   initVisualizationPanel(syncBlocklySize);
+  initStepperPanel(() => workspace);
   initExamplesMenu(
     () => workspace,
     onExampleLoaded

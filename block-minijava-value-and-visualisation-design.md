@@ -5,6 +5,14 @@
 > records + visualisation design for building a stepper. Data structures are given as
 > TypeScript-flavoured pseudocode intended for direct implementation.
 
+> **Implementation status (2026-07-08):** every artifact this note specifies is built.
+> §1 type layers → `src/core/types/` (Problems tab). §6 Model A machine →
+> `src/core/semantics/minijavaMachine.ts` + the Stepper tab. §8 A/B lockstep → the same
+> machine parameterized by `ValueModel` + the A vs B tab. §7 substitution + machine
+> correspondence → `src/core/semantics/minijavaSubstitution.ts` + the Rewrite tab.
+> Executable checks: `npm test` (roundtrip, typecheck, machine, subst suites).
+> Remaining ideas live in §9 (paper-side) and Vehicle 2 belongs to the MnL repos.
+
 ## 0. The core fork (decide this first)
 
 Two distinct projects share the "block-based MiniJava" label; they need different value models:

@@ -19,6 +19,7 @@ import {
   type MachineState,
   type MachineValue
 } from '../semantics/minijavaMachine';
+import { mirrorProgramOutput } from './programConsole';
 
 const PLAY_INTERVAL_MS = 550;
 const MAX_HISTORY = 5000;
@@ -278,6 +279,12 @@ function renderOutput(): void {
   }
   pre.textContent = current.output.join('\n');
   pre.classList.toggle('is-changed', current.lastEffect?.kind === 'output');
+  const note = current.status === 'done'
+    ? '— program finished —'
+    : current.status === 'error'
+      ? `⨯ ${current.error}`
+      : undefined;
+  mirrorProgramOutput(`Stepper · Model ${current.model}`, current.output, note);
 }
 
 function renderAll(): void {

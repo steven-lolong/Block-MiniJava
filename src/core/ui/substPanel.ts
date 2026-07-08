@@ -15,6 +15,7 @@ import {
   type SubstitutionState
 } from '../semantics/minijavaSubstitution';
 import { injectMachine, step as machineStep } from '../semantics/minijavaMachine';
+import { mirrorProgramOutput } from './programConsole';
 
 const PLAY_INTERVAL_MS = 700;
 const MAX_HISTORY = 2000;
@@ -182,6 +183,15 @@ function renderAll(): void {
   renderStatus();
   renderButtons();
   renderTree();
+  if (current && !stale) {
+    if (current.status === 'done') {
+      mirrorProgramOutput('Rewrite · substitution', [formatTree(current.tree)], '— program finished —');
+    } else if (current.status === 'error') {
+      mirrorProgramOutput('Rewrite · substitution', [], `⨯ ${current.error}`);
+    } else {
+      mirrorProgramOutput('Rewrite · substitution', []);
+    }
+  }
 }
 
 function loadSubstitution(): void {

@@ -331,6 +331,8 @@ button {
 .icon-copy::before { content: "⧉"; }
 .icon-check::before { content: "✓"; }
 .icon-viz::before { content: "◧"; }
+.icon-run::before { content: "▶"; font-size: 0.82rem; }
+.run-button .icon { color: var(--aquamarine); }
 .icon-arrange::before { content: "⬍"; }
 .icon-collapse::before { content: "▾"; }
 
@@ -951,6 +953,19 @@ body.code-hidden .code-column {
 
 .console-view {
   white-space: pre-wrap;
+}
+
+.console-view.is-console-changed {
+  animation: console-flash 700ms ease-out;
+}
+
+@keyframes console-flash {
+  from {
+    background-color: color-mix(in srgb, var(--gold) 30%, var(--code-bg));
+  }
+  to {
+    background-color: var(--code-bg);
+  }
 }
 
 .grammar-highlight {

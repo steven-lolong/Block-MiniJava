@@ -19,6 +19,7 @@ import {
   type MachineState,
   type MachineValue
 } from '../semantics/minijavaMachine';
+import { mirrorProgramOutput } from './programConsole';
 
 const PLAY_INTERVAL_MS = 600;
 const MAX_HISTORY = 5000;
@@ -266,6 +267,15 @@ function renderAll(): void {
   renderHeap(stateA);
   renderOutput('compare-output-a', stateA);
   renderOutput('compare-output-b', stateB);
+  if (stateA && stateB) {
+    const finished = stateA.status !== 'running' && stateB.status !== 'running';
+    const agree = stateA.output.join('\n') === stateB.output.join('\n');
+    mirrorProgramOutput(
+      'A vs B · lockstep',
+      ['— Model A —', ...stateA.output, '— Model B —', ...stateB.output],
+      finished ? (agree ? '— same output —' : '— DIFFERENT output —') : undefined
+    );
+  }
 
   if (stale) return;
   const focusIds: string[] = [];

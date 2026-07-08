@@ -13,6 +13,8 @@ import { refreshTypeDiagnostics } from './typeDiagnostics';
 import { initStepperPanel } from './stepperPanel';
 import { initComparePanel } from './comparePanel';
 import { initSubstPanel } from './substPanel';
+import { appendConsoleLog, mirrorProgramOutput } from './programConsole';
+import { injectMachine, run } from '../semantics/minijavaMachine';
 
 const AUTOSAVE_KEY = 'block-minijava.autosave.v2';
 const THEME_KEY = 'block-minijava.theme';
@@ -256,10 +258,19 @@ function scheduleRequiredBlockEnforcement(): void {
   }, 0);
 }
 
-function appendConsoleOutput(message: string): void {
-  const output = byId<HTMLPreElement>('program-output');
-  const current = output.textContent?.trim();
-  output.textContent = current && current !== 'No run yet.' ? `${current}\n${message}` : message;
+function runProgram(): void {
+  if (!workspace) return;
+  selectInspectorPanel('output');
+  const initial = injectMachine(workspace, 'A');
+  if ('injectError' in initial) {
+    mirrorProgramOutput('Run', [], `⨯ ${initial.injectError}`);
+    return;
+  }
+  const final = run(initial);
+  const note = final.status === 'done'
+    ? `— program finished in ${final.stepCount} step(s) —`
+    : `⨯ ${final.error}`;
+  mirrorProgramOutput('Run', final.output, note);
 }
 
 function selectInspectorPanel(panel: InspectorPanel): void {
@@ -419,7 +430,7 @@ function exportGeneratedCode(): void {
   a.remove();
   URL.revokeObjectURL(url);
   scheduleAutosaveStatus(`Exported ${fileName}`);
-  appendConsoleOutput(`Exported ${fileName}`);
+  appendConsoleLog(`Exported ${fileName}`);
   selectInspectorPanel('output');
 }
 
@@ -475,11 +486,11 @@ function copyCode(): void {
     .writeText(currentCodeText())
     .then(() => {
       scheduleAutosaveStatus('Code copied');
-      appendConsoleOutput('MiniJava code copied to clipboard.');
+      appendConsoleLog('MiniJava code copied to clipboard.');
     })
     .catch(() => {
       scheduleAutosaveStatus('Copy failed');
-      appendConsoleOutput('Clipboard copy failed.');
+      appendConsoleLog('Clipboard copy failed.');
     });
 }
 
@@ -772,6 +783,7 @@ function wireEvents(): void {
   byId<HTMLButtonElement>('show-code-button').addEventListener('click', () => setCodeHidden(false));
   byId<HTMLButtonElement>('show-toolbox-button').addEventListener('click', () => setToolboxHidden(false));
   byId<HTMLButtonElement>('copy-code').addEventListener('click', copyCode);
+  byId<HTMLButtonElement>('run-program').addEventListener('click', runProgram);
   for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('.inspector-tab'))) {
     tab.addEventListener('click', () => selectInspectorPanel((tab.dataset.panel ?? 'code') as InspectorPanel));
   }

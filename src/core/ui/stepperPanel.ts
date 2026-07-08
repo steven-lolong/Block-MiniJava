@@ -48,6 +48,7 @@ function valueChip(value: MachineValue): HTMLElement {
   if (value.tag === 'Ref') {
     chip.className = 'stepper-ref';
     chip.style.setProperty('--loc-hue', String(locHue(value.loc)));
+    chip.dataset.refLoc = String(value.loc);
     chip.textContent = `#${value.loc}`;
   } else {
     chip.className = value.tag === 'Null' ? 'stepper-null' : 'stepper-scalar';
@@ -204,7 +205,11 @@ function renderHeap(): void {
     const box = document.createElement('div');
     box.className = 'stepper-heap-box';
     box.style.setProperty('--loc-hue', String(locHue(loc)));
+    box.dataset.heapLoc = String(loc);
     if (effect?.kind === 'new' && effect.loc === loc) box.classList.add('is-changed');
+    if ((effect?.kind === 'field-write' || effect?.kind === 'arr-write') && effect.loc === loc) {
+      box.classList.add('is-write-target');
+    }
 
     const title = document.createElement('div');
     title.className = 'stepper-heap-title';
@@ -250,6 +255,119 @@ function renderAll(): void {
   renderHeap();
   renderOutput();
   if (current && !stale) setHighlight(current.status === 'running' ? current.focusBlockId : null);
+  scheduleArrowRedraw(true);
+}
+
+/* -- SVG arrows: every Ref chip draws an arrow to its heap box ------------- */
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+let arrowRaf: number | null = null;
+let arrowPulsePending = false;
+
+/**
+ * Redraws are batched per frame. `withPulse` marks redraws caused by a state
+ * change: only those replay the write animation, so scroll/resize redraws
+ * keep the arrows still.
+ */
+function scheduleArrowRedraw(withPulse: boolean): void {
+  arrowPulsePending = arrowPulsePending || withPulse;
+  if (arrowRaf !== null) return;
+  arrowRaf = window.requestAnimationFrame(() => {
+    arrowRaf = null;
+    const pulse = arrowPulsePending;
+    arrowPulsePending = false;
+    drawArrows(pulse);
+  });
+}
+
+/** Rect of an element, or null when scrolled out of its panel body. */
+function visibleRect(el: Element): DOMRect | null {
+  const rect = el.getBoundingClientRect();
+  const scroller = el.closest('.stepper-panel-body');
+  if (!scroller) return rect;
+  const bounds = scroller.getBoundingClientRect();
+  if (rect.bottom < bounds.top + 2 || rect.top > bounds.bottom - 2) return null;
+  return rect;
+}
+
+function drawArrows(pulse: boolean): void {
+  const svg = document.getElementById('stepper-arrows');
+  if (!(svg instanceof SVGSVGElement)) return;
+  svg.replaceChildren();
+  if (!current) return;
+  const overlay = svg.getBoundingClientRect();
+  if (overlay.width === 0) return; // machine tab is hidden
+
+  const effect = current.lastEffect;
+  const writeLoc =
+    pulse && (effect?.kind === 'field-write' || effect?.kind === 'arr-write') ? effect.loc : null;
+
+  const boxes = new Map<number, HTMLElement>();
+  for (const box of document.querySelectorAll<HTMLElement>('#stepper-heap .stepper-heap-box')) {
+    boxes.set(Number(box.dataset.heapLoc), box);
+  }
+
+  const chips = document.querySelectorAll<HTMLElement>(
+    '#stepper-frames [data-ref-loc], #stepper-heap [data-ref-loc]'
+  );
+  for (const chip of chips) {
+    const loc = Number(chip.dataset.refLoc);
+    const box = boxes.get(loc);
+    if (!box) continue;
+    const chipRect = visibleRect(chip);
+    const boxRect = visibleRect(box);
+    if (!chipRect || !boxRect) continue;
+
+    const fromHeap = !!chip.closest('#stepper-heap');
+    const sx = chipRect.right - overlay.left + 2;
+    const sy = chipRect.top + chipRect.height / 2 - overlay.top;
+    const ty = boxRect.top + Math.min(14, boxRect.height / 2) - overlay.top;
+    let tx: number;
+    let d: string;
+    if (fromHeap) {
+      // Box-to-box: leave the chip rightward and hook back into the target's
+      // right edge through the gutter.
+      tx = boxRect.right - overlay.left + 2;
+      const bend = Math.max(sx, tx) + 26;
+      d = `M ${sx} ${sy} C ${bend} ${sy}, ${bend} ${ty}, ${tx} ${ty}`;
+    } else {
+      // Stack-to-heap: flow rightward into the box's left edge.
+      tx = boxRect.left - overlay.left - 2;
+      const dx = Math.max(36, (tx - sx) * 0.45);
+      d = `M ${sx} ${sy} C ${sx + dx} ${sy}, ${tx - dx} ${ty}, ${tx} ${ty}`;
+    }
+
+    const hue = String(locHue(loc));
+    const isWrite = writeLoc === loc;
+
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('class', `stepper-arrow${isWrite ? ' is-pulse' : ''}`);
+    path.style.setProperty('--loc-hue', hue);
+    svg.appendChild(path);
+
+    const side = fromHeap ? 1 : -1;
+    const head = document.createElementNS(SVG_NS, 'polygon');
+    head.setAttribute('points', `${tx},${ty} ${tx + side * 8},${ty - 4.5} ${tx + side * 8},${ty + 4.5}`);
+    head.setAttribute('class', 'stepper-arrowhead');
+    head.style.setProperty('--loc-hue', hue);
+    svg.appendChild(head);
+
+    // The value travels from the writing frame's chip into the box.
+    if (isWrite && chip.closest('.stepper-frame.is-top')) {
+      const dot = document.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('r', '4.5');
+      dot.setAttribute('class', 'stepper-write-dot');
+      dot.style.setProperty('--loc-hue', hue);
+      const motion = document.createElementNS(SVG_NS, 'animateMotion');
+      motion.setAttribute('dur', '0.4s');
+      motion.setAttribute('path', d);
+      motion.setAttribute('fill', 'freeze');
+      dot.appendChild(motion);
+      svg.appendChild(dot);
+      window.setTimeout(() => dot.remove(), 650);
+    }
+  }
 }
 
 function loadMachine(): void {
@@ -311,7 +429,13 @@ export function resetStepperFromDock(): void {
 
 /** Called by the viz dock when the machine tab is shown/hidden. */
 export function setStepperTabVisible(visible: boolean): void {
-  if (!visible) stopPlay();
+  if (!visible) {
+    stopPlay();
+    return;
+  }
+  // The overlay was unmeasurable while hidden; redraw once it has a size.
+  scheduleArrowRedraw(false);
+  window.setTimeout(() => scheduleArrowRedraw(false), 60);
 }
 
 export function initStepperPanel(getter: GetWorkspace): void {
@@ -320,6 +444,13 @@ export function initStepperPanel(getter: GetWorkspace): void {
   byId<HTMLButtonElement>('stepper-step').addEventListener('click', stepOnce);
   byId<HTMLButtonElement>('stepper-back').addEventListener('click', stepBack);
   byId<HTMLButtonElement>('stepper-play').addEventListener('click', togglePlay);
+  for (const body of Array.from(document.querySelectorAll('.stepper-panel-body'))) {
+    body.addEventListener('scroll', () => scheduleArrowRedraw(false), { passive: true });
+  }
+  if ('ResizeObserver' in window) {
+    const panels = document.querySelector('.stepper-panels');
+    if (panels) new ResizeObserver(() => scheduleArrowRedraw(false)).observe(panels);
+  }
   attachWorkspaceListener();
   renderAll();
 }

@@ -1268,6 +1268,7 @@ body.code-hidden .code-column {
 }
 
 .stepper-panels {
+  position: relative;
   flex: 1;
   display: grid;
   grid-template-columns: minmax(220px, 0.9fr) minmax(250px, 1.2fr) minmax(170px, 0.8fr);
@@ -1275,6 +1276,73 @@ body.code-hidden .code-column {
   padding: 10px;
   min-height: 0;
   overflow: hidden;
+}
+
+.stepper-arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.stepper-arrow {
+  fill: none;
+  stroke: hsl(var(--loc-hue) 60% 52%);
+  stroke-width: 2;
+  opacity: 0.85;
+}
+
+.stepper-arrowhead {
+  fill: hsl(var(--loc-hue) 60% 52%);
+  opacity: 0.9;
+}
+
+body[data-theme="light"] .stepper-arrow {
+  stroke: hsl(var(--loc-hue) 55% 40%);
+}
+
+body[data-theme="light"] .stepper-arrowhead {
+  fill: hsl(var(--loc-hue) 55% 40%);
+}
+
+/* The money animation: arrows NEVER move on a write — they pulse in place
+   while the box contents change, asserting "same object". */
+.stepper-arrow.is-pulse {
+  animation: stepper-arrow-pulse 700ms ease-out;
+}
+
+@keyframes stepper-arrow-pulse {
+  0% {
+    stroke-width: 4.5;
+    opacity: 1;
+  }
+  100% {
+    stroke-width: 2;
+    opacity: 0.85;
+  }
+}
+
+.stepper-write-dot {
+  fill: hsl(var(--loc-hue) 72% 58%);
+  stroke: #fff;
+  stroke-width: 1;
+  opacity: 0.95;
+}
+
+.stepper-heap-box.is-write-target {
+  animation: stepper-box-glow 700ms ease-out;
+}
+
+@keyframes stepper-box-glow {
+  from {
+    box-shadow: 0 0 0 3px hsl(var(--loc-hue) 60% 52% / 0.55);
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
 }
 
 .stepper-panel {

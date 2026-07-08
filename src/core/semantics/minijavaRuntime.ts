@@ -228,11 +228,10 @@ export function createRuntimeEnv(workspace: Blockly.Workspace, strategy: Reducti
 }
 
 function childEnv(parent: RuntimeEnv, owner: ClassInfo, thisValue: ObjectValue | null): RuntimeEnv {
+  // Fields stay in thisValue.fields and are reached via lookupName/assignName;
+  // copying them into vars would turn field writes into writes on a shadow copy.
   const vars = new Map<string, RuntimeSlot>();
   const staticTypes = new Map<string, string>();
-  if (thisValue) {
-    for (const [name, value] of thisValue.fields) vars.set(name, value);
-  }
   return {
     program: parent.program,
     vars,
@@ -249,6 +248,13 @@ function readSlot(slot: RuntimeSlot | undefined): RuntimeValue {
   if (slot === undefined) return unknown('unbound identifier');
   if (isThunk(slot)) return evaluateExpression(slot.block, slot.env);
   return slot;
+}
+
+/** Locals and params shadow fields, as in Java. */
+function lookupName(env: RuntimeEnv, name: string): RuntimeSlot | undefined {
+  if (env.vars.has(name)) return env.vars.get(name);
+  if (env.thisValue?.fields.has(name)) return env.thisValue.fields.get(name);
+  return undefined;
 }
 
 function numberValue(value: RuntimeValue): number | UnknownValue {
@@ -388,7 +394,7 @@ export function executeStatement(block: Blockly.Block | null, env: RuntimeEnv): 
         break;
       }
       case 'mj_statement_array_assign': {
-        const array = readSlot(env.vars.get(field(current, 'NAME', 'array')));
+        const array = readSlot(lookupName(env, field(current, 'NAME', 'array')));
         const index = numberValue(evaluateExpression(child(current, 'INDEX'), env));
         const value = evaluateExpression(child(current, 'VALUE'), env);
         if (isArrayValue(array) && typeof index === 'number' && index >= 0) array.items[Math.floor(index)] = value;
@@ -444,7 +450,7 @@ export function evaluateExpression(block: Blockly.Block | null, env: RuntimeEnv)
       result = false;
       break;
     case 'mj_expr_identifier':
-      result = readSlot(env.vars.get(field(block, 'NAME', 'x')));
+      result = readSlot(lookupName(env, field(block, 'NAME', 'x')));
       break;
     case 'mj_expr_this':
       result = env.thisValue ?? (env.currentClass ? makeObject(env.program, env.currentClass) : unknown('this outside class'));

@@ -337,8 +337,28 @@ making CbS behaviour legible at a glance.
    rules — Vehicle 1: `new`, field-read, field-write, assign, call, return, println (four
    panels). Vehicle 2: substitution stepper + optional CSESK machine view (single surface).
 
-## Open theory items (from MnL work, may interact)
-- Machine type-soundness proof.
-- let-generalization question.
-- Hazel/Hazelnut (Omar et al., POPL 2017/2019) as primary related-work risk → dedicated
-  comparison subsection; the operational-correspondence demo (§7) supports this.
+## Open theory items (from MnL work, may interact) — ALL RESOLVED 2026-07-09
+- ~~Machine type-soundness proof.~~ **DONE**: mechanized in Coq as
+  `Paper-Live-Types…/artifact/proofs/Machine.v` — a CESK-style model of the CSESK
+  stepper (`cseskMachine/machine.ts`, frames matched one-to-one: FAppL~KArg,
+  FAppR~KApply, FLet~KBind), with `preservation` + `progress` + `machine_soundness`
+  (never stuck; final answers typed), axiom-free/admit-free, total step function so
+  determinism is definitional. Paper: Thm. "Machine type soundness" in
+  `programming-with-live-types.tex` §Metatheory (thm:machine-sound).
+- ~~let-generalization question.~~ **ANSWERED**: machine value typing is stable under
+  every type substitution (`vty_tsub` — values are type-erased and the language is
+  pure, so there is no store and no value restriction is needed); hence a let-bound
+  machine value inhabits EVERY instance of its generalized scheme
+  (`let_gen_inhabits`, arbitrary Γ and instantiation). Generalization has no runtime
+  content — `machine_poly_id` runs the poly_id program on the machine by computation
+  (one closure, two type instantiations, answer (0,1)). Paper: thm:machine-letgen.
+  Machine soundness against the polymorphic judgment `has_type` directly is NOT
+  claimed — its closure rule needs the arbitrary-substitution typing lemma
+  (proofs/ROADMAP.md Obl. 3–4), which stays on the Damas–Milner-completeness path.
+- ~~Hazel/Hazelnut comparison subsection.~~ **UPDATED**: rem:hazel / rem:vs-hazel /
+  Related Work in `programming-with-live-types.tex` now carry a dynamics leg —
+  Hazelnut Live evaluates *around* holes (hole closures, fill-and-resume; conceded,
+  no counterpart here); MnL adds a mechanically type-sound environment machine, a
+  no-value-restriction polymorphism story, and the §7 substitution⇄environment
+  correspondence as an *executable editor artifact* (Lockstep tab + per-example trace
+  and value agreement + the corpus-wide three-way differential audit).

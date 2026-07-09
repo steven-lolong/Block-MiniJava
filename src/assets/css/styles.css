@@ -1678,31 +1678,32 @@ body[data-theme="light"] .stepper-ref {
   body.code-hidden .ide-layout,
   body.toolbox-hidden.code-hidden .ide-layout {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(520px, 68vh) auto minmax(360px, 45vh);
+    /* Stack the panels and let each size to its own min-height. A fixed row
+       template mis-placed the panels here: the resizer is display:none on
+       mobile, so the code column fell onto an `auto` track (and the toolbox
+       row was `auto` too) and both collapsed to their ~2px top border —
+       the toolbox and code panels vanished. grid-auto-rows avoids the
+       positional dependency across every show/hide combination. */
+    grid-template-rows: none;
+    grid-auto-rows: auto;
     height: auto;
     overflow: visible;
-  }
-
-  body.toolbox-hidden .ide-layout {
-    grid-template-rows: minmax(560px, 72vh) auto minmax(360px, 45vh);
-  }
-
-  body.code-hidden .ide-layout {
-    grid-template-rows: auto minmax(560px, 72vh);
-  }
-
-  body.toolbox-hidden.code-hidden .ide-layout {
-    grid-template-rows: minmax(640px, 78vh);
   }
 
   .code-resizer {
     display: none;
   }
 
-  .toolbox-column,
-  .workspace-column,
+  .toolbox-column {
+    min-height: 40vh;
+  }
+
+  .workspace-column {
+    min-height: 62vh;
+  }
+
   .code-column {
-    min-height: 0;
+    min-height: 44vh;
   }
 
   .workspace-footer {

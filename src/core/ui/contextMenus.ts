@@ -1,7 +1,9 @@
 import * as Blockly from 'blockly';
 import { openVisualization } from './visualizationPanel';
+import { downloadScreenshot } from './screenshot';
 
 type BlockScope = { block?: Blockly.BlockSvg };
+type WorkspaceScope = { workspace?: Blockly.WorkspaceSvg };
 
 const ScopeType = Blockly.ContextMenuRegistry.ScopeType;
 type Item = Blockly.ContextMenuRegistry.RegistryItem;
@@ -36,6 +38,20 @@ export function registerMiniJavaContextMenus(): void {
       preconditionFn: (scope: BlockScope) => show(scope.block?.type === 'mj_expr_method_call'),
       callback: (scope: BlockScope) => {
         if (scope.block) openVisualization('value', scope.block);
+      }
+    },
+    {
+      // Download the workspace's blocks as a PNG. WORKSPACE scope, so it appears on the
+      // main program and on any visualization/stepper workspace.
+      id: 'miniJavaDownloadScreenshot',
+      scopeType: ScopeType.WORKSPACE,
+      displayText: 'Download Screenshot',
+      weight: 99,
+      preconditionFn: (scope: WorkspaceScope) =>
+        show(!!(scope.workspace && scope.workspace.getTopBlocks(false).length > 0)),
+      callback: (scope: WorkspaceScope) => {
+        const ws = scope.workspace ?? (Blockly.getMainWorkspace() as Blockly.WorkspaceSvg);
+        if (ws) downloadScreenshot(ws);
       }
     }
   ];

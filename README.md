@@ -86,6 +86,34 @@ The visualization dock (◧ button) hosts five tabs; the last three are small-st
   machine and checks that every salient rewrite rule matches the machine's trace — the
   operational-correspondence claim, executed. Load the built-in *Independent Copies* example.
 
+### Why the step counters differ (or don't) between tabs
+
+These tabs count "steps" in two different ways, and it is worth knowing which is which.
+
+- **A vs B is machine-vs-machine at the *same* granularity.** Each press advances
+  *both* machines by exactly one transition (`comparePanel.ts`, `stepBoth`:
+  `stateA = step(stateA); stateB = step(stateB)`, and `minijavaMachine.ts`
+  bumps `state.stepCount += 1` once per transition). Model A and Model B share
+  their control flow, so their `stepCount`s stay **equal** — the two numbers are
+  the same by construction. They diverge only when a program *observes* a value
+  the models disagree about (aliasing), which is the lesson. On *Aliasing
+  Contrast* both finish in **51 steps**, printing `4141` vs `41`.
+- **Rewrite-vs-machine is coarse-vs-fine.** The **Rewrite** tab's correspondence
+  line replays the program on the Model B machine and matches *salient* rewrite
+  rules against the machine's trace. Here the two counters are *not* equal: the
+  substitution rewriter counts only salient reductions (the human-visible
+  redexes), while the machine's `stepCount` counts *every* transition — call,
+  block entry, `if`/`while` dispatch, assignment, field read/write, and the
+  bookkeeping in between (`minijavaMachine.ts`, one `step` per transition). One
+  salient rewrite corresponds to several machine steps, so the machine's step
+  count is the larger number even though both reach the same result.
+
+Rule of thumb: two counters over the **same machine granularity** (A vs B) advance
+together, whereas a **substitution/rewrite** counter over a machine (the Rewrite
+tab here, and the lockstep views in Block-based-MNL and Block-Lambda-Calculus) is
+coarser than the machine's own step count — because the machine also counts the
+administrative transitions the rewriter never names.
+
 ## Commands
 
 ```bash

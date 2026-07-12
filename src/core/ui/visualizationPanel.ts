@@ -19,7 +19,7 @@ const ALL_KINDS: VizKind[] = ['structure', 'value', 'machine', 'compare', 'subst
 const TITLE: Record<VizKind, string> = {
   structure: 'Call-by-Structure',
   value: 'Call-by-Value',
-  machine: 'Stepper · Model A (frames & heap)',
+  machine: 'CSESK machine · Model A — Control · Stack · Environment · Store · Kontinuation',
   compare: 'A vs B · one program, two value models, lockstep',
   subst: 'Rewrite · substitution semantics (Model B, pure fragment)'
 };

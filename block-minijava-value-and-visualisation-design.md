@@ -7,7 +7,8 @@
 
 > **Implementation status (2026-07-08):** every artifact this note specifies is built.
 > §1 type layers → `src/core/types/` (Problems tab). §6 Model A machine →
-> `src/core/semantics/minijavaMachine.ts` + the Stepper tab. §8 A/B lockstep → the same
+> `src/core/semantics/minijavaMachine.ts` + the CSESK tab (one column per machine
+> component: Control · Stack + Environment · Store · Kontinuation). §8 A/B lockstep → the same
 > machine parameterized by `ValueModel` + the A vs B tab. §7 substitution + machine
 > correspondence → `src/core/semantics/minijavaSubstitution.ts` + the Rewrite tab.
 > Executable checks: `npm test` (roundtrip, typecheck, machine, subst suites).

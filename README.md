@@ -69,12 +69,18 @@ produced output owns it.
 
 The visualization dock (◧ button) hosts five tabs; the last three are small-step machines:
 
-- **Stepper** — a pure CESK-style machine over **Value Model A** (objects live on a heap,
-  variables hold references, aliasing is real). Four coordinated surfaces: the focus block is
-  highlighted in the workspace, plus call-stack, heap, and output panels. SVG arrows connect
-  every reference to its heap box; a field write glows the box, pulses the arrows into it, and
-  animates the value along its path. Heap-box and frame titles link back to the `new`/call
-  block that created them. `step` is pure, so **Back** is exact time travel.
+- **CSESK** — a pure CESK-style machine over **Value Model A** (objects live on a heap,
+  variables hold references, aliasing is real). The panel shows **one column per machine
+  component, in machine order**: **C**·ontrol (what the machine evaluates next, plus the
+  rule that just fired), **S**·tack + **E**·nvironment (the call stack of activation frames
+  with their locals), **S**·tore (the heap — the component that earns Model A the extra `S`
+  over the store-free CSEK machines in Block-based-MNL / Block-Lambda-Calculus), and
+  **K**·ontinuation (pending work per frame, innermost first, ▢ marking the hole the
+  in-flight value fills) — plus the output log; the focus block is highlighted in the
+  workspace. SVG arrows connect every reference to its heap box; a field write glows the
+  box, pulses the arrows into it, and animates the value along its path. Control, frame,
+  heap-box, and kontinuation entries all link back to the block that created or awaits
+  them. `step` is pure, so **Back** is exact time travel.
 - **A vs B** — the same program stepped in lockstep under Model A and **Value Model B**
   (inline structural values, no heap, functional field update). The two machines share their
   control flow, so they stay step-synchronized until the program observes a value the models
@@ -121,7 +127,7 @@ npm install
 npm run build      # production bundle -> docs/
 npm run serve      # dev server
 npm run typecheck
-npm test           # all four headless suites
+npm test           # all five headless suites
 ```
 
 The webpack bundle is emitted as:
@@ -132,7 +138,7 @@ docs/block_minijava.js
 
 ## Tests
 
-`npm test` builds node bundles of the real modules (`webpack.test.config.js`) and runs four
+`npm test` builds node bundles of the real modules (`webpack.test.config.js`) and runs five
 suites, no browser required:
 
 - `test/run_roundtrip.js` — text→blocks→text round-trips for the parser/generator pair
@@ -140,6 +146,9 @@ suites, no browser required:
 - `test/run_machine.js` — machine runs under both value models, including A/B contrast programs
 - `test/run_subst.js` — substitution runs, structure-preservation invariants, and the
   rewrite↔machine correspondence checks
+- `test/smoke-csesk.entry.ts` — the CSESK tab driven end-to-end under jsdom: every machine
+  column (Control, Stack+Environment, Store, Kontinuation) must render and the machine must
+  finish with the right output
 
 ## Logo
 

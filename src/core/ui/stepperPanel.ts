@@ -1,11 +1,12 @@
 /**
- * The Model A stepper panel (viz-dock "Stepper" tab).
+ * The Model A machine panel (viz-dock "CSESK" tab).
  *
- * Renders the machine state as the design note's coordinated surfaces: the
- * program surface is the main workspace itself (the focus block is
- * highlighted there), plus a call-stack/locals panel, a heap panel, and the
- * output log. Ref values and heap boxes share a per-Loc hue — the poor
- * man's arrow: two chips with one color are two arrows to one box.
+ * Renders the machine state as one column per CSESK component — C·ontrol,
+ * S·tack + E·nvironment (the call stack with per-frame locals), S·tore (the
+ * heap), K·ontinuation (pending work, innermost first) — plus the output log.
+ * The program surface is the main workspace itself (the focus block is
+ * highlighted there). Ref values and heap boxes share a per-Loc hue — the
+ * poor man's arrow: two chips with one color are two arrows to one box.
  *
  * `step` is pure, so Back is just a history stack.
  */
@@ -16,6 +17,7 @@ import {
   injectMachine,
   step,
   type Frame,
+  type Kont,
   type MachineState,
   type MachineValue
 } from '../semantics/minijavaMachine';
@@ -174,6 +176,146 @@ function renderButtons(): void {
   byId<HTMLButtonElement>('stepper-back').disabled = history.length === 0 || stale;
 }
 
+/** Short readable text for a program block, for the Control card. */
+function blockText(block: Blockly.Block): string {
+  const text = block.toString().replace(/\s+/g, ' ').trim();
+  return text.length > 90 ? text.slice(0, 87) + '…' : text;
+}
+
+function renderControl(): void {
+  const host = byId<HTMLDivElement>('stepper-control');
+  host.innerHTML = '';
+  if (!current) {
+    host.appendChild(hint('What the machine evaluates next — a statement, an expression, or a computed value.'));
+    return;
+  }
+  const control = current.control;
+  const card = document.createElement('div');
+  card.className = 'stepper-control-card';
+
+  const kind = document.createElement('span');
+  kind.className = 'stepper-control-kind';
+  kind.dataset.kind = control.tag.toLowerCase();
+  kind.textContent =
+    control.tag === 'Stmt' ? 'statement' :
+    control.tag === 'Expr' ? 'expression' :
+    control.tag === 'Value' ? 'value' : 'done';
+  card.appendChild(kind);
+
+  if (control.tag === 'Stmt' || control.tag === 'Expr') {
+    const text = document.createElement('div');
+    text.className = 'stepper-control-text stepper-provenance';
+    text.textContent = blockText(control.block);
+    text.title = 'Show this block in the program';
+    text.addEventListener('click', () => locateProvenance(control.block.id));
+    card.appendChild(text);
+  } else if (control.tag === 'Value') {
+    const value = document.createElement('div');
+    value.className = 'stepper-control-text';
+    value.appendChild(valueChip(control.value));
+    card.appendChild(value);
+  } else {
+    const done = document.createElement('div');
+    done.className = 'stepper-control-text';
+    done.textContent = '✓ program finished';
+    card.appendChild(done);
+  }
+  host.appendChild(card);
+
+  if (current.lastRule) {
+    const rule = document.createElement('div');
+    rule.className = 'stepper-control-rule';
+    rule.textContent = `rule · ${current.lastRule}`;
+    host.appendChild(rule);
+  }
+}
+
+const BIN_SYMBOL: Record<string, string> = { add: '+', sub: '-', mul: '*', less: '<', and: '&&' };
+
+/**
+ * One kontinuation frame's label: the pending work with ▢ marking the hole
+ * the in-flight value will fill. Embedded already-computed values render as
+ * chips (Refs keep their heap arrows).
+ */
+function kontEntry(k: Kont): { parts: (string | MachineValue)[]; blockId: string | null } {
+  switch (k.tag) {
+    case 'KStmtSeq': return { parts: ['▢ ; then next statement'], blockId: k.next?.id ?? null };
+    case 'KLoop': return { parts: ['loop ▸ repeat the body'], blockId: k.block.id };
+    case 'KIf': return { parts: ['if ▢ ▸ pick a branch'], blockId: k.block.id };
+    case 'KWhile': return { parts: ['while ▢ ▸ body or exit'], blockId: k.block.id };
+    case 'KPrint': return { parts: ['println ( ▢ )'], blockId: null };
+    case 'KAssign': return { parts: [`${k.name} = ▢`], blockId: k.block.id };
+    case 'KArrAssignIdx': return { parts: [`${k.name}[ ▢ ] = …`], blockId: k.block.id };
+    case 'KArrAssignVal': return { parts: [`${k.name}[`, k.index, '] = ▢'], blockId: k.block.id };
+    case 'KNot': return { parts: ['! ▢'], blockId: null };
+    case 'KAnd': return { parts: ['▢ && …'], blockId: k.rightBlock?.id ? k.rightBlock.id : null };
+    case 'KBinL': return { parts: [`▢ ${BIN_SYMBOL[k.op] ?? k.op} …`], blockId: k.rightBlock?.id ?? null };
+    case 'KBinR': return { parts: [k.left, ` ${BIN_SYMBOL[k.op] ?? k.op} ▢`], blockId: null };
+    case 'KLookupArr': return { parts: ['▢ [ … ] ▸ evaluate the array'], blockId: k.indexBlock?.id ?? null };
+    case 'KLookupIdx': return { parts: [k.arr, ' [ ▢ ]'], blockId: null };
+    case 'KLength': return { parts: ['▢ .length'], blockId: null };
+    case 'KNewArr': return { parts: ['new int [ ▢ ]'], blockId: k.block.id };
+    case 'KCallRecv': return { parts: ['▢ .method(…) ▸ evaluate the receiver'], blockId: k.block.id };
+    case 'KCallArgs':
+      return {
+        parts: [k.recv, ` ▸ argument ${k.done.length + 1} of ${k.done.length + 1 + k.remaining.length}`],
+        blockId: k.block.id
+      };
+  }
+}
+
+function renderKont(): void {
+  const host = byId<HTMLDivElement>('stepper-kont');
+  host.innerHTML = '';
+  if (!current) {
+    host.appendChild(hint('Pending work, innermost first. Each call frame keeps its own kontinuation stack; ▢ is the hole the in-flight value fills.'));
+    return;
+  }
+  const frames = [...current.stack].reverse();
+  frames.forEach((frame: Frame, frameIndex) => {
+    const isTopFrame = frameIndex === 0;
+    const section = document.createElement('div');
+    section.className = `stepper-kont-frame${isTopFrame ? ' is-top' : ''}`;
+
+    const title = document.createElement('div');
+    title.className = 'stepper-kont-frame-title stepper-provenance';
+    title.textContent = frame.method;
+    title.title = 'Show this frame’s method';
+    title.addEventListener('click', () => locateProvenance(frame.callBlockId ?? frame.blockId));
+    section.appendChild(title);
+
+    const konts = [...frame.kont].reverse(); // innermost (next to fire) first
+    if (konts.length === 0 && !frame.returnBlock) {
+      const empty = document.createElement('div');
+      empty.className = 'stepper-kont-empty';
+      empty.textContent = '(no pending work)';
+      section.appendChild(empty);
+    }
+    konts.forEach((k, i) => {
+      const { parts, blockId } = kontEntry(k);
+      const row = document.createElement('div');
+      row.className = `stepper-kont-entry${isTopFrame && i === 0 ? ' is-next' : ''}`;
+      for (const part of parts) {
+        if (typeof part === 'string') row.append(part);
+        else row.appendChild(valueChip(part));
+      }
+      if (blockId) {
+        row.classList.add('stepper-provenance');
+        row.title = 'Show the block waiting on this value';
+        row.addEventListener('click', () => locateProvenance(blockId));
+      }
+      section.appendChild(row);
+    });
+    if (frame.returnBlock) {
+      const ret = document.createElement('div');
+      ret.className = 'stepper-kont-entry stepper-kont-return';
+      ret.textContent = `⏎ return ▢ to the caller`;
+      section.appendChild(ret);
+    }
+    host.appendChild(section);
+  });
+}
+
 function renderFrames(): void {
   const host = byId<HTMLDivElement>('stepper-frames');
   host.innerHTML = '';
@@ -284,14 +426,16 @@ function renderOutput(): void {
     : current.status === 'error'
       ? `⨯ ${current.error}`
       : undefined;
-  mirrorProgramOutput(`Stepper · Model ${current.model}`, current.output, note);
+  mirrorProgramOutput(`CSESK · Model ${current.model}`, current.output, note);
 }
 
 function renderAll(): void {
   renderStatus();
   renderButtons();
+  renderControl();
   renderFrames();
   renderHeap();
+  renderKont();
   renderOutput();
   if (current && !stale) setHighlight(current.status === 'running' ? current.focusBlockId : null);
   scheduleArrowRedraw(true);
@@ -347,7 +491,7 @@ function drawArrows(pulse: boolean): void {
   }
 
   const chips = document.querySelectorAll<HTMLElement>(
-    '#stepper-frames [data-ref-loc], #stepper-heap [data-ref-loc]'
+    '#stepper-control [data-ref-loc], #stepper-frames [data-ref-loc], #stepper-heap [data-ref-loc], #stepper-kont [data-ref-loc]'
   );
   for (const chip of chips) {
     const loc = Number(chip.dataset.refLoc);

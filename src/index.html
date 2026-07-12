@@ -163,8 +163,8 @@
               <button class="viz-tab" data-kind="value" role="tab" type="button" aria-selected="false" title="Call-by-Value">
                 <span class="viz-tab-icon" aria-hidden="true">V</span><span class="viz-tab-label">Call-by-Value</span>
               </button>
-              <button class="viz-tab" data-kind="machine" role="tab" type="button" aria-selected="false" title="Step the program on the Model A machine (heap and frames)">
-                <span class="viz-tab-icon" aria-hidden="true">A</span><span class="viz-tab-label">Stepper</span>
+              <button class="viz-tab" data-kind="machine" role="tab" type="button" aria-selected="false" title="Step the program on the Model A CSESK machine — Control · Stack · Environment · Store · Kontinuation">
+                <span class="viz-tab-icon" aria-hidden="true">A</span><span class="viz-tab-label">CSESK</span>
               </button>
               <button class="viz-tab" data-kind="compare" role="tab" type="button" aria-selected="false" title="Step the same program under Model A and Model B in lockstep">
                 <span class="viz-tab-icon" aria-hidden="true">⇄</span><span class="viz-tab-label">A vs B</span>
@@ -192,15 +192,23 @@
                   <button id="stepper-play" class="stepper-button" type="button" title="Step automatically">⏵ Play</button>
                   <span id="stepper-status" class="stepper-status" aria-live="polite"></span>
                 </div>
-                <div class="stepper-panels">
+                <div class="stepper-panels stepper-panels-csesk">
                   <svg id="stepper-arrows" class="stepper-arrows" aria-hidden="true"></svg>
-                  <section class="stepper-panel" aria-label="Call stack and locals">
-                    <h3>Call Stack</h3>
+                  <section class="stepper-panel" aria-label="Control — what the machine evaluates next">
+                    <h3><span class="csesk-letter">C</span> Control</h3>
+                    <div id="stepper-control" class="stepper-panel-body"></div>
+                  </section>
+                  <section class="stepper-panel" aria-label="Call stack and environment (per-frame locals)">
+                    <h3><span class="csesk-letter">S·E</span> Stack + Environment</h3>
                     <div id="stepper-frames" class="stepper-panel-body"></div>
                   </section>
-                  <section class="stepper-panel" aria-label="Heap objects">
-                    <h3>Heap</h3>
+                  <section class="stepper-panel" aria-label="Store (heap objects)">
+                    <h3><span class="csesk-letter">S</span> Store</h3>
                     <div id="stepper-heap" class="stepper-panel-body"></div>
+                  </section>
+                  <section class="stepper-panel" aria-label="Kontinuation — pending work, innermost first">
+                    <h3><span class="csesk-letter">K</span> Kontinuation</h3>
+                    <div id="stepper-kont" class="stepper-panel-body"></div>
                   </section>
                   <section class="stepper-panel" aria-label="Program output">
                     <h3>Output</h3>

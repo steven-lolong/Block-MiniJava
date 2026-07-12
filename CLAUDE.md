@@ -7,5 +7,5 @@
   (type system §1, Model A stepper §6, substitution rewriter + correspondence §7, A/B
   lockstep §8) are implemented — see the README's "Type system" and "Semantics & steppers"
   sections for the code map.
-- Before committing: `npm run typecheck` and `npm test` (four headless suites). `npm run build`
+- Before committing: `npm run typecheck` and `npm test` (five headless suites). `npm run build`
   regenerates `docs/`, which is tracked (GitHub Pages) — rebuild it when `src/` changes.

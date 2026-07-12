@@ -1,9 +1,10 @@
 /**
- * The Model A machine panel (viz-dock "CSESK" tab).
+ * The Model A machine panel (viz-dock "CESK" tab).
  *
- * Renders the machine state as one column per CSESK component — C·ontrol,
- * S·tack + E·nvironment (the call stack with per-frame locals), S·tore (the
- * heap), K·ontinuation (pending work, innermost first) — plus the output log.
+ * Renders the machine state as one column per CESK component, over an explicit
+ * activation-frame stack — C·ontrol, E·nvironment (grouped into the call
+ * stack's per-frame locals), S·tore (the heap), K·ontinuation (pending work,
+ * innermost first) — plus the output log.
  * The program surface is the main workspace itself (the focus block is
  * highlighted there). Ref values and heap boxes share a per-Loc hue — the
  * poor man's arrow: two chips with one color are two arrows to one box.
@@ -426,7 +427,7 @@ function renderOutput(): void {
     : current.status === 'error'
       ? `⨯ ${current.error}`
       : undefined;
-  mirrorProgramOutput(`CSESK · Model ${current.model}`, current.output, note);
+  mirrorProgramOutput(`CESK · Model ${current.model}`, current.output, note);
 }
 
 function renderAll(): void {

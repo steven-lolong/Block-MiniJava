@@ -7,7 +7,7 @@
 
 > **Implementation status (2026-07-08):** every artifact this note specifies is built.
 > §1 type layers → `src/core/types/` (Problems tab). §6 Model A machine →
-> `src/core/semantics/minijavaMachine.ts` + the CSESK tab (one column per machine
+> `src/core/semantics/minijavaMachine.ts` + the CESK tab (one column per machine
 > component: Control · Stack + Environment · Store · Kontinuation). §8 A/B lockstep → the same
 > machine parameterized by `ValueModel` + the A vs B tab. §7 substitution + machine
 > correspondence → `src/core/semantics/minijavaSubstitution.ts` + the Rewrite tab.
@@ -309,7 +309,7 @@ Two rendering modes, and building BOTH (shown to agree) is the high-value resear
   deep-copy `v`'s block-tree into every `x`-hole, discard the redex. Structure-preservation
   invariant: the copy is a deep CLOSED subtree; two occurrences must be INDEPENDENT copies
   (no shared node with two parents — that would secretly be Model A). No environment panel needed.
-- **Machine view (under the hood):** render the CSESK configuration (control / environment /
+- **Machine view (under the hood):** render the CESK configuration (control / environment /
   closures / continuation stack); occurrences of `x` are looked up in the environment rather
   than physically substituted.
 
@@ -321,7 +321,7 @@ Target renders:
   value-block, not an arrow. Env table is a SNAPSHOT (capture-by-copy) — "what you see is what
   it captured", no post-capture spooky action.
 
-**Research payoff:** step substitution semantics and the CSESK machine in lockstep and show
+**Research payoff:** step substitution semantics and the CESK machine in lockstep and show
 each machine step realises the corresponding substitution (env lookup = lazy substitution).
 A steppable operational-correspondence demo strengthens the Hazel/Hazelnut comparison by
 making CbS behaviour legible at a glance.
@@ -336,12 +336,12 @@ making CbS behaviour legible at a glance.
    either implementation.
 2. Otherwise pick the committed vehicle and build its `step(State): State` over the core
    rules — Vehicle 1: `new`, field-read, field-write, assign, call, return, println (four
-   panels). Vehicle 2: substitution stepper + optional CSESK machine view (single surface).
+   panels). Vehicle 2: substitution stepper + optional CESK machine view (single surface).
 
 ## Open theory items (from MnL work, may interact) — ALL RESOLVED 2026-07-09
 - ~~Machine type-soundness proof.~~ **DONE**: mechanized in Coq as
-  `Paper-Live-Types…/artifact/proofs/Machine.v` — a CESK-style model of the CSESK
-  stepper (`cseskMachine/machine.ts`, frames matched one-to-one: FAppL~KArg,
+  `Paper-Live-Types…/artifact/proofs/Machine.v` — a CESK-style Coq model (no store,
+  hence CEK) of MNL's machine (`csekMachine/machine.ts`, frames matched one-to-one: FAppL~KArg,
   FAppR~KApply, FLet~KBind), with `preservation` + `progress` + `machine_soundness`
   (never stuck; final answers typed), axiom-free/admit-free, total step function so
   determinism is definitional. Paper: Thm. "Machine type soundness" in

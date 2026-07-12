@@ -1282,7 +1282,8 @@ body.code-hidden .code-column {
   color: var(--aquamarine);
 }
 
-/* One column per CSESK machine component, in machine order:
+/* One column per CESK machine component, in machine order, over an explicit
+   activation-frame stack:
    C·ontrol | S·tack + E·nvironment | S·tore | K·ontinuation | output. */
 .stepper-panels {
   position: relative;

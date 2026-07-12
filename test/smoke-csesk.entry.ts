@@ -1,6 +1,6 @@
 /**
- * CSESK panel smoke: drives the real stepper panel end-to-end under jsdom —
- * load a program, click Step to completion, and assert that every CSESK
+ * CESK panel smoke: drives the real stepper panel end-to-end under jsdom —
+ * load a program, click Step to completion, and assert that every CESK
  * column (Control, Stack+Environment, Store, Kontinuation) rendered content
  * and the machine finished with the right output.
  * Run with: npm test (or node test/dist/smoke.bundle.js after test:build).
@@ -73,5 +73,5 @@ if (failures) {
   console.log(`${failures} smoke failure(s)`);
   process.exitCode = 1;
 } else {
-  console.log('CSESK panel smoke CLEAN');
+  console.log('CESK panel smoke CLEAN');
 }

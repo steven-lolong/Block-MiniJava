@@ -504,11 +504,22 @@ function onExampleLoaded(example: MiniJavaExample): void {
   saveAutosave();
 }
 
-function renderToolbox(): void {
+function renderToolbox(query = ''): void {
   const root = byId<HTMLDivElement>('toolbox-content');
   root.innerHTML = '';
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  let visibleBlockCount = 0;
 
   for (const category of MINI_JAVA_CATEGORIES) {
+    const categoryMatches = category.label.toLocaleLowerCase().includes(normalizedQuery)
+      || category.id.toLocaleLowerCase().includes(normalizedQuery);
+    const visibleBlocks = normalizedQuery && !categoryMatches
+      ? category.blocks.filter((block) =>
+          block.label.toLocaleLowerCase().includes(normalizedQuery)
+          || block.type.toLocaleLowerCase().includes(normalizedQuery))
+      : category.blocks;
+    if (visibleBlocks.length === 0) continue;
+
     const group = document.createElement('section');
     group.className = 'toolbox-category';
     group.dataset.category = category.id;
@@ -523,7 +534,7 @@ function renderToolbox(): void {
 
     const list = document.createElement('div');
     list.className = 'toolbox-block-list';
-    for (const block of category.blocks) {
+    for (const block of visibleBlocks) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'toolbox-block-button';
@@ -543,10 +554,19 @@ function renderToolbox(): void {
         byId<HTMLDivElement>('blockly-area').classList.remove('workspace-drop-target');
       });
       list.appendChild(button);
+      visibleBlockCount += 1;
     }
 
     group.append(header, list);
     root.appendChild(group);
+  }
+
+  if (visibleBlockCount === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'toolbox-search-empty';
+    empty.setAttribute('role', 'status');
+    empty.textContent = `No blocks found for “${query.trim()}”.`;
+    root.appendChild(empty);
   }
 }
 
@@ -766,6 +786,9 @@ function updateMenuToggle(open: boolean): void {
 }
 
 function wireEvents(): void {
+  byId<HTMLInputElement>('toolbox-search').addEventListener('input', (event) => {
+    renderToolbox((event.currentTarget as HTMLInputElement).value);
+  });
   byId<HTMLButtonElement>('new-workspace').addEventListener('click', newWorkspace);
   byId<HTMLButtonElement>('save-workspace').addEventListener('click', downloadWorkspace);
   byId<HTMLButtonElement>('load-workspace').addEventListener('click', () => byId<HTMLInputElement>('load-file-input').click());

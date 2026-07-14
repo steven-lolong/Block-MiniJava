@@ -451,6 +451,10 @@ body.toolbox-hidden.code-hidden .ide-layout {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
+.toolbox-column {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
 .code-column {
   grid-template-rows: auto auto minmax(0, 1fr);
 }
@@ -565,6 +569,44 @@ body:not(.code-hidden) #toggle-code-column {
   overflow: auto;
   padding: 10px;
   scrollbar-color: var(--border-strong) transparent;
+}
+
+.toolbox-search {
+  position: relative;
+  display: block;
+  padding: 10px 10px 0;
+}
+
+.toolbox-search input {
+  width: 100%;
+  padding: 10px 38px 10px 12px;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  outline: none;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+.toolbox-search input:focus {
+  border-color: var(--aquamarine);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--aquamarine) 18%, transparent);
+}
+
+.toolbox-search span {
+  position: absolute;
+  right: 23px;
+  top: calc(50% + 5px);
+  color: var(--muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.toolbox-search-empty {
+  margin: 12px 4px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .toolbox-category {

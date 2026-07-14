@@ -88,14 +88,12 @@ function puzzleFromPoints(type: number, width: number, height: number, downPoint
   return puzzle(type, width, height, line(downPoints), line(mirrorVertical(downPoints)));
 }
 
+function notch(type: number, width: number, height: number, left: string, right: string): Notch {
+  return { type, width, height, pathLeft: left, pathRight: right };
+}
+
 function notchFromPoints(type: number, width: number, height: number, leftPoints: readonly Point[]): Notch {
-  return {
-    type,
-    width,
-    height,
-    pathLeft: line(leftPoints),
-    pathRight: line(mirrorHorizontal(leftPoints))
-  };
+  return notch(type, width, height, line(leftPoints), line(mirrorHorizontal(leftPoints)));
 }
 
 function primaryCheck(connection: Blockly.RenderedConnection): string | null {
@@ -227,13 +225,16 @@ class MiniJavaConstantProvider extends Blockly.blockRendering.ConstantProvider {
         [6, -6]
       ]),
       Statement: statementShape,
-      FormalParameter: notchFromPoints(type, 18, 5, [
-        [3, 0],
-        [0, 5],
-        [12, 0],
-        [0, -5],
-        [3, 0]
-      ]),
+      // The smooth arch is deliberately from a different visual family than
+      // ClassDeclaration's box and VarDeclaration's angular zigzag.  The
+      // cubic reaches about 4.5px deep and retains the common 18px spacing.
+      FormalParameter: notch(
+        type,
+        18,
+        5,
+        ' l 3,0 c 0,6 12,6 12,0 l 3,0 ',
+        ' l -3,0 c 0,6 -12,6 -12,0 l -3,0 '
+      ),
       // ExpressionArg reuses the formal/list-item notch family.  The Blockly
       // connection check still prevents arguments and formal parameters from
       // connecting to each other.

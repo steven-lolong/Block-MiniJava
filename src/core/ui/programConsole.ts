@@ -10,10 +10,12 @@ const EMPTY_HINT = '(no output yet)';
 
 let mirroredBody = '';
 
-function consoleEl(): HTMLPreElement {
-  const el = document.getElementById('program-output');
-  if (!el) throw new Error('Missing element #program-output');
-  return el as HTMLPreElement;
+function consoleEls(): HTMLPreElement[] {
+  const elements = ['program-output', 'bottom-program-output']
+    .map((id) => document.getElementById(id))
+    .filter((element): element is HTMLPreElement => element?.tagName === 'PRE');
+  if (elements.length === 0) throw new Error('Missing program output surfaces');
+  return elements;
 }
 
 /**
@@ -21,27 +23,29 @@ function consoleEl(): HTMLPreElement {
  * a run that has ended (finished or stuck), so the empty hint drops "yet".
  */
 export function mirrorProgramOutput(source: string, lines: string[], note?: string): void {
-  const el = consoleEl();
   const body = lines.join('\n');
   const parts = [`[${source}]`, body || (note ? '(no output)' : EMPTY_HINT)];
   if (note) parts.push(note);
-  el.textContent = parts.join('\n');
-  el.scrollTop = el.scrollHeight;
-  if (body && body !== mirroredBody) {
-    el.classList.remove('is-console-changed');
-    void el.offsetWidth; /* restart the flash animation */
-    el.classList.add('is-console-changed');
-  } else if (!body) {
-    el.classList.remove('is-console-changed');
+  for (const el of consoleEls()) {
+    el.textContent = parts.join('\n');
+    el.scrollTop = el.scrollHeight;
+    if (body && body !== mirroredBody) {
+      el.classList.remove('is-console-changed');
+      void el.offsetWidth; /* restart the flash animation */
+      el.classList.add('is-console-changed');
+    } else if (!body) {
+      el.classList.remove('is-console-changed');
+    }
   }
   mirroredBody = body;
 }
 
 /** Appends an editor-action log line (export, clipboard, …). */
 export function appendConsoleLog(message: string): void {
-  const el = consoleEl();
-  const text = el.textContent?.trim();
-  el.textContent = text && text !== 'No run yet.' ? `${text}\n${message}` : message;
-  el.scrollTop = el.scrollHeight;
+  for (const el of consoleEls()) {
+    const text = el.textContent?.trim();
+    el.textContent = text && text !== 'No run yet.' ? `${text}\n${message}` : message;
+    el.scrollTop = el.scrollHeight;
+  }
   mirroredBody = '';
 }

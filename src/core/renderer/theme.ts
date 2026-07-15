@@ -2,11 +2,11 @@ import * as Blockly from 'blockly';
 import { MINI_JAVA_BLOCK_TYPES, MiniJavaBlockType, miniJavaBlockStyle } from '../blocks/minijavaBlocks';
 
 export const COPPER_AQUAMARINE_DARK = {
-  bg: '#0d1312',
-  panel: '#172220',
-  panel2: '#263733',
-  text: '#f1ece5',
-  muted: '#b8aaa0',
+  bg: '#171a20',
+  panel: '#1a1d24',
+  panel2: '#242832',
+  text: '#f1f3f5',
+  muted: '#a9b0bc',
   copper: '#d08355',
   copperStrong: '#f0a36f',
   aquamarine: '#45d5c0',
@@ -17,11 +17,11 @@ export const COPPER_AQUAMARINE_DARK = {
 };
 
 export const COPPER_AQUAMARINE_LIGHT = {
-  bg: '#fffaf4',
-  panel: '#f4efe8',
-  panel2: '#e7ddd1',
-  text: '#26211d',
-  muted: '#71635a',
+  bg: '#f7f8fa',
+  panel: '#f3f5f7',
+  panel2: '#e9edf2',
+  text: '#202631',
+  muted: '#606b79',
   copper: '#ad5f37',
   copperStrong: '#8d4526',
   aquamarine: '#158f83',
@@ -159,7 +159,7 @@ export function createBlocklyTheme(mode: 'dark' | 'light'): Blockly.Theme {
       flyoutBackgroundColour: p.panel2,
       flyoutForegroundColour: p.text,
       flyoutOpacity: 0.98,
-      scrollbarColour: mode === 'dark' ? '#48635e' : '#b9aa9b',
+      scrollbarColour: mode === 'dark' ? '#414955' : '#b8c0cb',
       insertionMarkerColour: p.gold,
       insertionMarkerOpacity: 0.45,
       markerColour: p.copper,

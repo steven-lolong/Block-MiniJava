@@ -5,7 +5,16 @@ import { highlightMiniJava } from '../generator/highlighter';
 import { BLOCKLY_RENDERER, createBlocklyTheme } from '../renderer/theme';
 import { registerMiniJavaRenderer } from '../renderer/minijavaRenderer';
 import { registerMiniJavaContextMenus } from './contextMenus';
-import { disposeVizWorkspaces, initVisualizationPanel, setVizOpen } from './visualizationPanel';
+import {
+  disposeVizWorkspaces,
+  initVisualizationPanel,
+  isVizOpen,
+  openBottomTool,
+  openVisualization,
+  resizeVisualizationPanel,
+  setVizOpen,
+  type VizKind
+} from './visualizationPanel';
 import { initExamplesMenu } from './examplesMenu';
 import type { MiniJavaExample } from '../examples';
 import { installEditableMiniJavaCodeEditor, type EditableMiniJavaCodeEditor } from './codeEditor';
@@ -15,11 +24,17 @@ import { initComparePanel } from './comparePanel';
 import { initSubstPanel } from './substPanel';
 import { appendConsoleLog, mirrorProgramOutput } from './programConsole';
 import { injectMachine, run } from '../semantics/minijavaMachine';
+import { installCommandPalette, type IdeCommand } from './commandPalette';
 
 const AUTOSAVE_KEY = 'block-minijava.autosave.v2';
 const THEME_KEY = 'block-minijava.theme';
 const AUTOSAVE_INTERVAL_KEY = 'block-minijava.autosave.interval';
 const CODE_WIDTH_KEY = 'block-minijava.code.width';
+const CODE_VISIBLE_KEY = 'block-minijava.layout.code.visible';
+const SIDEBAR_WIDTH_KEY = 'block-minijava.layout.sidebar.width';
+const SIDEBAR_VISIBLE_KEY = 'block-minijava.layout.sidebar.visible';
+const ACTIVE_ACTIVITY_KEY = 'block-minijava.layout.activity';
+const PERSPECTIVE_KEY = 'block-minijava.layout.perspective';
 
 let workspace: Blockly.WorkspaceSvg | null = null;
 let codeEditor: EditableMiniJavaCodeEditor | null = null;
@@ -32,6 +47,14 @@ let toolboxHidden = false;
 let currentTheme: 'dark' | 'light' = 'dark';
 let clickAddOffset = 0;
 let enforcingRequiredBlocks = false;
+let activeActivity: ActivityKind = 'blocks';
+let currentPerspective: Perspective = 'edit';
+let applyingPerspective = false;
+let codeMaximized = false;
+let compactPanelLayout = window.matchMedia('(max-width: 1100px)').matches;
+let layoutResizeFrame: number | null = null;
+let layoutResizeTimers: number[] = [];
+let layoutResizeObserver: ResizeObserver | null = null;
 
 const TOOLBOX_BLOCK_MIME = 'application/x-block-minijava-block';
 const [GOAL_BLOCK_TYPE, MAIN_BLOCK_TYPE] = MINI_JAVA_REQUIRED_BLOCK_TYPES;
@@ -43,6 +66,17 @@ const BLOCK_WORKSPACE_MUTATION_EVENTS = new Set<string>([
   Blockly.Events.BLOCK_MOVE
 ]);
 type InspectorPanel = 'code' | 'output' | 'problems';
+type ActivityKind = 'blocks' | 'search' | 'run' | 'settings';
+type Perspective = 'edit' | 'debug' | 'types' | 'presentation' | 'custom';
+
+const ACTIVITY_KINDS: ActivityKind[] = ['blocks', 'search', 'run', 'settings'];
+const PERSPECTIVES: Perspective[] = ['edit', 'debug', 'types', 'presentation', 'custom'];
+const ACTIVITY_META: Record<ActivityKind, { title: string; icon: string }> = {
+  blocks: { title: 'Blocks', icon: 'icon-blocks' },
+  search: { title: 'Search Blocks', icon: 'icon-search' },
+  run: { title: 'Run and Analysis', icon: 'icon-run' },
+  settings: { title: 'Settings and Layout', icon: 'icon-settings' }
+};
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -50,20 +84,53 @@ function byId<T extends HTMLElement>(id: string): T {
   return el as T;
 }
 
-function syncBlocklySize(): void {
+function syncLayoutSize(): void {
   if (workspace) {
     Blockly.svgResize(workspace);
   }
+  codeEditor?.resize();
+  resizeVisualizationPanel();
 }
 
-function scheduleBlocklyResize(): void {
-  window.setTimeout(syncBlocklySize, 40);
-  window.setTimeout(syncBlocklySize, 160);
+/**
+ * One coordinator for shell-level layout changes. The animation frame handles
+ * pointer-driven resizing; the settle passes cover CSS grid transitions.
+ */
+function requestLayoutResize(settle = true): void {
+  if (layoutResizeFrame === null) {
+    layoutResizeFrame = window.requestAnimationFrame(() => {
+      layoutResizeFrame = null;
+      syncLayoutSize();
+    });
+  }
+  if (!settle) return;
+  for (const timer of layoutResizeTimers) window.clearTimeout(timer);
+  layoutResizeTimers = [
+    window.setTimeout(syncLayoutSize, 60),
+    window.setTimeout(syncLayoutSize, 180)
+  ];
 }
 
-function setEyeIcon(button: HTMLElement, isEyeOff: boolean): void {
-  const icon = button.querySelector<HTMLElement>('.eye-symbol');
-  if (icon) icon.classList.toggle('eye-off', isEyeOff);
+function initLayoutResizeCoordinator(): void {
+  if ('ResizeObserver' in window) {
+    layoutResizeObserver = new ResizeObserver(() => requestLayoutResize(false));
+    for (const id of ['blockly-area', 'toolbox-column', 'code-column', 'viz-dock']) {
+      const element = document.getElementById(id);
+      if (element) layoutResizeObserver.observe(element);
+    }
+  }
+  requestLayoutResize();
+}
+
+function storedBoolean(key: string, fallback: boolean): boolean {
+  const value = localStorage.getItem(key);
+  return value === 'true' ? true : value === 'false' ? false : fallback;
+}
+
+function updateProjectIdentity(): void {
+  const fileLabel = byId<HTMLDivElement>('loaded-file-label').textContent?.trim();
+  const projectName = document.querySelector<HTMLElement>('.project-name');
+  if (projectName) projectName.textContent = fileLabel || 'Project.java';
 }
 
 function workspaceFileDisplayName(): string {
@@ -121,11 +188,16 @@ function createBlockInWorkspace(type: string, position: { x: number; y: number }
     ensureRequiredBlocks(workspace);
     return;
   }
-  const block = workspace.newBlock(type);
-  block.initSvg();
-  block.render();
-  block.moveBy(position.x, position.y);
-  block.select();
+  Blockly.Events.setGroup(true);
+  try {
+    const block = workspace.newBlock(type);
+    block.initSvg();
+    block.render();
+    block.moveBy(position.x, position.y);
+    block.select();
+  } finally {
+    Blockly.Events.setGroup(false);
+  }
   updateCode();
   saveAutosave();
 }
@@ -143,6 +215,9 @@ function updateCode(): void {
   } else {
     byId<HTMLElement>('generated-code').innerHTML = highlightMiniJava(latestCode);
   }
+  const blockCount = workspace.getAllBlocks(false).length;
+  byId<HTMLSpanElement>('status-block-count').textContent = `${blockCount} block${blockCount === 1 ? '' : 's'}`;
+  updateProjectIdentity();
   scheduleTypeCheck();
 }
 
@@ -261,6 +336,7 @@ function scheduleRequiredBlockEnforcement(): void {
 function runProgram(): void {
   if (!workspace) return;
   selectInspectorPanel('output');
+  openBottomTool('output');
   const initial = injectMachine(workspace, 'A');
   if ('injectError' in initial) {
     mirrorProgramOutput('Run', [], `⨯ ${initial.injectError}`);
@@ -278,10 +354,125 @@ function selectInspectorPanel(panel: InspectorPanel): void {
     const isActive = tab.dataset.panel === panel;
     tab.classList.toggle('is-active', isActive);
     tab.setAttribute('aria-selected', String(isActive));
+    tab.tabIndex = isActive ? 0 : -1;
   }
   for (const section of Array.from(document.querySelectorAll<HTMLElement>('.inspector-panel'))) {
     section.classList.toggle('is-active', section.id === `panel-${panel}`);
   }
+  requestLayoutResize(false);
+}
+
+function updateActivityButtons(): void {
+  const compact = window.matchMedia('(max-width: 1100px)').matches;
+  const sidebarOpen = !toolboxHidden && (!compact || document.body.classList.contains('mobile-sidebar-open'));
+  for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.activity-item[data-activity]'))) {
+    const selected = button.dataset.activity === activeActivity;
+    button.classList.toggle('is-active', selected);
+    button.setAttribute('aria-pressed', String(selected && sidebarOpen));
+  }
+}
+
+function setActiveActivity(activity: ActivityKind, ensureVisible = true, focusSearch = activity === 'search'): void {
+  activeActivity = activity;
+  document.body.dataset.activity = activity;
+  localStorage.setItem(ACTIVE_ACTIVITY_KEY, activity);
+  updateActivityButtons();
+
+  const meta = ACTIVITY_META[activity];
+  byId<HTMLSpanElement>('sidebar-title').textContent = meta.title;
+  byId<HTMLSpanElement>('sidebar-title-icon').className = `icon ${meta.icon}`;
+  for (const view of Array.from(document.querySelectorAll<HTMLElement>('.sidebar-view[data-activity-view]'))) {
+    const visible = (view.dataset.activityView ?? '').split(/\s+/).includes(activity);
+    view.classList.toggle('is-active', visible);
+    view.setAttribute('aria-hidden', String(!visible));
+  }
+
+  if (ensureVisible) setToolboxHidden(false);
+  if (focusSearch) window.requestAnimationFrame(() => byId<HTMLInputElement>('toolbox-search').focus());
+}
+
+function setPerspectiveIdentity(perspective: Perspective, persist = true): void {
+  currentPerspective = perspective;
+  document.body.dataset.perspective = perspective;
+  document.body.classList.toggle('presentation-mode', perspective === 'presentation');
+  const select = byId<HTMLSelectElement>('perspective-select');
+  const customOption = select.querySelector<HTMLOptionElement>('option[value="custom"]');
+  if (customOption) customOption.hidden = perspective !== 'custom';
+  select.value = perspective;
+  const label = perspective === 'types'
+    ? 'Type Analysis'
+    : perspective.charAt(0).toLocaleUpperCase() + perspective.slice(1);
+  byId<HTMLSpanElement>('status-perspective-label').textContent = label;
+  for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.perspective-option'))) {
+    button.classList.toggle('is-active', button.dataset.perspective === perspective);
+  }
+  if (persist) localStorage.setItem(PERSPECTIVE_KEY, perspective);
+}
+
+function markPerspectiveCustom(): void {
+  if (!applyingPerspective && currentPerspective !== 'custom') setPerspectiveIdentity('custom');
+}
+
+function showProblems(): void {
+  openBottomTool('problems');
+  if (workspace) refreshTypeDiagnostics(workspace);
+}
+
+function applyPerspective(perspective: Perspective): void {
+  applyingPerspective = true;
+  try {
+    setPerspectiveIdentity(perspective);
+    if (perspective === 'edit') {
+      setActiveActivity('blocks', false, false);
+      setToolboxHidden(false);
+      setCodeHidden(false);
+      setCodeMaximized(false);
+      selectInspectorPanel('code');
+      setVizOpen(false);
+    } else if (perspective === 'debug') {
+      setActiveActivity('run', false, false);
+      setToolboxHidden(false);
+      setCodeHidden(false);
+      setCodeMaximized(false);
+      selectInspectorPanel('output');
+      openBottomTool('machine');
+    } else if (perspective === 'types') {
+      setActiveActivity('blocks', false, false);
+      setToolboxHidden(false);
+      setCodeHidden(false);
+      setCodeMaximized(false);
+      selectInspectorPanel('problems');
+      openBottomTool('problems');
+      if (workspace) refreshTypeDiagnostics(workspace);
+    } else if (perspective === 'presentation') {
+      setCodeMaximized(false);
+      setToolboxHidden(true);
+      setCodeHidden(true);
+      setVizOpen(false);
+    }
+  } finally {
+    applyingPerspective = false;
+    if (window.matchMedia('(max-width: 1100px)').matches) {
+      document.body.classList.remove('mobile-sidebar-open', 'mobile-code-open');
+    }
+    requestLayoutResize();
+  }
+}
+
+function openAnalysisTool(kind: VizKind): void {
+  if (kind !== 'structure' && kind !== 'value') {
+    openBottomTool(kind);
+    return;
+  }
+  if (!workspace) return;
+  const selected = Blockly.common.getSelected() as Blockly.BlockSvg | null;
+  const selectedBlock = selected && workspace.getBlockById(selected.id) ? selected : null;
+  const block = selectedBlock ?? workspace.getTopBlocks(true)[0];
+  if (!block) {
+    scheduleAutosaveStatus('Add or select a block to visualize');
+    return;
+  }
+  openVisualization(kind, block as Blockly.BlockSvg);
 }
 
 function scheduleAutosaveStatus(message: string): void {
@@ -346,43 +537,66 @@ function applyTheme(theme: 'dark' | 'light'): void {
   input.setAttribute('aria-label', theme === 'dark' ? 'Dark theme on' : 'Light theme on');
   if (workspace) workspace.setTheme(createBlocklyTheme(theme));
   disposeVizWorkspaces();
+  requestLayoutResize();
+}
+
+function setCodeMaximized(next: boolean): void {
+  codeMaximized = next;
+  if (next && codeHidden) setCodeHidden(false);
+  document.body.classList.toggle('code-maximized', next);
+  const button = byId<HTMLButtonElement>('toggle-code-maximize');
+  button.setAttribute('aria-pressed', String(next));
+  button.setAttribute('aria-label', next ? 'Restore inspector' : 'Maximize inspector');
+  button.title = next ? 'Restore inspector' : 'Maximize inspector';
+  const glyph = button.querySelector<HTMLElement>('.toolbar-glyph');
+  if (glyph) glyph.textContent = next ? '◱' : '□';
+  requestLayoutResize();
 }
 
 function setCodeHidden(next: boolean): void {
   codeHidden = next;
+  if (next && codeMaximized) setCodeMaximized(false);
   document.body.classList.toggle('code-hidden', codeHidden);
+  if (window.matchMedia('(max-width: 1100px)').matches) {
+    document.body.classList.toggle('mobile-code-open', !codeHidden);
+  } else if (codeHidden) {
+    document.body.classList.remove('mobile-code-open');
+  }
+  localStorage.setItem(CODE_VISIBLE_KEY, String(!codeHidden));
 
   const column = byId<HTMLButtonElement>('toggle-code-column');
   const showButton = byId<HTMLButtonElement>('show-code-button');
 
-  setEyeIcon(column, !codeHidden);
-  setEyeIcon(showButton, false);
+  column.title = codeHidden ? 'Show inspector' : 'Hide inspector';
+  column.setAttribute('aria-label', codeHidden ? 'Show inspector' : 'Hide inspector');
+  showButton.title = 'Show MiniJava inspector';
+  showButton.setAttribute('aria-label', 'Show MiniJava inspector');
+  byId<HTMLButtonElement>('settings-toggle-code').setAttribute('aria-pressed', String(!codeHidden));
 
-  column.title = codeHidden ? 'Show code' : 'Hide code';
-  column.setAttribute('aria-label', codeHidden ? 'Show code' : 'Hide code');
-  showButton.title = 'Show MiniJava';
-  showButton.setAttribute('aria-label', 'Show MiniJava code');
-
-  scheduleBlocklyResize();
+  requestLayoutResize();
 }
 
 
 function setToolboxHidden(next: boolean): void {
   toolboxHidden = next;
   document.body.classList.toggle('toolbox-hidden', toolboxHidden);
+  if (window.matchMedia('(max-width: 1100px)').matches) {
+    document.body.classList.toggle('mobile-sidebar-open', !toolboxHidden);
+  } else if (toolboxHidden) {
+    document.body.classList.remove('mobile-sidebar-open');
+  }
+  localStorage.setItem(SIDEBAR_VISIBLE_KEY, String(!toolboxHidden));
 
   const button = byId<HTMLButtonElement>('toggle-toolbox');
   const showButton = byId<HTMLButtonElement>('show-toolbox-button');
 
-  setEyeIcon(button, !toolboxHidden);
-  setEyeIcon(showButton, false);
+  button.title = toolboxHidden ? 'Show sidebar' : 'Hide sidebar';
+  button.setAttribute('aria-label', toolboxHidden ? 'Show sidebar' : 'Hide sidebar');
+  showButton.title = 'Show sidebar';
+  showButton.setAttribute('aria-label', 'Show sidebar');
+  updateActivityButtons();
 
-  button.title = toolboxHidden ? 'Show Toolbox' : 'Hide Toolbox';
-  button.setAttribute('aria-label', toolboxHidden ? 'Show toolbox' : 'Hide toolbox');
-  showButton.title = 'Show Toolbox';
-  showButton.setAttribute('aria-label', 'Show toolbox');
-
-  scheduleBlocklyResize();
+  requestLayoutResize();
 }
 
 
@@ -407,6 +621,7 @@ function downloadWorkspace(): void {
   a.remove();
   URL.revokeObjectURL(url);
   byId<HTMLDivElement>('loaded-file-label').textContent = fileName;
+  scheduleAutosaveStatus(`Saved ${fileName}`);
 }
 
 function normalizeJavaFileName(value: string): string {
@@ -463,6 +678,7 @@ function loadWorkspaceFile(file: File): void {
       byId<HTMLDivElement>('loaded-file-label').textContent = file.name;
       updateCode();
       saveAutosave();
+      scheduleAutosaveStatus(`Loaded ${file.name}`);
     } catch (error) {
       console.error(error);
       byId<HTMLDivElement>('loaded-file-label').textContent = 'Could not load workspace';
@@ -527,13 +743,17 @@ function renderToolbox(query = ''): void {
     const header = document.createElement('button');
     header.type = 'button';
     header.className = 'toolbox-category-header';
+    header.setAttribute('aria-expanded', 'true');
     header.innerHTML = `<span class="category-left"><span class="category-icon" aria-hidden="true">${category.icon}</span><span>${category.label}</span></span><span class="category-caret" aria-hidden="true">⌄</span>`;
     header.addEventListener('click', () => {
-      group.classList.toggle('collapsed');
+      const collapsed = group.classList.toggle('collapsed');
+      header.setAttribute('aria-expanded', String(!collapsed));
     });
 
     const list = document.createElement('div');
     list.className = 'toolbox-block-list';
+    list.id = `toolbox-category-${category.id}`;
+    header.setAttribute('aria-controls', list.id);
     for (const block of visibleBlocks) {
       const button = document.createElement('button');
       button.type = 'button';
@@ -614,11 +834,56 @@ function initToolboxDragAndDrop(): void {
 }
 
 
+function setSidebarWidth(width: number): void {
+  const maxWidth = Math.max(220, Math.min(420, Math.round(window.innerWidth * 0.45)));
+  const clamped = Math.min(Math.max(width, 220), maxWidth);
+  document.documentElement.style.setProperty('--ide-primary-sidebar-width', `${Math.round(clamped)}px`);
+  localStorage.setItem(SIDEBAR_WIDTH_KEY, String(Math.round(clamped)));
+  requestLayoutResize(false);
+}
+
+function initSidebarResizer(): void {
+  const resizer = byId<HTMLDivElement>('sidebar-resizer');
+  let startX = 0;
+  let startWidth = 0;
+
+  const readSidebarWidth = (): number => {
+    const width = byId<HTMLElement>('toolbox-column').getBoundingClientRect().width;
+    return width
+      || Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ide-primary-sidebar-width'), 10)
+      || 270;
+  };
+  const onPointerMove = (event: PointerEvent): void => setSidebarWidth(startWidth + event.clientX - startX);
+  const stopResize = (): void => {
+    document.body.classList.remove('is-resizing-sidebar');
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', stopResize);
+    syncLayoutSize();
+  };
+
+  resizer.addEventListener('pointerdown', (event) => {
+    if (toolboxHidden || window.matchMedia('(max-width: 1100px)').matches) return;
+    startX = event.clientX;
+    startWidth = readSidebarWidth();
+    document.body.classList.add('is-resizing-sidebar');
+    resizer.setPointerCapture?.(event.pointerId);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', stopResize);
+  });
+  resizer.addEventListener('keydown', (event) => {
+    if (toolboxHidden) return;
+    const step = event.key === 'ArrowLeft' ? -24 : event.key === 'ArrowRight' ? 24 : 0;
+    if (!step) return;
+    event.preventDefault();
+    setSidebarWidth(readSidebarWidth() + step);
+  });
+}
+
 function setCodeWidth(width: number): void {
   const clamped = Math.min(Math.max(width, 300), Math.min(window.innerWidth * 0.68, 900));
-  document.documentElement.style.setProperty('--code-width', `${Math.round(clamped)}px`);
+  document.documentElement.style.setProperty('--ide-code-panel-width', `${Math.round(clamped)}px`);
   localStorage.setItem(CODE_WIDTH_KEY, String(Math.round(clamped)));
-  window.setTimeout(syncBlocklySize, 20);
+  requestLayoutResize(false);
 }
 
 function initCodeResizer(): void {
@@ -632,7 +897,9 @@ function initCodeResizer(): void {
   const readCodeWidth = (): number => {
     const column = byId<HTMLElement>('code-column');
     const rect = column.getBoundingClientRect();
-    return rect.width || Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue('--code-width'), 10) || 430;
+    return rect.width
+      || Number.parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ide-code-panel-width'), 10)
+      || 430;
   };
 
   const onPointerMove = (event: PointerEvent): void => {
@@ -644,11 +911,11 @@ function initCodeResizer(): void {
     document.body.classList.remove('is-resizing-code');
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', stopResize);
-    syncBlocklySize();
+    syncLayoutSize();
   };
 
   resizer.addEventListener('pointerdown', (event) => {
-    if (codeHidden || window.matchMedia('(max-width: 980px)').matches) return;
+    if (codeHidden || window.matchMedia('(max-width: 1100px)').matches) return;
     startX = event.clientX;
     startWidth = readCodeWidth();
     document.body.classList.add('is-resizing-code');
@@ -746,7 +1013,13 @@ function initBlockly(): void {
 
   updateCode();
   updateZoomIndicator();
-  window.setTimeout(syncBlocklySize, 100);
+  requestLayoutResize();
+  if (window.matchMedia('(max-width: 700px)').matches) {
+    window.setTimeout(() => {
+      workspace?.zoomToFit();
+      updateZoomIndicator();
+    }, 100);
+  }
 }
 
 function installCodeEditor(): void {
@@ -782,7 +1055,52 @@ function updateMenuToggle(open: boolean): void {
   button.title = open ? 'Close menu' : 'Menu';
   button.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
   button.setAttribute('aria-expanded', String(open));
-  scheduleBlocklyResize();
+  requestLayoutResize();
+}
+
+function initCommandPalette(): void {
+  const click = (id: string): void => byId<HTMLButtonElement>(id).click();
+  const commands: IdeCommand[] = [
+    { id: 'file.new', category: 'File', label: 'New Workspace', shortcut: 'Ctrl N', run: newWorkspace },
+    { id: 'file.open', category: 'File', label: 'Open Workspace or MiniJava File', shortcut: 'Ctrl O', run: () => click('load-workspace') },
+    { id: 'file.save', category: 'File', label: 'Save Workspace', shortcut: 'Ctrl S', run: downloadWorkspace },
+    { id: 'file.export', category: 'File', label: 'Export MiniJava Source', run: exportGeneratedCode },
+    { id: 'file.autosave', category: 'File', label: 'Restore Autosave', run: loadAutosave },
+    { id: 'run.program', category: 'Run', label: 'Run Program', shortcut: 'Ctrl F5', keywords: ['output', 'execute'], run: runProgram },
+    { id: 'analysis.machine', category: 'Analysis', label: 'Open CESK Machine', run: () => openBottomTool('machine') },
+    { id: 'analysis.compare', category: 'Analysis', label: 'Compare Model A and Model B', run: () => openBottomTool('compare') },
+    { id: 'analysis.rewrite', category: 'Analysis', label: 'Open Rewrite Semantics', run: () => openBottomTool('subst') },
+    { id: 'view.blocks', category: 'View', label: 'Show Blocks Sidebar', run: () => setActiveActivity('blocks') },
+    { id: 'view.search', category: 'View', label: 'Search Blocks', shortcut: 'Ctrl Shift F', run: () => setActiveActivity('search') },
+    { id: 'view.problems', category: 'View', label: 'Show Problems', run: showProblems },
+    { id: 'view.inspector', category: 'View', label: 'Toggle MiniJava Inspector', run: () => { setCodeHidden(!codeHidden); markPerspectiveCustom(); } },
+    { id: 'view.bottom', category: 'View', label: 'Toggle Bottom Tools', shortcut: 'Ctrl J', run: () => { setVizOpen(!isVizOpen()); markPerspectiveCustom(); } },
+    { id: 'workspace.undo', category: 'Workspace', label: 'Undo Block Change', run: () => workspace?.undo(false) },
+    { id: 'workspace.redo', category: 'Workspace', label: 'Redo Block Change', run: () => workspace?.undo(true) },
+    { id: 'workspace.fit', category: 'Workspace', label: 'Fit Blocks in View', run: () => workspace?.zoomToFit() },
+    { id: 'perspective.edit', category: 'Perspective', label: 'Switch to Edit Perspective', run: () => applyPerspective('edit') },
+    { id: 'perspective.debug', category: 'Perspective', label: 'Switch to Debug Perspective', run: () => applyPerspective('debug') },
+    { id: 'perspective.types', category: 'Perspective', label: 'Switch to Type Analysis Perspective', run: () => applyPerspective('types') },
+    { id: 'perspective.presentation', category: 'Perspective', label: 'Switch to Presentation Perspective', run: () => applyPerspective('presentation') },
+    { id: 'theme.toggle', category: 'Preferences', label: 'Toggle Color Theme', run: () => applyTheme(currentTheme === 'dark' ? 'light' : 'dark') }
+  ];
+  installCommandPalette(commands);
+}
+
+function wireInspectorTabKeyboard(): void {
+  const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.inspector-tab'));
+  tabs.forEach((tab, index) => {
+    tab.tabIndex = tab.classList.contains('is-active') ? 0 : -1;
+    tab.addEventListener('keydown', (event) => {
+      const offset = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+      const targetIndex = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : index + offset;
+      if (!offset && event.key !== 'Home' && event.key !== 'End') return;
+      event.preventDefault();
+      const target = tabs[(targetIndex + tabs.length) % tabs.length];
+      target.focus();
+      target.click();
+    });
+  });
 }
 
 function wireEvents(): void {
@@ -801,15 +1119,75 @@ function wireEvents(): void {
     input.value = '';
   });
   byId<HTMLButtonElement>('load-autosave').addEventListener('click', loadAutosave);
-  byId<HTMLButtonElement>('toggle-code-column').addEventListener('click', () => setCodeHidden(!codeHidden));
-  byId<HTMLButtonElement>('toggle-toolbox').addEventListener('click', () => setToolboxHidden(!toolboxHidden));
-  byId<HTMLButtonElement>('show-code-button').addEventListener('click', () => setCodeHidden(false));
-  byId<HTMLButtonElement>('show-toolbox-button').addEventListener('click', () => setToolboxHidden(false));
+  byId<HTMLButtonElement>('toggle-code-column').addEventListener('click', () => {
+    setCodeHidden(!codeHidden);
+    markPerspectiveCustom();
+  });
+  byId<HTMLButtonElement>('toggle-toolbox').addEventListener('click', () => {
+    setToolboxHidden(!toolboxHidden);
+    markPerspectiveCustom();
+  });
+  byId<HTMLButtonElement>('show-code-button').addEventListener('click', () => {
+    setCodeHidden(false);
+    markPerspectiveCustom();
+  });
+  byId<HTMLButtonElement>('show-toolbox-button').addEventListener('click', () => {
+    setToolboxHidden(false);
+    markPerspectiveCustom();
+  });
+  byId<HTMLButtonElement>('toggle-code-maximize').addEventListener('click', () => setCodeMaximized(!codeMaximized));
+  byId<HTMLButtonElement>('sidebar-scrim').addEventListener('click', () => setToolboxHidden(true));
+  byId<HTMLButtonElement>('code-scrim').addEventListener('click', () => setCodeHidden(true));
   byId<HTMLButtonElement>('copy-code').addEventListener('click', copyCode);
   byId<HTMLButtonElement>('run-program').addEventListener('click', runProgram);
+  byId<HTMLButtonElement>('sidebar-run-program').addEventListener('click', runProgram);
+  byId<HTMLButtonElement>('sidebar-open-cesk').addEventListener('click', () => openAnalysisTool('machine'));
+  byId<HTMLButtonElement>('sidebar-open-compare').addEventListener('click', () => openAnalysisTool('compare'));
+  byId<HTMLButtonElement>('sidebar-open-rewrite').addEventListener('click', () => openAnalysisTool('subst'));
+  byId<HTMLButtonElement>('sidebar-open-structure').addEventListener('click', () => openAnalysisTool('structure'));
+  byId<HTMLButtonElement>('sidebar-open-value').addEventListener('click', () => openAnalysisTool('value'));
+  byId<HTMLButtonElement>('settings-toggle-code').addEventListener('click', () => {
+    setCodeHidden(!codeHidden);
+    markPerspectiveCustom();
+  });
+  byId<HTMLButtonElement>('settings-toggle-bottom').addEventListener('click', () => {
+    setVizOpen(!isVizOpen());
+    markPerspectiveCustom();
+  });
+  byId<HTMLButtonElement>('workspace-undo').addEventListener('click', () => workspace?.undo(false));
+  byId<HTMLButtonElement>('workspace-redo').addEventListener('click', () => workspace?.undo(true));
+  byId<HTMLButtonElement>('workspace-zoom-out').addEventListener('click', () => workspace?.zoomCenter(-1));
+  byId<HTMLButtonElement>('workspace-zoom-in').addEventListener('click', () => workspace?.zoomCenter(1));
+  byId<HTMLButtonElement>('workspace-fit').addEventListener('click', () => {
+    workspace?.zoomToFit();
+    updateZoomIndicator();
+  });
+
+  for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.activity-item[data-activity]'))) {
+    button.addEventListener('click', () => {
+      const activity = button.dataset.activity as ActivityKind;
+      const compact = window.matchMedia('(max-width: 1100px)').matches;
+      const sidebarOpen = !toolboxHidden && (!compact || document.body.classList.contains('mobile-sidebar-open'));
+      if (activity === activeActivity && sidebarOpen) {
+        setToolboxHidden(true);
+        markPerspectiveCustom();
+      } else {
+        setActiveActivity(activity);
+      }
+    });
+  }
+  for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.perspective-option[data-perspective]'))) {
+    button.addEventListener('click', () => applyPerspective(button.dataset.perspective as Perspective));
+  }
+  byId<HTMLSelectElement>('perspective-select').addEventListener('change', (event) => {
+    applyPerspective((event.currentTarget as HTMLSelectElement).value as Perspective);
+  });
+  byId<HTMLButtonElement>('status-perspective').addEventListener('click', () => setActiveActivity('settings'));
+  byId<HTMLButtonElement>('status-problems-button').addEventListener('click', showProblems);
   for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('.inspector-tab'))) {
     tab.addEventListener('click', () => selectInspectorPanel((tab.dataset.panel ?? 'code') as InspectorPanel));
   }
+  wireInspectorTabKeyboard();
   byId<HTMLInputElement>('theme-toggle').addEventListener('change', (event) => {
     const isDark = (event.currentTarget as HTMLInputElement).checked;
     applyTheme(isDark ? 'dark' : 'light');
@@ -831,12 +1209,51 @@ function wireEvents(): void {
     workspace.scrollCenter();
     updateZoomIndicator();
   });
+  document.addEventListener('keydown', (event) => {
+    const modifier = event.ctrlKey || event.metaKey;
+    const key = event.key.toLocaleLowerCase();
+    if (modifier && !event.shiftKey && key === 's') {
+      event.preventDefault();
+      downloadWorkspace();
+    } else if (modifier && !event.shiftKey && key === 'o') {
+      event.preventDefault();
+      byId<HTMLInputElement>('load-file-input').click();
+    } else if (modifier && !event.shiftKey && key === 'n') {
+      event.preventDefault();
+      newWorkspace();
+    } else if (modifier && !event.shiftKey && key === 'j') {
+      event.preventDefault();
+      setVizOpen(!isVizOpen());
+      markPerspectiveCustom();
+    } else if (modifier && event.shiftKey && key === 'f') {
+      event.preventDefault();
+      setActiveActivity('search');
+    } else if (modifier && event.key === 'F5') {
+      event.preventDefault();
+      runProgram();
+    }
+  });
+  new MutationObserver(updateProjectIdentity).observe(byId<HTMLDivElement>('loaded-file-label'), {
+    childList: true,
+    characterData: true,
+    subtree: true
+  });
+  window.addEventListener('bmj:problem-located', () => {
+    if (window.matchMedia('(max-width: 1100px)').matches) setToolboxHidden(true);
+  });
+  document.addEventListener('fullscreenchange', () => requestLayoutResize());
   window.addEventListener('resize', () => {
-    if (window.matchMedia('(min-width: 981px)').matches) {
+    const compact = window.matchMedia('(max-width: 1100px)').matches;
+    if (compact && !compactPanelLayout) {
+      document.body.classList.remove('mobile-sidebar-open', 'mobile-code-open');
+    }
+    compactPanelLayout = compact;
+    updateActivityButtons();
+    if (window.matchMedia('(min-width: 901px)').matches) {
       byId<HTMLElement>('main-menu').classList.remove('menu-open');
       updateMenuToggle(false);
     }
-    scheduleBlocklyResize();
+    requestLayoutResize();
   });
 }
 
@@ -849,7 +1266,21 @@ function restorePreferences(): void {
     if (!Number.isNaN(value)) byId<HTMLInputElement>('autosave-interval').value = String(value);
   }
   const savedCodeWidth = Number(localStorage.getItem(CODE_WIDTH_KEY));
-  if (!Number.isNaN(savedCodeWidth) && savedCodeWidth > 0) setCodeWidth(savedCodeWidth);
+  if (Number.isFinite(savedCodeWidth) && savedCodeWidth > 0) setCodeWidth(savedCodeWidth);
+  const savedSidebarWidth = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+  if (Number.isFinite(savedSidebarWidth) && savedSidebarWidth > 0) setSidebarWidth(savedSidebarWidth);
+
+  const savedActivity = localStorage.getItem(ACTIVE_ACTIVITY_KEY) as ActivityKind | null;
+  setActiveActivity(savedActivity && ACTIVITY_KINDS.includes(savedActivity) ? savedActivity : 'blocks', false, false);
+  setToolboxHidden(!storedBoolean(SIDEBAR_VISIBLE_KEY, true));
+  setCodeHidden(!storedBoolean(CODE_VISIBLE_KEY, true));
+
+  const savedPerspective = localStorage.getItem(PERSPECTIVE_KEY) as Perspective | null;
+  setPerspectiveIdentity(savedPerspective && PERSPECTIVES.includes(savedPerspective) ? savedPerspective : 'edit', false);
+  if (compactPanelLayout) {
+    document.body.classList.remove('mobile-sidebar-open', 'mobile-code-open');
+    updateActivityButtons();
+  }
   applyTheme(currentTheme);
   updateAutosaveIntervalLabel();
 }
@@ -862,13 +1293,16 @@ export function startBlockMiniJava(): void {
   restorePreferences();
   wireEvents();
   initToolboxDragAndDrop();
+  initSidebarResizer();
   initCodeResizer();
   initBlockly();
   installCodeEditor();
-  initVisualizationPanel(syncBlocklySize);
+  initVisualizationPanel(() => requestLayoutResize());
   initStepperPanel(() => workspace);
   initComparePanel(() => workspace);
   initSubstPanel(() => workspace);
+  initCommandPalette();
+  initLayoutResizeCoordinator();
   initExamplesMenu(
     () => workspace,
     onExampleLoaded

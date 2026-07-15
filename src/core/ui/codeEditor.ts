@@ -22,11 +22,14 @@ export type EditableMiniJavaCodeEditor = {
   syncFromWorkspace: (code?: string, message?: string) => void;
   currentText: () => string;
   loadText: (source: string, label?: string) => void;
+  /** Re-measures the editor after an enclosing IDE panel changes size. */
+  resize: () => void;
 };
 
 let editor: HTMLTextAreaElement | null = null;
 let highlight: HTMLElement | null = null;
 let highlightView: HTMLElement | null = null;
+let lineNumbers: HTMLElement | null = null;
 let status: HTMLElement | null = null;
 let parseTimer: number | null = null;
 let suppressWorkspaceSyncUntil = 0;
@@ -48,6 +51,13 @@ function hasMiniJavaSource(text: string): boolean {
 function syncHighlightScroll(): void {
   if (!editor || !highlight) return;
   highlight.style.transform = `translate(${-editor.scrollLeft}px, ${-editor.scrollTop}px)`;
+  if (lineNumbers) lineNumbers.style.transform = `translateY(${-editor.scrollTop}px)`;
+}
+
+function renderLineNumbers(): void {
+  if (!editor || !lineNumbers) return;
+  const count = Math.max(1, editor.value.split('\n').length);
+  lineNumbers.textContent = Array.from({ length: count }, (_, index) => String(index + 1)).join('\n');
 }
 
 // The highlight layer must wrap at exactly the textarea's content width, so
@@ -60,6 +70,7 @@ function syncHighlightMetrics(): void {
 
 function renderHighlight(force = false): void {
   if (!editor || !highlight) return;
+  renderLineNumbers();
   // While the editor is focused it renders its own plain text and covers the
   // highlight layer entirely, so defer the rebuild until it loses focus.
   if (!force && document.activeElement === editor) {
@@ -213,7 +224,7 @@ function handleEditorKeydown(
 }
 
 function createEditorDom(): boolean {
-  if (editor && highlight && status) return true;
+  if (editor && highlight && lineNumbers && status) return true;
 
   const generatedCode = document.getElementById('generated-code');
   const codeView = generatedCode?.closest<HTMLPreElement>('.code-view');
@@ -226,13 +237,17 @@ function createEditorDom(): boolean {
   codeView.classList.add('code-editor-highlight');
   codeView.setAttribute('aria-hidden', 'true');
   codeView.parentElement?.insertBefore(pane, codeView);
+  lineNumbers = document.createElement('pre');
+  lineNumbers.className = 'code-editor-line-numbers';
+  lineNumbers.setAttribute('aria-hidden', 'true');
+  pane.appendChild(lineNumbers);
   pane.appendChild(codeView);
 
   editor = document.createElement('textarea');
   editor.id = 'generated-code-editor';
   editor.className = 'code-editor-input';
   editor.spellcheck = false;
-  editor.wrap = 'soft';
+  editor.wrap = 'off';
   editor.autocomplete = 'off';
   editor.setAttribute('autocapitalize', 'off');
   editor.setAttribute('aria-label', 'Editable MiniJava code');
@@ -281,6 +296,11 @@ export function installEditableMiniJavaCodeEditor(
   const controller: EditableMiniJavaCodeEditor = {
     syncFromWorkspace: (code, message) => syncEditorFromWorkspace(workspace, code, message),
     currentText: () => editor?.value ?? '',
+    resize: () => {
+      renderLineNumbers();
+      syncHighlightMetrics();
+      syncHighlightScroll();
+    },
     loadText: (source, label = 'minijava-text.java') => {
       if (parseTimer !== null) {
         window.clearTimeout(parseTimer);

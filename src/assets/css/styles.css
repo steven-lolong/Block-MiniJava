@@ -2,8 +2,15 @@
   color-scheme: dark light;
   --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-code: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  --toolbox-width: 286px;
-  --code-width: 430px;
+  --ide-activity-bar-width: 0px;
+  --ide-primary-sidebar-width: 286px;
+  --ide-code-panel-width: 430px;
+  --ide-bottom-panel-height: 320px;
+  --ide-status-bar-height: 48px;
+  /* Compatibility aliases retained for existing integrations. */
+  --toolbox-width: var(--ide-primary-sidebar-width);
+  --code-width: var(--ide-code-panel-width);
+  --viz-height: var(--ide-bottom-panel-height);
   --header-height: 68px;
   --radius-panel: 8px;
   --radius-control: 6px;
@@ -75,6 +82,26 @@ body[data-theme="light"] {
   --token-punctuation: #8b8177;
 }
 
+/* Semantic IDE tokens initially map to the established copper/aquamarine palette. */
+body[data-theme] {
+  --ide-shell-bg: var(--bg);
+  --ide-panel-bg: var(--panel);
+  --ide-surface-raised: var(--panel-elevated);
+  --ide-workspace-bg: var(--bg-strong);
+  --ide-toolbar-bg: var(--panel-soft);
+  --ide-header-bg: var(--panel);
+  --ide-border: var(--border);
+  --ide-border-strong: var(--border-strong);
+  --ide-text: var(--text);
+  --ide-text-muted: var(--muted);
+  --ide-text-disabled: color-mix(in srgb, var(--muted) 62%, transparent);
+  --ide-accent: var(--aquamarine);
+  --ide-success: var(--aquamarine-strong);
+  --ide-warning: var(--gold);
+  --ide-error: var(--danger);
+  --ide-info: var(--token-operator);
+}
+
 * { box-sizing: border-box; }
 
 html,
@@ -90,9 +117,9 @@ body {
   background:
     linear-gradient(var(--bg-grid, rgba(255, 255, 255, 0.035)) 1px, transparent 1px),
     linear-gradient(90deg, var(--bg-grid, rgba(255, 255, 255, 0.035)) 1px, transparent 1px),
-    var(--bg);
+    var(--ide-shell-bg);
   background-size: 28px 28px, 28px 28px, auto;
-  color: var(--text);
+  color: var(--ide-text);
   font-family: var(--font-ui);
 }
 
@@ -110,20 +137,27 @@ button {
 
 .app-shell {
   display: grid;
+  grid-template-areas:
+    "application-header"
+    "workbench"
+    "bottom-tools";
   grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 320px;
+  min-height: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 .app-header {
+  grid-area: application-header;
   min-height: var(--header-height);
   display: grid;
   grid-template-columns: minmax(260px, 430px) minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border-bottom: 1px solid var(--ide-border);
+  background: color-mix(in srgb, var(--ide-header-bg) 94%, transparent);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
   backdrop-filter: blur(16px);
   z-index: 20;
@@ -330,7 +364,14 @@ button {
 .icon-code::before { content: "{}"; font-size: 0.78rem; font-weight: 860; }
 .icon-copy::before { content: "⧉"; }
 .icon-check::before { content: "✓"; }
-.icon-viz::before { content: "◧"; }
+.icon-viz::before {
+  content: "";
+  width: 14px;
+  height: 11px;
+  border: 1px solid currentColor;
+  box-sizing: border-box;
+  box-shadow: inset 0 -3px 0 currentColor;
+}
 .icon-run::before { content: "▶"; font-size: 0.82rem; }
 .run-button .icon { color: var(--aquamarine); }
 .icon-arrange::before { content: "⬍"; }
@@ -404,24 +445,52 @@ button {
   background: var(--aquamarine);
 }
 
-.ide-layout {
+.ide-workbench {
+  grid-area: workbench;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(226px, var(--toolbox-width)) minmax(380px, 1fr) 10px minmax(300px, var(--code-width));
+  grid-template-areas: "activity-bar editor-area";
+  grid-template-columns: var(--ide-activity-bar-width) minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.activity-bar {
+  grid-area: activity-bar;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--ide-border);
+  background: var(--ide-toolbar-bg);
+}
+
+.activity-bar[hidden] {
+  display: none;
+}
+
+.ide-layout {
+  grid-area: editor-area;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-areas: "primary-sidebar workspace code-resizer inspector";
+  grid-template-columns: minmax(226px, var(--ide-primary-sidebar-width)) minmax(380px, 1fr) 10px minmax(300px, var(--ide-code-panel-width));
   gap: 10px;
   padding: 10px;
+  overflow: hidden;
   transition: grid-template-columns var(--transition);
 }
 
 body.toolbox-hidden .ide-layout {
-  grid-template-columns: minmax(400px, 1fr) 10px minmax(300px, var(--code-width));
+  grid-template-areas: "workspace code-resizer inspector";
+  grid-template-columns: minmax(400px, 1fr) 10px minmax(300px, var(--ide-code-panel-width));
 }
 
 body.code-hidden .ide-layout {
-  grid-template-columns: minmax(226px, var(--toolbox-width)) minmax(420px, 1fr);
+  grid-template-areas: "primary-sidebar workspace";
+  grid-template-columns: minmax(226px, var(--ide-primary-sidebar-width)) minmax(420px, 1fr);
 }
 
 body.toolbox-hidden.code-hidden .ide-layout {
+  grid-template-areas: "workspace";
   grid-template-columns: minmax(420px, 1fr);
 }
 
@@ -429,9 +498,9 @@ body.toolbox-hidden.code-hidden .ide-layout {
   position: relative;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 1px solid var(--ide-border);
   border-radius: var(--radius-panel);
-  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  background: color-mix(in srgb, var(--ide-panel-bg) 96%, transparent);
   box-shadow: var(--shadow-panel);
   backdrop-filter: blur(14px);
 }
@@ -450,6 +519,11 @@ body.toolbox-hidden.code-hidden .ide-layout {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
 }
+
+.toolbox-column { grid-area: primary-sidebar; }
+.workspace-column { grid-area: workspace; }
+.code-resizer { grid-area: code-resizer; }
+.code-column { grid-area: inspector; }
 
 .toolbox-column {
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -749,7 +823,7 @@ body.toolbox-hidden .toolbox-column {
   background:
     linear-gradient(var(--bg-grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px),
-    var(--bg-strong);
+    var(--ide-workspace-bg);
   background-size: 24px 24px, 24px 24px, auto;
 }
 
@@ -787,7 +861,7 @@ body.toolbox-hidden .toolbox-column {
 }
 
 .workspace-footer {
-  min-height: 48px;
+  min-height: var(--ide-status-bar-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1107,13 +1181,14 @@ body.code-hidden .code-column {
 }
 
 .viz-dock {
+  grid-area: bottom-tools;
   display: none;
 }
 
 .viz-dock[data-open="true"] {
   display: grid;
   grid-template-rows: 10px minmax(0, 1fr);
-  height: var(--viz-height, 320px);
+  height: var(--ide-bottom-panel-height);
   min-height: 0;
   padding: 0 10px 10px;
 }
@@ -1761,18 +1836,23 @@ body[data-theme="light"] .stepper-ref {
   }
 
   .ide-layout {
-    grid-template-columns: minmax(214px, 260px) minmax(360px, 1fr) 10px minmax(280px, min(var(--code-width), 36vw));
+    grid-template-columns: minmax(214px, 260px) minmax(360px, 1fr) 10px minmax(280px, min(var(--ide-code-panel-width), 36vw));
   }
 }
 
 @media (max-width: 980px) {
   body {
-    overflow: auto;
+    overflow: hidden;
   }
 
   .app-shell {
-    min-height: 100%;
-    height: auto;
+    min-height: 0;
+    height: 100%;
+  }
+
+  .ide-workbench {
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 
   .hamburger {
@@ -1846,6 +1926,11 @@ body[data-theme="light"] .stepper-ref {
     overflow: visible;
   }
 
+  .ide-layout { grid-template-areas: "primary-sidebar" "workspace" "inspector"; }
+  body.toolbox-hidden .ide-layout { grid-template-areas: "workspace" "inspector"; }
+  body.code-hidden .ide-layout { grid-template-areas: "primary-sidebar" "workspace"; }
+  body.toolbox-hidden.code-hidden .ide-layout { grid-template-areas: "workspace"; }
+
   .code-resizer {
     display: none;
   }
@@ -1872,7 +1957,7 @@ body[data-theme="light"] .stepper-ref {
   }
 
   .viz-dock[data-open="true"] {
-    height: min(var(--viz-height, 320px), 56vh);
+    height: min(var(--ide-bottom-panel-height), 56vh);
     padding: 0 8px 8px;
   }
 }
@@ -1944,7 +2029,7 @@ body[data-theme="light"] .stepper-ref {
   }
 
   .viz-dock[data-open="true"] {
-    height: min(var(--viz-height, 300px), 52vh);
+    height: min(var(--ide-bottom-panel-height), 52vh);
     grid-template-rows: 16px minmax(0, 1fr);
   }
 

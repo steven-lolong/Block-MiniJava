@@ -1,6 +1,6 @@
 /**
  * Surfaces type-checker diagnostics in the IDE: a warning icon on each
- * offending block and a Problems tab in the inspector with click-to-locate.
+ * offending block and the Problems views with click-to-locate.
  */
 
 import * as Blockly from 'blockly';
@@ -39,18 +39,10 @@ function locateBlock(workspace: Blockly.WorkspaceSvg, blockId: string): void {
   workspace.centerOnBlock(blockId);
   // setSelected (unlike BlockSvg.select) also clears the previous selection.
   Blockly.common.setSelected(block);
+  window.dispatchEvent(new CustomEvent('bmj:problem-located'));
 }
 
-function renderProblemsPanel(workspace: Blockly.WorkspaceSvg, diags: TypeDiagnostic[]): void {
-  const list = document.getElementById('problems-list');
-  const badge = document.getElementById('problems-count');
-  if (!list || !badge) return;
-
-  const errorCount = diags.filter((diag) => diag.severity === 'error').length;
-  badge.textContent = String(diags.length);
-  badge.hidden = diags.length === 0;
-  badge.classList.toggle('has-errors', errorCount > 0);
-
+function renderProblemList(list: HTMLElement, workspace: Blockly.WorkspaceSvg, diags: TypeDiagnostic[]): void {
   list.innerHTML = '';
   if (diags.length === 0) {
     const empty = document.createElement('div');
@@ -77,6 +69,28 @@ function renderProblemsPanel(workspace: Blockly.WorkspaceSvg, diags: TypeDiagnos
     row.append(dot, text);
     row.addEventListener('click', () => locateBlock(workspace, diag.blockId));
     list.appendChild(row);
+  }
+}
+
+function renderProblemsPanel(workspace: Blockly.WorkspaceSvg, diags: TypeDiagnostic[]): void {
+  const errorCount = diags.filter((diag) => diag.severity === 'error').length;
+  for (const id of ['problems-count', 'bottom-problems-count']) {
+    const badge = document.getElementById(id);
+    if (!badge) continue;
+    badge.textContent = String(diags.length);
+    badge.hidden = diags.length === 0;
+    badge.classList.toggle('has-errors', errorCount > 0);
+  }
+
+  const statusCount = document.getElementById('status-problems-count');
+  if (statusCount) {
+    statusCount.textContent = `${diags.length} Problem${diags.length === 1 ? '' : 's'}`;
+    statusCount.classList.toggle('has-errors', errorCount > 0);
+  }
+
+  for (const id of ['problems-list', 'bottom-problems-list']) {
+    const list = document.getElementById(id);
+    if (list) renderProblemList(list, workspace, diags);
   }
 }
 

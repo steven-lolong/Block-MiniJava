@@ -166,7 +166,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_main_class',
-      message0: 'class %1 method main, argument %2 %3 %4',
+      message0: 'class name %1, method main, argument %2 %3 %4',
       args0: [
         { type: 'field_input', name: 'CLASS', text: 'Main' },
         { type: 'field_input', name: 'ARG', text: 'args' },

@@ -12,17 +12,23 @@ import { resetStepperFromDock, setStepperTabVisible } from './stepperPanel';
 import { resetCompareFromDock, setCompareTabVisible } from './comparePanel';
 import { disposeSubstWorkspace, resetSubstFromDock, setSubstTabVisible } from './substPanel';
 
-export type VizKind = ReductionKind | 'machine' | 'compare' | 'subst';
+export type VizKind = ReductionKind | 'machine' | 'compare' | 'subst' | 'problems' | 'output';
 
 const KINDS: ReductionKind[] = ['structure', 'value'];
-const ALL_KINDS: VizKind[] = ['structure', 'value', 'machine', 'compare', 'subst'];
+const ALL_KINDS: VizKind[] = ['problems', 'output', 'structure', 'value', 'machine', 'compare', 'subst'];
 const TITLE: Record<VizKind, string> = {
+  problems: 'Type-checker diagnostics from the current block program',
+  output: 'Output from the most recent program run or semantic stepper',
   structure: 'Call-by-Structure',
   value: 'Call-by-Value',
   machine: 'CESK machine · Model A — Control · Environment · Store · Kontinuation, over an activation-frame stack',
   compare: 'A vs B · one program, two value models, lockstep',
   subst: 'Rewrite · substitution semantics (Model B, pure fragment)'
 };
+
+const BOTTOM_OPEN_KEY = 'block-minijava.layout.bottom.open';
+const BOTTOM_HEIGHT_KEY = 'block-minijava.layout.bottom.height';
+const BOTTOM_TAB_KEY = 'block-minijava.layout.bottom.tab';
 
 function isWorkspaceKind(kind: VizKind): kind is ReductionKind {
   return kind === 'structure' || kind === 'value';
@@ -39,7 +45,7 @@ const views: Record<ReductionKind, View> = {
   value: { workspace: null, block: null, order: null }
 };
 
-let active: VizKind = 'structure';
+let active: VizKind = 'problems';
 let onLayoutChange: () => void = () => {};
 
 
@@ -94,6 +100,11 @@ function resizeActive(delay = 0): void {
   if (workspace) window.setTimeout(() => Blockly.svgResize(workspace), delay);
 }
 
+/** Shell-level resize hook; component-internal workspaces remain owned here. */
+export function resizeVisualizationPanel(delay = 0): void {
+  resizeActive(delay);
+}
+
 function updateInfo(): void {
   if (!isWorkspaceKind(active)) {
     byId<HTMLDivElement>('viz-dock-info').textContent = TITLE[active];
@@ -103,18 +114,37 @@ function updateInfo(): void {
   byId<HTMLDivElement>('viz-dock-info').textContent = view.block ? `${TITLE[active]} · ${view.block.type}` : '';
 }
 
+function updateToolActions(): void {
+  const rerun = byId<HTMLButtonElement>('viz-rerun');
+  const arrange = byId<HTMLButtonElement>('viz-arrange');
+  const passive = active === 'problems' || active === 'output';
+  rerun.hidden = passive;
+  arrange.hidden = !isWorkspaceKind(active);
+}
+
 function setActive(kind: VizKind): void {
   active = kind;
   for (const k of ALL_KINDS) {
-    hostOf(k).dataset.active = String(k === kind);
+    const selected = k === kind;
+    hostOf(k).dataset.active = String(selected);
+    hostOf(k).hidden = !selected;
+    hostOf(k).setAttribute('aria-hidden', String(!selected));
     tabOf(k).setAttribute('aria-selected', String(k === kind));
+    tabOf(k).tabIndex = selected ? 0 : -1;
   }
   byId<HTMLDivElement>('viz-empty').hidden = isWorkspaceKind(kind) ? !!views[kind].block : true;
   setStepperTabVisible(kind === 'machine');
   setCompareTabVisible(kind === 'compare');
   setSubstTabVisible(kind === 'subst');
   updateInfo();
+  updateToolActions();
+  localStorage.setItem(BOTTOM_TAB_KEY, kind);
   resizeActive(0);
+}
+
+export function openBottomTool(kind: VizKind): void {
+  setActive(kind);
+  setVizOpen(true);
 }
 
 export function isVizOpen(): boolean {
@@ -123,9 +153,19 @@ export function isVizOpen(): boolean {
 
 export function setVizOpen(open: boolean): void {
   dock().dataset.open = String(open);
-  const toggle = document.getElementById('toggle-viz-dock');
-  if (toggle) toggle.setAttribute('aria-pressed', String(open));
+  for (const id of ['toggle-viz-dock', 'top-toggle-bottom-panel']) {
+    document.getElementById(id)?.setAttribute('aria-pressed', String(open));
+  }
+  if (!open) {
+    document.body.classList.remove('bottom-maximized');
+    const maximize = document.getElementById('viz-maximize');
+    maximize?.setAttribute('aria-pressed', 'false');
+    maximize?.setAttribute('aria-label', 'Maximize bottom tools');
+    if (maximize) maximize.title = 'Maximize bottom tools';
+  }
+  localStorage.setItem(BOTTOM_OPEN_KEY, String(open));
   onLayoutChange();
+  if (!open) window.requestAnimationFrame(onLayoutChange);
   if (open) resizeActive(40);
 }
 
@@ -176,7 +216,8 @@ function initResizer(): void {
 
   const applyHeight = (height: number): void => {
     const clamped = Math.max(160, Math.min(height, Math.round(window.innerHeight * 0.7)));
-    root.style.setProperty('--viz-height', `${clamped}px`);
+    root.style.setProperty('--ide-bottom-panel-height', `${clamped}px`);
+    localStorage.setItem(BOTTOM_HEIGHT_KEY, String(clamped));
     onLayoutChange();
     resizeActive(0);
   };
@@ -208,7 +249,25 @@ function initResizer(): void {
 
 export function initVisualizationPanel(layoutChange: () => void): void {
   onLayoutChange = layoutChange;
-  for (const kind of ALL_KINDS) tabOf(kind).addEventListener('click', () => setActive(kind));
+  ALL_KINDS.forEach((kind, index) => {
+    const tab = tabOf(kind);
+    const host = hostOf(kind);
+    tab.id = `bottom-tab-${kind}`;
+    tab.setAttribute('aria-controls', `bottom-panel-${kind}`);
+    host.id = `bottom-panel-${kind}`;
+    host.setAttribute('role', 'tabpanel');
+    host.setAttribute('aria-labelledby', tab.id);
+    tab.addEventListener('click', () => setActive(kind));
+    tab.addEventListener('keydown', (event) => {
+      const offset = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+      const targetIndex = event.key === 'Home' ? 0 : event.key === 'End' ? ALL_KINDS.length - 1 : index + offset;
+      if (!offset && event.key !== 'Home' && event.key !== 'End') return;
+      event.preventDefault();
+      const next = ALL_KINDS[(targetIndex + ALL_KINDS.length) % ALL_KINDS.length];
+      tabOf(next).focus();
+      setActive(next);
+    });
+  });
   byId<HTMLButtonElement>('viz-rerun').addEventListener('click', () => {
     if (!isWorkspaceKind(active)) {
       if (active === 'machine') resetStepperFromDock();
@@ -228,10 +287,24 @@ export function initVisualizationPanel(layoutChange: () => void): void {
   });
   byId<HTMLButtonElement>('viz-collapse').addEventListener('click', () => setVizOpen(false));
   byId<HTMLButtonElement>('toggle-viz-dock').addEventListener('click', () => setVizOpen(!isVizOpen()));
-  initResizer();
-  window.addEventListener('resize', () => {
-    if (isVizOpen()) resizeActive(80);
+  byId<HTMLButtonElement>('top-toggle-bottom-panel').addEventListener('click', () => setVizOpen(!isVizOpen()));
+  byId<HTMLButtonElement>('viz-maximize').addEventListener('click', (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    const maximized = document.body.classList.toggle('bottom-maximized');
+    button.setAttribute('aria-pressed', String(maximized));
+    button.setAttribute('aria-label', maximized ? 'Restore bottom tools' : 'Maximize bottom tools');
+    button.title = maximized ? 'Restore bottom tools' : 'Maximize bottom tools';
+    onLayoutChange();
+    resizeActive(40);
   });
-  setActive('structure');
-}
+  initResizer();
 
+  const savedHeight = Number(localStorage.getItem(BOTTOM_HEIGHT_KEY));
+  if (Number.isFinite(savedHeight) && savedHeight >= 160) {
+    const clamped = Math.max(160, Math.min(savedHeight, Math.round(window.innerHeight * 0.7)));
+    document.documentElement.style.setProperty('--ide-bottom-panel-height', `${Math.round(clamped)}px`);
+  }
+  const savedKind = localStorage.getItem(BOTTOM_TAB_KEY);
+  setActive(ALL_KINDS.find((kind) => kind === savedKind) ?? 'problems');
+  setVizOpen(localStorage.getItem(BOTTOM_OPEN_KEY) === 'true');
+}

@@ -9,9 +9,11 @@ import './smoke-jsdom';
 import * as Blockly from 'blockly';
 import { defineMiniJavaBlocks } from '../src/core/blocks/minijavaBlocks';
 import { parseMiniJavaTextToWorkspaceState } from '../src/core/parser/minijavaTextParser';
+import { MINI_JAVA_RENDERER_NAME, registerMiniJavaRenderer } from '../src/core/renderer/minijavaRenderer';
 import { initStepperPanel } from '../src/core/ui/stepperPanel';
 
 defineMiniJavaBlocks();
+registerMiniJavaRenderer();
 
 const SRC = `class Main {
   public static void main(String[] args) {
@@ -51,6 +53,42 @@ const check = (label: string, ok: boolean) => {
   console.log(`${ok ? 'ok   ' : 'FAIL '} ${label}`);
   if (!ok) failures++;
 };
+
+// Exercise the registered renderer rather than duplicating its shape data in
+// the test. Formal parameters use a curved arch so they stay visibly different
+// from both the class stack's box and variable declarations' angular zigzag.
+const RendererClass = Blockly.registry.getClass(
+  Blockly.registry.Type.RENDERER,
+  MINI_JAVA_RENDERER_NAME
+) as unknown as new (name: string) => Blockly.blockRendering.Renderer;
+const renderer = new RendererClass(MINI_JAVA_RENDERER_NAME);
+renderer.init(Blockly.Themes.Classic);
+const constants = renderer.getConstants();
+const verticalShape = (nonTerminal: string): Blockly.blockRendering.Notch =>
+  constants.shapeFor({
+    type: Blockly.ConnectionType.PREVIOUS_STATEMENT,
+    getCheck: () => [nonTerminal],
+    targetConnection: null,
+    getSourceBlock: () => ({ type: '' })
+  } as unknown as Blockly.RenderedConnection) as Blockly.blockRendering.Notch;
+const classShape = verticalShape('ClassDeclaration');
+const variableShape = verticalShape('VarDeclaration');
+const formalShape = verticalShape('FormalParameter');
+
+check(
+  'FormalParameter connector is distinct from other declarations',
+  formalShape.pathLeft !== classShape.pathLeft && formalShape.pathLeft !== variableShape.pathLeft
+);
+check(
+  'FormalParameter connector has the only curved silhouette',
+  formalShape.pathLeft.includes(' c ') &&
+    !classShape.pathLeft.includes(' c ') &&
+    !variableShape.pathLeft.includes(' c ')
+);
+check(
+  'FormalParameter preserves declaration connector spacing',
+  formalShape.width === classShape.width && formalShape.width === variableShape.width
+);
 
 const stepBtn = document.getElementById('stepper-step')!;
 const seen = { control: false, kont: false, heap: false, frames: false };

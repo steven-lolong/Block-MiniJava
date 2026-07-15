@@ -74,7 +74,7 @@ function renderProblemList(list: HTMLElement, workspace: Blockly.WorkspaceSvg, d
 
 function renderProblemsPanel(workspace: Blockly.WorkspaceSvg, diags: TypeDiagnostic[]): void {
   const errorCount = diags.filter((diag) => diag.severity === 'error').length;
-  for (const id of ['problems-count', 'bottom-problems-count']) {
+  for (const id of ['bottom-problems-count']) {
     const badge = document.getElementById(id);
     if (!badge) continue;
     badge.textContent = String(diags.length);
@@ -88,7 +88,7 @@ function renderProblemsPanel(workspace: Blockly.WorkspaceSvg, diags: TypeDiagnos
     statusCount.classList.toggle('has-errors', errorCount > 0);
   }
 
-  for (const id of ['problems-list', 'bottom-problems-list']) {
+  for (const id of ['bottom-problems-list']) {
     const list = document.getElementById(id);
     if (list) renderProblemList(list, workspace, diags);
   }

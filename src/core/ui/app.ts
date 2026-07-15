@@ -41,6 +41,7 @@ let codeEditor: EditableMiniJavaCodeEditor | null = null;
 let autosaveTimer: number | null = null;
 let requiredBlockTimer: number | null = null;
 let typeCheckTimer: number | null = null;
+let outlineFrame: number | null = null;
 let latestCode = '';
 let codeHidden = false;
 let toolboxHidden = false;
@@ -65,7 +66,7 @@ const BLOCK_WORKSPACE_MUTATION_EVENTS = new Set<string>([
   Blockly.Events.BLOCK_FIELD_INTERMEDIATE_CHANGE,
   Blockly.Events.BLOCK_MOVE
 ]);
-type InspectorPanel = 'code' | 'output' | 'problems';
+type InspectorPanel = 'code' | 'outline';
 type ActivityKind = 'blocks' | 'search' | 'run' | 'settings';
 type Perspective = 'edit' | 'debug' | 'types' | 'presentation' | 'custom';
 
@@ -335,7 +336,6 @@ function scheduleRequiredBlockEnforcement(): void {
 
 function runProgram(): void {
   if (!workspace) return;
-  selectInspectorPanel('output');
   openBottomTool('output');
   const initial = injectMachine(workspace, 'A');
   if ('injectError' in initial) {
@@ -359,7 +359,69 @@ function selectInspectorPanel(panel: InspectorPanel): void {
   for (const section of Array.from(document.querySelectorAll<HTMLElement>('.inspector-panel'))) {
     section.classList.toggle('is-active', section.id === `panel-${panel}`);
   }
+  if (panel === 'outline') scheduleOutlineRender();
   requestLayoutResize(false);
+}
+
+function scheduleOutlineRender(): void {
+  if (outlineFrame !== null) window.cancelAnimationFrame(outlineFrame);
+  outlineFrame = window.requestAnimationFrame(() => {
+    outlineFrame = null;
+    renderOutline();
+  });
+}
+
+function renderOutline(): void {
+  const container = byId<HTMLDivElement>('program-outline');
+  container.replaceChildren();
+  if (!workspace) return;
+
+  const topBlocks = workspace.getTopBlocks(true);
+  if (topBlocks.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'outline-empty';
+    empty.textContent = 'The workspace has no blocks.';
+    container.appendChild(empty);
+    return;
+  }
+
+  const addBlock = (block: Blockly.Block, depth: number): void => {
+    const children = block.getChildren(true);
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'outline-item';
+    item.dataset.blockId = block.id;
+    item.style.setProperty('--outline-depth', String(depth));
+    item.setAttribute('role', 'treeitem');
+    item.setAttribute('aria-level', String(depth + 1));
+
+    const disclosure = document.createElement('span');
+    disclosure.className = 'outline-disclosure';
+    disclosure.textContent = children.length > 0 ? '⌄' : '·';
+    disclosure.setAttribute('aria-hidden', 'true');
+
+    const label = document.createElement('span');
+    label.className = 'outline-label';
+    const blockText = block.toString(54, '…');
+    label.textContent = blockText.replace(/\s+/g, ' ').trim() || block.type;
+
+    const type = document.createElement('span');
+    type.className = 'outline-type';
+    type.textContent = block.type.replace(/^mj_/, '').replace(/_/g, ' ');
+
+    item.append(disclosure, label, type);
+    item.addEventListener('click', () => {
+      if (!workspace) return;
+      const selected = workspace.getBlockById(item.dataset.blockId ?? '') as Blockly.BlockSvg | null;
+      if (!selected) return;
+      workspace.centerOnBlock(selected.id);
+      Blockly.common.setSelected(selected);
+    });
+    container.appendChild(item);
+    children.forEach((child) => addBlock(child, depth + 1));
+  };
+
+  topBlocks.forEach((block) => addBlock(block, 0));
 }
 
 function updateActivityButtons(): void {
@@ -434,14 +496,14 @@ function applyPerspective(perspective: Perspective): void {
       setToolboxHidden(false);
       setCodeHidden(false);
       setCodeMaximized(false);
-      selectInspectorPanel('output');
+      selectInspectorPanel('outline');
       openBottomTool('machine');
     } else if (perspective === 'types') {
       setActiveActivity('blocks', false, false);
       setToolboxHidden(false);
       setCodeHidden(false);
       setCodeMaximized(false);
-      selectInspectorPanel('problems');
+      selectInspectorPanel('outline');
       openBottomTool('problems');
       if (workspace) refreshTypeDiagnostics(workspace);
     } else if (perspective === 'presentation') {
@@ -646,7 +708,7 @@ function exportGeneratedCode(): void {
   URL.revokeObjectURL(url);
   scheduleAutosaveStatus(`Exported ${fileName}`);
   appendConsoleLog(`Exported ${fileName}`);
-  selectInspectorPanel('output');
+  openBottomTool('output');
 }
 
 
@@ -997,6 +1059,7 @@ function initBlockly(): void {
   loadInitialSample(workspace);
   ensureRequiredBlocks(workspace);
   workspace.addChangeListener((event) => {
+    if (event.type !== Blockly.Events.VIEWPORT_CHANGE) scheduleOutlineRender();
     if (event.type === Blockly.Events.FINISHED_LOADING) {
       scheduleRequiredBlockEnforcement();
       return;
@@ -1012,6 +1075,7 @@ function initBlockly(): void {
   });
 
   updateCode();
+  scheduleOutlineRender();
   updateZoomIndicator();
   requestLayoutResize();
   if (window.matchMedia('(max-width: 700px)').matches) {

@@ -35,7 +35,7 @@ document.body.innerHTML =
    <button id="stepper-step"></button><button id="stepper-play"></button>
    <span id="stepper-status"></span><svg id="stepper-arrows"></svg>
    ${ids.map((i) => `<div id="${i}"></div>`).join('')}
-   <pre id="stepper-output"></pre><pre id="program-output"></pre>`;
+   <pre id="stepper-output"></pre><pre id="bottom-program-output"></pre>`;
 
 const ws = new Blockly.Workspace();
 Blockly.serialization.workspaces.load(parseMiniJavaTextToWorkspaceState(SRC), ws);
@@ -106,6 +106,7 @@ check('S · store box rendered', seen.heap);
 check('K · kontinuation entries rendered', seen.kont);
 check('machine finished: status shows ✓', document.getElementById('stepper-status')!.textContent!.includes('✓'));
 check('output rendered 42', document.getElementById('stepper-output')!.textContent!.trim() === '42');
+check('bottom Output tool mirrors 42', document.getElementById('bottom-program-output')!.textContent!.includes('42'));
 
 if (failures) {
   console.log(`${failures} smoke failure(s)`);

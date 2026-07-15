@@ -211,7 +211,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_var_declaration',
-      message0: 'var %1 %2',
+      message0: 'var type %1 name %2',
       args0: [
         { type: 'input_value', name: 'TYPE', check: 'Type' },
         { type: 'field_input', name: 'NAME', text: 'x' }
@@ -224,7 +224,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_method_declaration',
-      message0: 'public %1 %2 params %3 %4 vars %5 body %6 return %7',
+      message0: 'public method type %1 name %2 params %3 %4 variables %5 body %6 return %7',
       args0: [
         { type: 'input_value', name: 'TYPE', check: 'Type' },
         { type: 'field_input', name: 'NAME', text: 'method' },
@@ -325,7 +325,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_statement_print',
-      message0: 'System.out.println %1',
+      message0: 'println %1',
       args0: [{ type: 'input_value', name: 'VALUE', check: 'Expression' }],
       previousStatement: 'Statement',
       nextStatement: 'Statement',

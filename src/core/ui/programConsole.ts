@@ -1,9 +1,8 @@
 /**
- * The inspector's Output tab as a console monitor: whichever stepper most
- * recently rendered mirrors its System.out.println lines here, so program
- * output is readable without keeping the viz dock's own output panel in
- * view. Editor actions (export, clipboard) append as plain log lines and
- * stay until the next mirrored run overwrites them.
+ * The bottom Output tool as a console monitor: whichever stepper most
+ * recently rendered mirrors its System.out.println lines here. Editor
+ * actions (export, clipboard) append as plain log lines and stay until the
+ * next mirrored run overwrites them.
  */
 
 const EMPTY_HINT = '(no output yet)';
@@ -11,7 +10,7 @@ const EMPTY_HINT = '(no output yet)';
 let mirroredBody = '';
 
 function consoleEls(): HTMLPreElement[] {
-  const elements = ['program-output', 'bottom-program-output']
+  const elements = ['bottom-program-output']
     .map((id) => document.getElementById(id))
     .filter((element): element is HTMLPreElement => element?.tagName === 'PRE');
   if (elements.length === 0) throw new Error('Missing program output surfaces');

@@ -1006,6 +1006,78 @@ body:not(.code-hidden) #toggle-code-column {
   display: none !important;
 }
 
+.outline-panel.is-active {
+  display: grid;
+  grid-template-rows: 31px minmax(0, 1fr);
+  background: var(--ide-panel-bg);
+}
+
+.outline-toolbar {
+  min-height: 31px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--ide-border);
+  color: var(--ide-text-disabled);
+  font-size: 10px;
+}
+
+.program-outline {
+  min-height: 0;
+  overflow: auto;
+  padding: 5px;
+}
+
+.outline-item {
+  width: 100%;
+  min-height: 28px;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px 3px calc(6px + var(--outline-depth) * 12px);
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ide-text-muted);
+  cursor: pointer;
+  text-align: left;
+  font: 11px/1.35 var(--font-ui);
+}
+
+.outline-item:hover,
+.outline-item:focus-visible {
+  background: var(--ide-surface-raised);
+  color: var(--ide-text);
+}
+
+.outline-disclosure {
+  color: var(--ide-text-disabled);
+}
+
+.outline-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-type {
+  max-width: 100px;
+  overflow: hidden;
+  color: var(--ide-text-disabled);
+  font-family: var(--font-code);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-empty {
+  padding: 12px 9px;
+  color: var(--ide-text-muted);
+  font: 12px/1.45 var(--font-ui);
+}
+
 .problems-list {
   padding: 5px;
   gap: 1px;
@@ -1136,7 +1208,7 @@ body.code-maximized .code-column {
 .viz-dock {
   grid-area: bottom-tools;
   min-height: 0;
-  margin-left: var(--ide-activity-bar-width);
+  margin-left: 0;
   background: var(--ide-panel-bg);
 }
 
@@ -1773,7 +1845,7 @@ body.bottom-maximized .viz-dock[data-open="true"] {
     position: fixed;
     right: 0;
     bottom: var(--ide-status-bar-height);
-    left: var(--ide-activity-bar-width);
+    left: 0;
     z-index: 120;
     width: auto;
     height: min(var(--ide-bottom-panel-height), 62vh);
@@ -1782,7 +1854,7 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   }
 
   .viz-dock-tabs {
-    max-width: calc(100vw - var(--ide-activity-bar-width) - 90px);
+    max-width: calc(100vw - 90px);
   }
 
   .viz-tab {

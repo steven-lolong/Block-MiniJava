@@ -9,7 +9,7 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
   {
     id: 'factorial',
     label: 'Factorial',
-    description: 'Recursive MiniJava factorial program',
+    description: 'Recursive MiniJava factorial program: ComputeFac(10) prints 3628800',
     state: {
       blocks: {
         languageVersion: 0,
@@ -24,7 +24,10 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
               MAIN: {
                 block: {
                   type: 'mj_main_class',
-                  fields: { CLASS: 'Main', ARG: 'args' },
+                  fields: {
+                    CLASS: 'Factorial',
+                    ARG: 'a'
+                  },
                   inputs: {
                     STATEMENT: {
                       block: {
@@ -33,12 +36,16 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                           VALUE: {
                             block: {
                               type: 'mj_expr_method_call',
-                              fields: { METHOD: 'ComputeFac' },
+                              fields: {
+                                METHOD: 'ComputeFac'
+                              },
                               inputs: {
                                 OBJECT: {
                                   block: {
                                     type: 'mj_expr_new_object',
-                                    fields: { CLASS: 'Fac' }
+                                    fields: {
+                                      CLASS: 'Fac'
+                                    }
                                   }
                                 },
                                 ARGS: {
@@ -48,7 +55,9 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                                       EXPR: {
                                         block: {
                                           type: 'mj_expr_integer',
-                                          fields: { VALUE: 10 }
+                                          fields: {
+                                            VALUE: 10
+                                          }
                                         }
                                       }
                                     }
@@ -66,29 +75,50 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
               CLASSES: {
                 block: {
                   type: 'mj_class_declaration',
-                  fields: { CLASS: 'Fac' },
+                  fields: {
+                    CLASS: 'Fac',
+                    HAS_EXTENDS: 'FALSE'
+                  },
                   inputs: {
                     METHODS: {
                       block: {
                         type: 'mj_method_declaration',
-                        fields: { NAME: 'ComputeFac' },
+                        fields: {
+                          NAME: 'ComputeFac'
+                        },
                         inputs: {
-                          TYPE: { block: { type: 'mj_type_int' } },
+                          TYPE: {
+                            block: {
+                              type: 'mj_type_int'
+                            }
+                          },
                           PARAMS: {
                             block: {
                               type: 'mj_formal_parameter',
-                              fields: { NAME: 'num' },
+                              fields: {
+                                NAME: 'num'
+                              },
                               inputs: {
-                                TYPE: { block: { type: 'mj_type_int' } }
+                                TYPE: {
+                                  block: {
+                                    type: 'mj_type_int'
+                                  }
+                                }
                               }
                             }
                           },
                           VARS: {
                             block: {
                               type: 'mj_var_declaration',
-                              fields: { NAME: 'num_aux' },
+                              fields: {
+                                NAME: 'num_aux'
+                              },
                               inputs: {
-                                TYPE: { block: { type: 'mj_type_int' } }
+                                TYPE: {
+                                  block: {
+                                    type: 'mj_type_int'
+                                  }
+                                }
                               }
                             }
                           },
@@ -99,18 +129,24 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                                 COND: {
                                   block: {
                                     type: 'mj_expr_compare',
-                                    fields: { OP: '<' },
+                                    fields: {
+                                      OP: '<'
+                                    },
                                     inputs: {
                                       LEFT: {
                                         block: {
                                           type: 'mj_expr_identifier',
-                                          fields: { NAME: 'num' }
+                                          fields: {
+                                            NAME: 'num'
+                                          }
                                         }
                                       },
                                       RIGHT: {
                                         block: {
                                           type: 'mj_expr_integer',
-                                          fields: { VALUE: 1 }
+                                          fields: {
+                                            VALUE: 1
+                                          }
                                         }
                                       }
                                     }
@@ -119,12 +155,16 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                                 THEN: {
                                   block: {
                                     type: 'mj_statement_assign',
-                                    fields: { NAME: 'num_aux' },
+                                    fields: {
+                                      NAME: 'num_aux'
+                                    },
                                     inputs: {
                                       VALUE: {
                                         block: {
                                           type: 'mj_expr_integer',
-                                          fields: { VALUE: 1 }
+                                          fields: {
+                                            VALUE: 1
+                                          }
                                         }
                                       }
                                     }
@@ -133,25 +173,37 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                                 ELSE: {
                                   block: {
                                     type: 'mj_statement_assign',
-                                    fields: { NAME: 'num_aux' },
+                                    fields: {
+                                      NAME: 'num_aux'
+                                    },
                                     inputs: {
                                       VALUE: {
                                         block: {
                                           type: 'mj_expr_arith',
-                                    fields: { OP: '*' },
+                                          fields: {
+                                            OP: '*'
+                                          },
                                           inputs: {
                                             LEFT: {
                                               block: {
                                                 type: 'mj_expr_identifier',
-                                                fields: { NAME: 'num' }
+                                                fields: {
+                                                  NAME: 'num'
+                                                }
                                               }
                                             },
                                             RIGHT: {
                                               block: {
                                                 type: 'mj_expr_method_call',
-                                                fields: { METHOD: 'ComputeFac' },
+                                                fields: {
+                                                  METHOD: 'ComputeFac'
+                                                },
                                                 inputs: {
-                                                  OBJECT: { block: { type: 'mj_expr_this' } },
+                                                  OBJECT: {
+                                                    block: {
+                                                      type: 'mj_expr_this'
+                                                    }
+                                                  },
                                                   ARGS: {
                                                     block: {
                                                       type: 'mj_argument_item',
@@ -159,18 +211,24 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                                                         EXPR: {
                                                           block: {
                                                             type: 'mj_expr_arith',
-                                    fields: { OP: '-' },
+                                                            fields: {
+                                                              OP: '-'
+                                                            },
                                                             inputs: {
                                                               LEFT: {
                                                                 block: {
                                                                   type: 'mj_expr_identifier',
-                                                                  fields: { NAME: 'num' }
+                                                                  fields: {
+                                                                    NAME: 'num'
+                                                                  }
                                                                 }
                                                               },
                                                               RIGHT: {
                                                                 block: {
                                                                   type: 'mj_expr_integer',
-                                                                  fields: { VALUE: 1 }
+                                                                  fields: {
+                                                                    VALUE: 1
+                                                                  }
                                                                 }
                                                               }
                                                             }
@@ -194,7 +252,9 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                           RETURN: {
                             block: {
                               type: 'mj_expr_identifier',
-                              fields: { NAME: 'num_aux' }
+                              fields: {
+                                NAME: 'num_aux'
+                              }
                             }
                           }
                         }

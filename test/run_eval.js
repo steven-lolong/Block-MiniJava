@@ -95,6 +95,52 @@ const CASES = [
     ['1']
   ],
   [
+    // The Sieve example: marks multiples composite, prints primes below 30.
+    'sieve of eratosthenes',
+    [
+      inMain('System.out.println(new Sieve().FindPrimes(30));'),
+      'class Sieve {',
+      '  int[] isPrime;',
+      '',
+      '  public int FindPrimes(int max) {',
+      '    int aux;',
+      '    int i;',
+      '    int j;',
+      '    int currentVal;',
+      '    aux = this.Init(max);',
+      '    i = 2;',
+      '    while (i < max) {',
+      '      currentVal = isPrime[i];',
+      '      if (0 < currentVal) {',
+      '        System.out.println(i);',
+      '        j = i * 2;',
+      '        while (j < max) {',
+      '          isPrime[j] = 0;',
+      '          j = j + i;',
+      '        }',
+      '      } else {',
+      '        aux = 0;',
+      '      }',
+      '      i = i + 1;',
+      '    }',
+      '    return 0;',
+      '  }',
+      '',
+      '  public int Init(int size) {',
+      '    int i;',
+      '    isPrime = new int[size];',
+      '    i = 0;',
+      '    while (i < size) {',
+      '      isPrime[i] = 1;',
+      '      i = i + 1;',
+      '    }',
+      '    return 0;',
+      '  }',
+      '}'
+    ].join('\n'),
+    ['2', '3', '5', '7', '11', '13', '17', '19', '23', '29', '0']
+  ],
+  [
     // The Bubble Sort example: nested loops and in-place swaps.
     'bubble sort',
     [

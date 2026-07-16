@@ -424,6 +424,51 @@ const BINARY_SEARCH = [
   '}'
 ].join('\n');
 
+/** The Sieve example: Init both ALLOCATES and fills the array. */
+const SIEVE = [
+  inMain('System.out.println(new Sieve().FindPrimes(30));'),
+  'class Sieve {',
+  '  int[] isPrime;',
+  '',
+  '  public int FindPrimes(int max) {',
+  '    int aux;',
+  '    int i;',
+  '    int j;',
+  '    int currentVal;',
+  '    aux = this.Init(max);',
+  '    i = 2;',
+  '    while (i < max) {',
+  '      currentVal = isPrime[i];',
+  '      if (0 < currentVal) {',
+  '        System.out.println(i);',
+  '        j = i * 2;',
+  '        while (j < max) {',
+  '          isPrime[j] = 0;',
+  '          j = j + i;',
+  '        }',
+  '      } else {',
+  '        aux = 0;',
+  '      }',
+  '      i = i + 1;',
+  '    }',
+  '    return 0;',
+  '  }',
+  '',
+  '  public int Init(int size) {',
+  '    int i;',
+  '    isPrime = new int[size];',
+  '    i = 0;',
+  '    while (i < size) {',
+  '      isPrime[i] = 1;',
+  '      i = i + 1;',
+  '    }',
+  '    return 0;',
+  '  }',
+  '}'
+].join('\n');
+
+const PRIMES_UNDER_30 = ['2', '3', '5', '7', '11', '13', '17', '19', '23', '29'];
+
 /** The Bubble Sort example: nested loops, swaps through a shared array. */
 const BUBBLE_SORT = [
   inMain('System.out.println(new BBS().Start(10));'),
@@ -617,6 +662,23 @@ const SHAPES = [
 ].join('\n');
 
 const MODEL_CASES = [
+  [
+    'sieve under Model A: every prime below 30',
+    SIEVE,
+    'A',
+    { output: [...PRIMES_UNDER_30, '0'], rulesInclude: ['array-write', 'array-read', 'new-array'] }
+  ],
+  [
+    // The sharpest form of the callee -> caller contrast. Elsewhere the caller
+    // allocates and only the VALUES are lost under Model B, so the program
+    // runs on and prints zeros. Here Init allocates too, so FindPrimes' field
+    // is still Null when it indexes it: Model B does not print wrong numbers,
+    // it gets STUCK. A lost write degrades quietly; a lost allocation does not.
+    'sieve under Model B: the lost Init allocation is a null dereference',
+    SIEVE,
+    'B',
+    { status: 'error', errorIncludes: 'null dereference: the array is null', output: [] }
+  ],
   [
     // Init fills the shared heap array, Print reads it, Sort swaps in place:
     // unsorted, 9999, sorted, then Start's 0.

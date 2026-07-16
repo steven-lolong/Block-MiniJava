@@ -146,6 +146,51 @@ const CASES = [
     { result: '6', rules: ['concat', 'str-length', 'add'] }
   ],
   [
+    // The Max Finder example: an `if` needs a store, so the method is outside
+    // the pure fragment and the rewriter says so instead of mis-stepping it.
+    'max finder example is reported as impure (if)',
+    [
+      inMain('System.out.println(new MaxFinder().FindMax(15, 42));'),
+      'class MaxFinder {',
+      '  public int FindMax(int num1, int num2) {',
+      '    int result;',
+      '    if (num1 < num2) { result = num2; } else { result = num1; }',
+      '    return result;',
+      '  }',
+      '}'
+    ].join('\n'),
+    { errorIncludes: "contains a 'if' statement" }
+  ],
+  [
+    // The Simple Sum example: the pure fragment takes `f = v` where v is
+    // ALREADY a value (the functional-update pattern), so an assignment whose
+    // right-hand side still needs reducing — result = num1 + num2 -> 5 + 7 —
+    // is refused rather than substituted unreduced (that would be
+    // call-by-name and could duplicate the work).
+    'simple sum example is reported as impure (rhs needs reducing)',
+    [
+      inMain('System.out.println(new Calculator().Add(5, 7));'),
+      'class Calculator {',
+      '  public int Add(int num1, int num2) {',
+      '    int result;',
+      '    result = num1 + num2;',
+      '    return result;',
+      '  }',
+      '}'
+    ].join('\n'),
+    { errorIncludes: "the assignment to 'result' is not a simple value" }
+  ],
+  [
+    // The same computation WITHOUT the intermediate assignment is in the pure
+    // fragment: returning the expression directly reduces normally.
+    'simple sum without the temporary does rewrite',
+    [
+      inMain('System.out.println(new Calculator().Add(5, 7));'),
+      'class Calculator { public int Add(int num1, int num2) { return num1 + num2; } }'
+    ].join('\n'),
+    { result: '12', rules: ['new', 'call', 'add'] }
+  ],
+  [
     'impure method is reported, not mis-stepped',
     [
       inMain('System.out.println(new Fac().ComputeFac(3));'),

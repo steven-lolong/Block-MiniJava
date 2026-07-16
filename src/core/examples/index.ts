@@ -7,6 +7,443 @@ export interface MiniJavaExample {
 
 export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
   {
+    id: 'simple-sum',
+    label: 'Simple Sum',
+    description: 'The smallest complete MiniJava program: main prints new Calculator().Add(5, 7), which returns 12',
+    state: {
+      blocks: {
+        languageVersion: 0,
+        blocks: [
+          {
+            type: 'mj_goal',
+            x: 48,
+            y: 48,
+            deletable: false,
+            movable: false,
+            inputs: {
+              MAIN: {
+                block: {
+                  type: 'mj_main_class',
+                  fields: {
+                    CLASS: 'SimpleSum',
+                    ARG: 'a'
+                  },
+                  inputs: {
+                    STATEMENT: {
+                      block: {
+                        type: 'mj_statement_print',
+                        inputs: {
+                          VALUE: {
+                            block: {
+                              type: 'mj_expr_method_call',
+                              fields: {
+                                METHOD: 'Add'
+                              },
+                              inputs: {
+                                OBJECT: {
+                                  block: {
+                                    type: 'mj_expr_new_object',
+                                    fields: {
+                                      CLASS: 'Calculator'
+                                    }
+                                  }
+                                },
+                                ARGS: {
+                                  block: {
+                                    type: 'mj_argument_item',
+                                    inputs: {
+                                      EXPR: {
+                                        block: {
+                                          type: 'mj_expr_integer',
+                                          fields: {
+                                            VALUE: 5
+                                          }
+                                        }
+                                      }
+                                    },
+                                    next: {
+                                      block: {
+                                        type: 'mj_argument_item',
+                                        inputs: {
+                                          EXPR: {
+                                            block: {
+                                              type: 'mj_expr_integer',
+                                              fields: {
+                                                VALUE: 7
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              CLASSES: {
+                block: {
+                  type: 'mj_class_declaration',
+                  fields: {
+                    CLASS: 'Calculator',
+                    HAS_EXTENDS: 'FALSE'
+                  },
+                  inputs: {
+                    METHODS: {
+                      block: {
+                        type: 'mj_method_declaration',
+                        fields: {
+                          NAME: 'Add'
+                        },
+                        inputs: {
+                          TYPE: {
+                            block: {
+                              type: 'mj_type_int'
+                            }
+                          },
+                          PARAMS: {
+                            block: {
+                              type: 'mj_formal_parameter',
+                              fields: {
+                                NAME: 'num1'
+                              },
+                              inputs: {
+                                TYPE: {
+                                  block: {
+                                    type: 'mj_type_int'
+                                  }
+                                }
+                              },
+                              next: {
+                                block: {
+                                  type: 'mj_formal_parameter',
+                                  fields: {
+                                    NAME: 'num2'
+                                  },
+                                  inputs: {
+                                    TYPE: {
+                                      block: {
+                                        type: 'mj_type_int'
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          VARS: {
+                            block: {
+                              type: 'mj_var_declaration',
+                              fields: {
+                                NAME: 'result'
+                              },
+                              inputs: {
+                                TYPE: {
+                                  block: {
+                                    type: 'mj_type_int'
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          BODY: {
+                            block: {
+                              type: 'mj_statement_assign',
+                              fields: {
+                                NAME: 'result'
+                              },
+                              inputs: {
+                                VALUE: {
+                                  block: {
+                                    type: 'mj_expr_arith',
+                                    fields: {
+                                      OP: '+'
+                                    },
+                                    inputs: {
+                                      LEFT: {
+                                        block: {
+                                          type: 'mj_expr_identifier',
+                                          fields: {
+                                            NAME: 'num1'
+                                          }
+                                        }
+                                      },
+                                      RIGHT: {
+                                        block: {
+                                          type: 'mj_expr_identifier',
+                                          fields: {
+                                            NAME: 'num2'
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          RETURN: {
+                            block: {
+                              type: 'mj_expr_identifier',
+                              fields: {
+                                NAME: 'result'
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    id: 'max-finder',
+    label: 'Max Finder',
+    description: 'A method that returns the larger of two ints via if/else: FindMax(15, 42) prints 42',
+    state: {
+      blocks: {
+        languageVersion: 0,
+        blocks: [
+          {
+            type: 'mj_goal',
+            x: 48,
+            y: 48,
+            deletable: false,
+            movable: false,
+            inputs: {
+              MAIN: {
+                block: {
+                  type: 'mj_main_class',
+                  fields: {
+                    CLASS: 'MaxDemo',
+                    ARG: 'a'
+                  },
+                  inputs: {
+                    STATEMENT: {
+                      block: {
+                        type: 'mj_statement_print',
+                        inputs: {
+                          VALUE: {
+                            block: {
+                              type: 'mj_expr_method_call',
+                              fields: {
+                                METHOD: 'FindMax'
+                              },
+                              inputs: {
+                                OBJECT: {
+                                  block: {
+                                    type: 'mj_expr_new_object',
+                                    fields: {
+                                      CLASS: 'MaxFinder'
+                                    }
+                                  }
+                                },
+                                ARGS: {
+                                  block: {
+                                    type: 'mj_argument_item',
+                                    inputs: {
+                                      EXPR: {
+                                        block: {
+                                          type: 'mj_expr_integer',
+                                          fields: {
+                                            VALUE: 15
+                                          }
+                                        }
+                                      }
+                                    },
+                                    next: {
+                                      block: {
+                                        type: 'mj_argument_item',
+                                        inputs: {
+                                          EXPR: {
+                                            block: {
+                                              type: 'mj_expr_integer',
+                                              fields: {
+                                                VALUE: 42
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              CLASSES: {
+                block: {
+                  type: 'mj_class_declaration',
+                  fields: {
+                    CLASS: 'MaxFinder',
+                    HAS_EXTENDS: 'FALSE'
+                  },
+                  inputs: {
+                    METHODS: {
+                      block: {
+                        type: 'mj_method_declaration',
+                        fields: {
+                          NAME: 'FindMax'
+                        },
+                        inputs: {
+                          TYPE: {
+                            block: {
+                              type: 'mj_type_int'
+                            }
+                          },
+                          PARAMS: {
+                            block: {
+                              type: 'mj_formal_parameter',
+                              fields: {
+                                NAME: 'num1'
+                              },
+                              inputs: {
+                                TYPE: {
+                                  block: {
+                                    type: 'mj_type_int'
+                                  }
+                                }
+                              },
+                              next: {
+                                block: {
+                                  type: 'mj_formal_parameter',
+                                  fields: {
+                                    NAME: 'num2'
+                                  },
+                                  inputs: {
+                                    TYPE: {
+                                      block: {
+                                        type: 'mj_type_int'
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          VARS: {
+                            block: {
+                              type: 'mj_var_declaration',
+                              fields: {
+                                NAME: 'result'
+                              },
+                              inputs: {
+                                TYPE: {
+                                  block: {
+                                    type: 'mj_type_int'
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          BODY: {
+                            block: {
+                              type: 'mj_statement_if',
+                              inputs: {
+                                COND: {
+                                  block: {
+                                    type: 'mj_expr_compare',
+                                    fields: {
+                                      OP: '<'
+                                    },
+                                    inputs: {
+                                      LEFT: {
+                                        block: {
+                                          type: 'mj_expr_identifier',
+                                          fields: {
+                                            NAME: 'num1'
+                                          }
+                                        }
+                                      },
+                                      RIGHT: {
+                                        block: {
+                                          type: 'mj_expr_identifier',
+                                          fields: {
+                                            NAME: 'num2'
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                THEN: {
+                                  block: {
+                                    type: 'mj_statement_assign',
+                                    fields: {
+                                      NAME: 'result'
+                                    },
+                                    inputs: {
+                                      VALUE: {
+                                        block: {
+                                          type: 'mj_expr_identifier',
+                                          fields: {
+                                            NAME: 'num2'
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                ELSE: {
+                                  block: {
+                                    type: 'mj_statement_assign',
+                                    fields: {
+                                      NAME: 'result'
+                                    },
+                                    inputs: {
+                                      VALUE: {
+                                        block: {
+                                          type: 'mj_expr_identifier',
+                                          fields: {
+                                            NAME: 'num1'
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          RETURN: {
+                            block: {
+                              type: 'mj_expr_identifier',
+                              fields: {
+                                NAME: 'result'
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
     id: 'factorial',
     label: 'Factorial',
     description: 'Recursive MiniJava factorial program: ComputeFac(10) prints 3628800',

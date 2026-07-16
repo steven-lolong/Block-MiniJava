@@ -29,6 +29,41 @@ function inMain(statements) {
  */
 const CASES = [
   ['print literal', inMain('System.out.println(42);'), { output: ['42'] }],
+  [
+    // The Simple Sum example: the smallest complete program — one call, one
+    // add. No object state, so nothing for the value models to disagree about.
+    'simple sum example',
+    [
+      inMain('System.out.println(new Calculator().Add(5, 7));'),
+      'class Calculator {',
+      '  public int Add(int num1, int num2) {',
+      '    int result;',
+      '    result = num1 + num2;',
+      '    return result;',
+      '  }',
+      '}'
+    ].join('\n'),
+    { output: ['12'], rulesInclude: ['new', 'call', 'add', 'return'] }
+  ],
+  [
+    // The Max Finder example: FindMax(15, 42) takes the then-branch.
+    'max finder example',
+    [
+      inMain('System.out.println(new MaxFinder().FindMax(15, 42));'),
+      'class MaxFinder {',
+      '  public int FindMax(int num1, int num2) {',
+      '    int result;',
+      '    if (num1 < num2) {',
+      '      result = num2;',
+      '    } else {',
+      '      result = num1;',
+      '    }',
+      '    return result;',
+      '  }',
+      '}'
+    ].join('\n'),
+    { output: ['42'], rulesInclude: ['less', 'if-true'], rulesExclude: ['if-false'] }
+  ],
   ['arithmetic precedence', inMain('System.out.println(1 + 2 * 3 - 4);'), { output: ['3'] }],
   ['division truncates toward zero', inMain('System.out.println(7 / 2);\nSystem.out.println((0 - 7) / 2);'), { output: ['3', '-3'], rulesInclude: ['div'] }],
   [

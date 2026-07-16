@@ -25,6 +25,40 @@ function inMain(statements) {
 /** [name, source, expected output lines] */
 const CASES = [
   ['print literal', inMain('System.out.println(42);'), ['42']],
+  [
+    // The Simple Sum example: the smallest complete program.
+    'simple sum',
+    [
+      inMain('System.out.println(new Calculator().Add(5, 7));'),
+      'class Calculator {',
+      '  public int Add(int num1, int num2) {',
+      '    int result;',
+      '    result = num1 + num2;',
+      '    return result;',
+      '  }',
+      '}'
+    ].join('\n'),
+    ['12']
+  ],
+  [
+    // The Max Finder example: if/else picking the larger operand.
+    'max finder',
+    [
+      inMain('System.out.println(new MaxFinder().FindMax(15, 42));'),
+      'class MaxFinder {',
+      '  public int FindMax(int num1, int num2) {',
+      '    int result;',
+      '    if (num1 < num2) {',
+      '      result = num2;',
+      '    } else {',
+      '      result = num1;',
+      '    }',
+      '    return result;',
+      '  }',
+      '}'
+    ].join('\n'),
+    ['42']
+  ],
   ['arithmetic dropdown ops', inMain('System.out.println(1 + 2 * 3 - 4);'), ['3']],
   ['compare and logic', inMain('System.out.println(1 < 2 && !(3 < 2));'), ['true']],
   ['division truncates toward zero', inMain('System.out.println(7 / 2);\nSystem.out.println((0 - 7) / 2);'), ['3', '-3']],

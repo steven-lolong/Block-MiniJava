@@ -360,7 +360,89 @@ const POKE_PROGRAM = [
 ].join('\n');
 
 /** [name, source, model, expectations] */
+/** The Binary Search example: init writes fields through `this`, then searches. */
+const BINARY_SEARCH = [
+  inMain('System.out.println(new BS().Start(20));'),
+  'class BS {',
+  '  int[] number;',
+  '  int size;',
+  '',
+  '  public int Start(int sz) {',
+  '    int aux;',
+  '    int searchResult;',
+  '    aux = this.Init(sz);',
+  '    searchResult = this.Search(8);',
+  '    System.out.println(searchResult);',
+  '    searchResult = this.Search(19);',
+  '    System.out.println(searchResult);',
+  '    return 0;',
+  '  }',
+  '',
+  '  public int Search(int num) {',
+  '    int l;',
+  '    int h;',
+  '    int mid;',
+  '    int found;',
+  '    int var_test;',
+  '    boolean keep_looking;',
+  '    l = 0;',
+  '    h = size - 1;',
+  '    found = 0;',
+  '    keep_looking = true;',
+  '    while (keep_looking) {',
+  '      if (h < l) {',
+  '        keep_looking = false;',
+  '      } else {',
+  '        mid = (l + h) / 2;',
+  '        var_test = number[mid];',
+  '        if (num < var_test) {',
+  '          h = mid - 1;',
+  '        } else {',
+  '          if (var_test < num) {',
+  '            l = mid + 1;',
+  '          } else {',
+  '            found = 1;',
+  '            keep_looking = false;',
+  '          }',
+  '        }',
+  '      }',
+  '    }',
+  '    return found;',
+  '  }',
+  '',
+  '  public int Init(int sz) {',
+  '    int i;',
+  '    size = sz;',
+  '    number = new int[sz];',
+  '    i = 0;',
+  '    while (i < size) {',
+  '      number[i] = i * 2;',
+  '      i = i + 1;',
+  '    }',
+  '    return 0;',
+  '  }',
+  '}'
+].join('\n');
+
 const MODEL_CASES = [
+  [
+    // Model A: Init's field writes mutate the shared heap object, so Start's
+    // search runs against the initialized array — 8 is found, 19 is not.
+    'binary search under Model A: the init writes reach the caller',
+    BINARY_SEARCH,
+    'A',
+    { output: ['1', '0', '0'], rulesInclude: ['div', 'field-write', 'field-read', 'array-read'] }
+  ],
+  [
+    // Model B: `this` is bound by structure, so Init functionally updates its
+    // OWN copy and the caller never sees the array — size stays 0, h = -1 < l,
+    // every search reports not-found. The mutate-through-this init idiom does
+    // not survive call-by-structure; that contrast is the point of the tab.
+    'binary search under Model B: the init writes stay in Init',
+    BINARY_SEARCH,
+    'B',
+    { output: ['0', '0', '0'], heapSize: 0, rulesExclude: ['field-write'] }
+  ],
   [
     'strings behave identically under Model B',
     inMain('System.out.println("mini".concat("java").charAt(4));'),

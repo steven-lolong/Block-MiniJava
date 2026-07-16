@@ -20,13 +20,13 @@ export const MINI_JAVA_BLOCK_TYPES = [
   'mj_goal',
   'mj_main_class',
   'mj_class_declaration',
-  'mj_class_extends_declaration',
   'mj_var_declaration',
   'mj_method_declaration',
   'mj_formal_parameter',
   'mj_type_int_array',
   'mj_type_boolean',
   'mj_type_int',
+  'mj_type_string',
   'mj_type_identifier',
   'mj_statement_block',
   'mj_statement_if',
@@ -34,18 +34,19 @@ export const MINI_JAVA_BLOCK_TYPES = [
   'mj_statement_print',
   'mj_statement_assign',
   'mj_statement_array_assign',
-  'mj_expr_and',
-  'mj_expr_less',
-  'mj_expr_plus',
-  'mj_expr_minus',
-  'mj_expr_times',
+  'mj_expr_arith',
+  'mj_expr_compare',
+  'mj_expr_logic',
   'mj_expr_array_lookup',
   'mj_expr_array_length',
+  'mj_expr_char_at',
+  'mj_expr_concat',
+  'mj_expr_str_length',
   'mj_expr_method_call',
   'mj_argument_item',
   'mj_expr_integer',
-  'mj_expr_true',
-  'mj_expr_false',
+  'mj_expr_string',
+  'mj_expr_boolean',
   'mj_expr_identifier',
   'mj_expr_this',
   'mj_expr_new_int_array',
@@ -69,8 +70,7 @@ export const MINI_JAVA_CATEGORIES: ToolboxCategory[] = [
     label: 'Program',
     icon: 'P',
     blocks: [
-      { type: 'mj_class_declaration', label: 'Class Declaration', icon: 'cls' },
-      { type: 'mj_class_extends_declaration', label: 'Class Extends Declaration', icon: 'ext' }
+      { type: 'mj_class_declaration', label: 'Class Declaration', icon: 'cls' }
     ]
   },
   {
@@ -91,6 +91,7 @@ export const MINI_JAVA_CATEGORIES: ToolboxCategory[] = [
       { type: 'mj_type_int_array', label: 'int[]', icon: '[]' },
       { type: 'mj_type_boolean', label: 'boolean', icon: 'bool' },
       { type: 'mj_type_int', label: 'int', icon: 'int' },
+      { type: 'mj_type_string', label: 'String', icon: 'str' },
       { type: 'mj_type_identifier', label: 'Identifier Type', icon: 'id' }
     ]
   },
@@ -112,13 +113,14 @@ export const MINI_JAVA_CATEGORIES: ToolboxCategory[] = [
     label: 'Expressions',
     icon: 'E',
     blocks: [
-      { type: 'mj_expr_and', label: '&&', icon: '&&' },
-      { type: 'mj_expr_less', label: '<', icon: '<' },
-      { type: 'mj_expr_plus', label: '+', icon: '+' },
-      { type: 'mj_expr_minus', label: '-', icon: '-' },
-      { type: 'mj_expr_times', label: '*', icon: '*' },
+      { type: 'mj_expr_arith', label: 'Arithmetic (+ − ×)', icon: '+' },
+      { type: 'mj_expr_compare', label: 'Compare (<)', icon: '<' },
+      { type: 'mj_expr_logic', label: 'Logic (&&)', icon: '&&' },
       { type: 'mj_expr_array_lookup', label: 'Array Lookup', icon: '[]' },
       { type: 'mj_expr_array_length', label: 'Array Length', icon: 'len' },
+      { type: 'mj_expr_char_at', label: 'charAt', icon: '@' },
+      { type: 'mj_expr_concat', label: 'concat', icon: '++' },
+      { type: 'mj_expr_str_length', label: 'String Length', icon: '#' },
       { type: 'mj_expr_method_call', label: 'Method Call', icon: 'call' },
       { type: 'mj_argument_item', label: 'Argument Item', icon: 'arg' },
       { type: 'mj_expr_not', label: 'Not', icon: '!' },
@@ -131,8 +133,8 @@ export const MINI_JAVA_CATEGORIES: ToolboxCategory[] = [
     icon: 'V',
     blocks: [
       { type: 'mj_expr_integer', label: 'Integer', icon: '123' },
-      { type: 'mj_expr_true', label: 'true', icon: 'T' },
-      { type: 'mj_expr_false', label: 'false', icon: 'F' },
+      { type: 'mj_expr_string', label: 'String Literal', icon: '"a"' },
+      { type: 'mj_expr_boolean', label: 'Boolean', icon: 'T/F' },
       { type: 'mj_expr_identifier', label: 'Identifier', icon: 'id' },
       { type: 'mj_expr_this', label: 'this', icon: 'this' },
       { type: 'mj_expr_new_int_array', label: 'new int[]', icon: 'new[]' },
@@ -176,37 +178,6 @@ export function defineMiniJavaBlocks(): void {
       output: 'MainClass',
       style: miniJavaBlockStyle('mj_main_class'),
       tooltip: 'MainClass ::= class Identifier { public static void main ( String [] Identifier ) { Statement } }',
-      helpUrl: ''
-    },
-    {
-      type: 'mj_class_declaration',
-      message0: 'class %1 %2 fields %3 methods %4',
-      args0: [
-        { type: 'field_input', name: 'CLASS', text: 'ClassName' },
-        { type: 'input_dummy' },
-        { type: 'input_statement', name: 'VARS', check: 'VarDeclaration' },
-        { type: 'input_statement', name: 'METHODS', check: 'MethodDeclaration' }
-      ],
-      previousStatement: 'ClassDeclaration',
-      nextStatement: 'ClassDeclaration',
-      style: miniJavaBlockStyle('mj_class_declaration'),
-      tooltip: 'ClassDeclaration ::= class Identifier { VarDeclaration* MethodDeclaration* }',
-      helpUrl: ''
-    },
-    {
-      type: 'mj_class_extends_declaration',
-      message0: 'class %1 extends %2 %3 fields %4 methods %5',
-      args0: [
-        { type: 'field_input', name: 'CLASS', text: 'ClassName' },
-        { type: 'field_input', name: 'PARENT', text: 'ParentName' },
-        { type: 'input_dummy' },
-        { type: 'input_statement', name: 'VARS', check: 'VarDeclaration' },
-        { type: 'input_statement', name: 'METHODS', check: 'MethodDeclaration' }
-      ],
-      previousStatement: 'ClassDeclaration',
-      nextStatement: 'ClassDeclaration',
-      style: miniJavaBlockStyle('mj_class_extends_declaration'),
-      tooltip: 'ClassDeclaration ::= class Identifier extends Identifier { VarDeclaration* MethodDeclaration* }',
       helpUrl: ''
     },
     {
@@ -275,6 +246,14 @@ export function defineMiniJavaBlocks(): void {
       output: 'Type',
       style: miniJavaBlockStyle('mj_type_int'),
       tooltip: 'Type ::= int',
+      helpUrl: ''
+    },
+    {
+      type: 'mj_type_string',
+      message0: 'String',
+      output: 'Type',
+      style: miniJavaBlockStyle('mj_type_string'),
+      tooltip: 'Type ::= String',
       helpUrl: ''
     },
     {
@@ -361,68 +340,50 @@ export function defineMiniJavaBlocks(): void {
       helpUrl: ''
     },
     {
-      type: 'mj_expr_and',
-      message0: '%1 && %2',
+      // One block for all int arithmetic; the operator is a dropdown whose
+      // value IS the MiniJava operator text.
+      type: 'mj_expr_arith',
+      message0: '%1 %2 %3',
       args0: [
         { type: 'input_value', name: 'LEFT', check: 'Expression' },
+        { type: 'field_dropdown', name: 'OP', options: [['+', '+'], ['-', '-'], ['*', '*']] },
         { type: 'input_value', name: 'RIGHT', check: 'Expression' }
       ],
       inputsInline: true,
       output: 'Expression',
-      style: miniJavaBlockStyle('mj_expr_and'),
-      tooltip: 'Expression ::= Expression && Expression',
+      style: miniJavaBlockStyle('mj_expr_arith'),
+      tooltip: 'Expression ::= Expression ( + | - | * ) Expression',
       helpUrl: ''
     },
     {
-      type: 'mj_expr_less',
-      message0: '%1 < %2',
+      // MiniJava's only comparison is <; the dropdown keeps the shape uniform
+      // with the arithmetic/logic blocks and leaves room for extensions.
+      type: 'mj_expr_compare',
+      message0: '%1 %2 %3',
       args0: [
         { type: 'input_value', name: 'LEFT', check: 'Expression' },
+        { type: 'field_dropdown', name: 'OP', options: [['<', '<']] },
         { type: 'input_value', name: 'RIGHT', check: 'Expression' }
       ],
       inputsInline: true,
       output: 'Expression',
-      style: miniJavaBlockStyle('mj_expr_less'),
+      style: miniJavaBlockStyle('mj_expr_compare'),
       tooltip: 'Expression ::= Expression < Expression',
       helpUrl: ''
     },
     {
-      type: 'mj_expr_plus',
-      message0: '%1 + %2',
+      // MiniJava's only boolean connective is &&.
+      type: 'mj_expr_logic',
+      message0: '%1 %2 %3',
       args0: [
         { type: 'input_value', name: 'LEFT', check: 'Expression' },
+        { type: 'field_dropdown', name: 'OP', options: [['&&', '&&']] },
         { type: 'input_value', name: 'RIGHT', check: 'Expression' }
       ],
       inputsInline: true,
       output: 'Expression',
-      style: miniJavaBlockStyle('mj_expr_plus'),
-      tooltip: 'Expression ::= Expression + Expression',
-      helpUrl: ''
-    },
-    {
-      type: 'mj_expr_minus',
-      message0: '%1 - %2',
-      args0: [
-        { type: 'input_value', name: 'LEFT', check: 'Expression' },
-        { type: 'input_value', name: 'RIGHT', check: 'Expression' }
-      ],
-      inputsInline: true,
-      output: 'Expression',
-      style: miniJavaBlockStyle('mj_expr_minus'),
-      tooltip: 'Expression ::= Expression - Expression',
-      helpUrl: ''
-    },
-    {
-      type: 'mj_expr_times',
-      message0: '%1 * %2',
-      args0: [
-        { type: 'input_value', name: 'LEFT', check: 'Expression' },
-        { type: 'input_value', name: 'RIGHT', check: 'Expression' }
-      ],
-      inputsInline: true,
-      output: 'Expression',
-      style: miniJavaBlockStyle('mj_expr_times'),
-      tooltip: 'Expression ::= Expression * Expression',
+      style: miniJavaBlockStyle('mj_expr_logic'),
+      tooltip: 'Expression ::= Expression && Expression',
       helpUrl: ''
     },
     {
@@ -445,6 +406,45 @@ export function defineMiniJavaBlocks(): void {
       output: 'Expression',
       style: miniJavaBlockStyle('mj_expr_array_length'),
       tooltip: 'Expression ::= Expression . length',
+      helpUrl: ''
+    },
+    {
+      // charAt yields a 1-character String: the language has no char type.
+      type: 'mj_expr_char_at',
+      message0: '%1 . charAt ( %2 )',
+      args0: [
+        { type: 'input_value', name: 'STR', check: 'Expression' },
+        { type: 'input_value', name: 'INDEX', check: 'Expression' }
+      ],
+      inputsInline: true,
+      output: 'Expression',
+      style: miniJavaBlockStyle('mj_expr_char_at'),
+      tooltip: 'Expression ::= Expression . charAt ( Expression )',
+      helpUrl: ''
+    },
+    {
+      type: 'mj_expr_concat',
+      message0: '%1 . concat ( %2 )',
+      args0: [
+        { type: 'input_value', name: 'LEFT', check: 'Expression' },
+        { type: 'input_value', name: 'RIGHT', check: 'Expression' }
+      ],
+      inputsInline: true,
+      output: 'Expression',
+      style: miniJavaBlockStyle('mj_expr_concat'),
+      tooltip: 'Expression ::= Expression . concat ( Expression )',
+      helpUrl: ''
+    },
+    {
+      // String length is `s.length()` WITH parens (as in Java), while array
+      // length is `a.length` without — the text forms stay distinguishable.
+      type: 'mj_expr_str_length',
+      message0: '%1 . length ( )',
+      args0: [{ type: 'input_value', name: 'STR', check: 'Expression' }],
+      inputsInline: true,
+      output: 'Expression',
+      style: miniJavaBlockStyle('mj_expr_str_length'),
+      tooltip: 'Expression ::= Expression . length ( )',
       helpUrl: ''
     },
     {
@@ -480,19 +480,24 @@ export function defineMiniJavaBlocks(): void {
       helpUrl: ''
     },
     {
-      type: 'mj_expr_true',
-      message0: 'true',
+      // The TEXT field is free-form (not identifier-validated): any characters
+      // are allowed; the generator escapes them into a MiniJava string literal.
+      type: 'mj_expr_string',
+      message0: 'string literal " %1 "',
+      args0: [{ type: 'field_input', name: 'TEXT', text: '' }],
       output: 'Expression',
-      style: miniJavaBlockStyle('mj_expr_true'),
-      tooltip: 'Expression ::= true',
+      style: miniJavaBlockStyle('mj_expr_string'),
+      tooltip: 'Expression ::= StringLiteral',
       helpUrl: ''
     },
     {
-      type: 'mj_expr_false',
-      message0: 'false',
+      // One boolean literal; true/false is a dropdown selection.
+      type: 'mj_expr_boolean',
+      message0: 'bool literal %1',
+      args0: [{ type: 'field_dropdown', name: 'VALUE', options: [['true', 'true'], ['false', 'false']] }],
       output: 'Expression',
-      style: miniJavaBlockStyle('mj_expr_false'),
-      tooltip: 'Expression ::= false',
+      style: miniJavaBlockStyle('mj_expr_boolean'),
+      tooltip: 'Expression ::= true | false',
       helpUrl: ''
     },
     {
@@ -566,6 +571,39 @@ export function defineMiniJavaBlocks(): void {
     }
   ]);
 
+  // Class declaration: ONE block for both plain and extends forms. The
+  // HAS_EXTENDS checkbox shows/hides the `extends ParentName` field pair;
+  // defined imperatively because field visibility needs a validator hook.
+  Blockly.Blocks['mj_class_declaration'] = {
+    init(this: Blockly.Block) {
+      const extendsLabel = new Blockly.FieldLabel('extends');
+      const parentField = new Blockly.FieldTextInput('ParentName');
+      this.appendDummyInput('HEAD')
+        .appendField('class')
+        .appendField(new Blockly.FieldTextInput('ClassName'), 'CLASS')
+        .appendField(new Blockly.FieldCheckbox('FALSE'), 'HAS_EXTENDS')
+        .appendField(extendsLabel, 'EXTENDS_LABEL')
+        .appendField(parentField, 'PARENT');
+      this.appendStatementInput('VARS').setCheck('VarDeclaration').appendField('fields');
+      this.appendStatementInput('METHODS').setCheck('MethodDeclaration').appendField('methods');
+      this.setPreviousStatement(true, 'ClassDeclaration');
+      this.setNextStatement(true, 'ClassDeclaration');
+      this.setStyle(miniJavaBlockStyle('mj_class_declaration'));
+      this.setTooltip('ClassDeclaration ::= class Identifier ( extends Identifier )? { VarDeclaration* MethodDeclaration* }');
+      const applyExtendsVisibility = (checked: boolean): void => {
+        extendsLabel.setVisible(checked);
+        parentField.setVisible(checked);
+        const svg = this as Blockly.Block & { rendered?: boolean; queueRender?: () => void };
+        if (svg.rendered) svg.queueRender?.();
+      };
+      this.getField('HAS_EXTENDS')!.setValidator((value: string) => {
+        applyExtendsVisibility(value === 'TRUE');
+        return value;
+      });
+      applyExtendsVisibility(false);
+    }
+  };
+
   // Structural object value (Model B display block): `C { f: [v] ... }`.
   // Its field inputs depend on the class, so it is defined imperatively and
   // shaped by extraState — it never appears in the toolbox or in programs.
@@ -602,7 +640,6 @@ export function defineMiniJavaBlocks(): void {
   const blockTypesWithIdentifierFields = [
     'mj_main_class',
     'mj_class_declaration',
-    'mj_class_extends_declaration',
     'mj_var_declaration',
     'mj_method_declaration',
     'mj_formal_parameter',

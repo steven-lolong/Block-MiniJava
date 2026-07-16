@@ -15,11 +15,11 @@ const KEYWORDS = new Set([
 ]);
 
 const TYPES = new Set(['int', 'boolean', 'String']);
-const MEMBER_BUILTINS = new Set(['out', 'println', 'length']);
+const MEMBER_BUILTINS = new Set(['out', 'println', 'length', 'charAt', 'concat']);
 const OPERATORS = new Set(['&&', '<', '+', '-', '*', '!', '=']);
 
 type RawToken = {
-  kind: 'comment' | 'word' | 'number' | 'symbol' | 'space' | 'other';
+  kind: 'comment' | 'word' | 'number' | 'string' | 'symbol' | 'space' | 'other';
   text: string;
 };
 
@@ -63,6 +63,19 @@ function tokenize(code: string): RawToken[] {
       let end = index + 1;
       while (end < code.length && DIGIT.test(code[end])) end += 1;
       tokens.push({ kind: 'number', text: code.slice(index, end) });
+      index = end;
+      continue;
+    }
+
+    if (char === '"') {
+      // String literal: scan to the closing quote, skipping escapes, but
+      // never across a newline (an unterminated literal stays on one line).
+      let end = index + 1;
+      while (end < code.length && code[end] !== '"' && code[end] !== '\n') {
+        end += code[end] === '\\' ? 2 : 1;
+      }
+      if (end < code.length && code[end] === '"') end += 1;
+      tokens.push({ kind: 'string', text: code.slice(index, end) });
       index = end;
       continue;
     }
@@ -159,6 +172,9 @@ export function highlightMiniJava(code: string): string {
         break;
       case 'number':
         parts.push(span('number', token.text));
+        break;
+      case 'string':
+        parts.push(span('string', token.text));
         break;
       case 'symbol':
         parts.push(span(OPERATORS.has(token.text) ? 'operator' : 'punctuation', token.text));

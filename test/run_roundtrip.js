@@ -54,6 +54,35 @@ const CASES = [
   ['array lookup chain', inMain('x = a[b[0]] + a[1];')],
   ['length of lookup', inMain('x = a[0].length;')],
 
+  // -- strings ------------------------------------------------------------------
+  ['print string literal', inMain('System.out.println("hello");')],
+  ['empty string literal', inMain('s = "";')],
+  ['string with escapes', inMain('s = "say \\"hi\\"\\n\\tdone \\\\ end";')],
+  ['string content that looks like tokens', inMain('s = "!".concat("true").concat("(").concat("int");')],
+  ['charAt', inMain('s = "abc".charAt(1);')],
+  ['concat', inMain('s = "ab".concat("cd");')],
+  ['charAt of concat chain', inMain('s = "ab".concat("cd").charAt(1 + 2);')],
+  ['string length', inMain('x = "abc".length();')],
+  ['string length of concat', inMain('x = "ab".concat(s).length() + 1;')],
+  ['array length stays parenless, string length keeps parens', inMain('x = a.length + s.length();')],
+  ['concat under not-parens head', inMain('s = (!b).concat("x");')],
+  [
+    'string type in fields, params, locals and returns',
+    [
+      inMain('System.out.println(new Greeter().greet("world"));'),
+      'class Greeter {',
+      '  String prefix;',
+      '',
+      '  public String greet(String who) {',
+      '    String message;',
+      '    message = prefix.concat(who);',
+      '    return message;',
+      '  }',
+      '}'
+    ].join('\n')
+  ],
+  ['identifiers named charAt and concat', inMain('charAt = 1;\nconcat = charAt + 2;\nSystem.out.println(concat);')],
+
   // -- method calls ----------------------------------------------------------------
   ['method call no args', inMain('x = this.compute();')],
   ['method call many args', inMain('x = this.compute(1, y, a[2]);')],

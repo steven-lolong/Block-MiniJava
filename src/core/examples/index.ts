@@ -98,7 +98,8 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                               inputs: {
                                 COND: {
                                   block: {
-                                    type: 'mj_expr_less',
+                                    type: 'mj_expr_compare',
+                                    fields: { OP: '<' },
                                     inputs: {
                                       LEFT: {
                                         block: {
@@ -136,7 +137,8 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                                     inputs: {
                                       VALUE: {
                                         block: {
-                                          type: 'mj_expr_times',
+                                          type: 'mj_expr_arith',
+                                    fields: { OP: '*' },
                                           inputs: {
                                             LEFT: {
                                               block: {
@@ -156,7 +158,8 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                                                       inputs: {
                                                         EXPR: {
                                                           block: {
-                                                            type: 'mj_expr_minus',
+                                                            type: 'mj_expr_arith',
+                                    fields: { OP: '-' },
                                                             inputs: {
                                                               LEFT: {
                                                                 block: {
@@ -393,11 +396,13 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                           },
                           RETURN: {
                             block: {
-                              type: 'mj_expr_plus',
+                              type: 'mj_expr_arith',
+                                    fields: { OP: '+' },
                               inputs: {
                                 LEFT: {
                                   block: {
-                                    type: 'mj_expr_times',
+                                    type: 'mj_expr_arith',
+                                    fields: { OP: '*' },
                                     inputs: {
                                       LEFT: {
                                         block: {
@@ -670,7 +675,8 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
                           },
                           RETURN: {
                             block: {
-                              type: 'mj_expr_plus',
+                              type: 'mj_expr_arith',
+                                    fields: { OP: '+' },
                               inputs: {
                                 LEFT: {
                                   block: {

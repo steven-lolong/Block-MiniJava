@@ -137,6 +137,47 @@ const CASES = [
     []
   ],
 
+  // -- strings --------------------------------------------------------------------
+  ['println accepts a String', inMain('System.out.println("hello");'), []],
+  ['println accepts concat and charAt', inMain('System.out.println("ab".concat("cd").charAt(2));'), []],
+  [
+    'string fields, params, locals and returns',
+    [
+      inMain('System.out.println(new Greeter().greet("world"));'),
+      'class Greeter {',
+      '  String prefix;',
+      '',
+      '  public String greet(String who) {',
+      '    String message;',
+      '    message = prefix.concat(who);',
+      '    return message;',
+      '  }',
+      '}'
+    ].join('\n'),
+    []
+  ],
+  ['println rejects boolean still', inMain('System.out.println(true);'), [err('Expected int or String, found boolean')]],
+  ['string length returns int', inMain('System.out.println("abc".length());'), []],
+  ['string length receiver must be String', inMain('System.out.println((1).length());'), [err('Expected String, found int')]],
+  ['charAt receiver must be String', inMain('System.out.println((1).charAt(0));'), [err('Expected String, found int')]],
+  ['charAt index must be int', inMain('System.out.println("ab".charAt(true));'), [err('Expected int, found boolean')]],
+  ['concat wants Strings', inMain('System.out.println("ab".concat(1));'), [err('Expected String, found int')]],
+  ['plus rejects strings', inMain('System.out.println("a" + "b");'), [err('Expected int, found String'), err('Expected int, found String')]],
+  [
+    'cannot assign String to int',
+    [
+      inMain('System.out.println(0);'),
+      'class C {',
+      '  public int go() {',
+      '    int x;',
+      '    x = "oops";',
+      '    return x;',
+      '  }',
+      '}'
+    ].join('\n'),
+    [err("Cannot assign String to 'x' (int)")]
+  ],
+
   // -- expression and statement typing errors -----------------------------------
   ['if condition must be boolean', inMain('if (1) {} else {}'), [err('Expected boolean, found int')]],
   ['plus wants ints', inMain('System.out.println(1 + true);'), [err('Expected int, found boolean')]],
@@ -218,7 +259,7 @@ const CASES = [
     ].join('\n'),
     [err("'x' is not an int[] (found int)")]
   ],
-  ['println of String[] argument', inMain('System.out.println(args);'), [err('Expected int, found String[]')]],
+  ['println of String[] argument', inMain('System.out.println(args);'), [err('Expected int or String, found String[]')]],
   ["this cannot be used in main", inMain('System.out.println(this);'), [err("'this' cannot be used inside main")]],
 
   // -- declarations and inheritance ----------------------------------------------

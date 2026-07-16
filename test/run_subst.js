@@ -26,7 +26,10 @@ function inMain(statements) {
   return `class Main {\n  public static void main(String[] args) {\n${body}\n  }\n}`;
 }
 
-const SALIENT = new Set(['add', 'sub', 'mul', 'less', 'not', 'and', 'and-short-circuit', 'new', 'call']);
+const SALIENT = new Set([
+  'add', 'sub', 'mul', 'less', 'not', 'and', 'and-short-circuit', 'new', 'call',
+  'concat', 'char-at', 'str-length'
+]);
 const salient = (rules) => rules.filter((rule) => SALIENT.has(rule));
 
 const CELL = [
@@ -104,6 +107,35 @@ const CASES = [
     { result: '42', rules: ['new', 'call', 'add'] }
   ],
   [
+    'concat then charAt',
+    inMain('System.out.println("mini".concat("java").charAt(4));'),
+    { result: '"j"', rules: ['concat', 'char-at'] }
+  ],
+  [
+    'string param and field through a pure method',
+    [
+      inMain('System.out.println(new G().greet("world"));'),
+      'class G {',
+      '  String p;',
+      '  public String greet(String w) {',
+      '    p = "hello ";',
+      '    return p.concat(w);',
+      '  }',
+      '}'
+    ].join('\n'),
+    { result: '"hello world"', rules: ['new', 'call', 'concat'] }
+  ],
+  [
+    'charAt out of bounds is reported',
+    inMain('System.out.println("ab".charAt(5));'),
+    { errorIncludes: 'string index 5 out of bounds' }
+  ],
+  [
+    'string length folds to an int',
+    inMain('System.out.println("ab".concat("cde").length() + 1);'),
+    { result: '6', rules: ['concat', 'str-length', 'add'] }
+  ],
+  [
     'impure method is reported, not mis-stepped',
     [
       inMain('System.out.println(new Fac().ComputeFac(3));'),
@@ -146,6 +178,15 @@ const CORRESPONDENCE = [
       '  }',
       '}',
       CELL
+    ].join('\n')
+  ],
+  ['string concat and charAt', inMain('System.out.println("mini".concat("java").charAt(4));')],
+  ['string length', inMain('System.out.println("ab".concat("cde").length() + 1);')],
+  [
+    'string beta and duplication',
+    [
+      inMain('System.out.println(new D().twice("ab".concat("c")));'),
+      'class D { public String twice(String s) { return s.concat(s); } }'
     ].join('\n')
   ]
 ];
@@ -227,7 +268,10 @@ for (const [name, source] of CORRESPONDENCE) {
       );
       continue;
     }
-    if (subst.result !== machine.output[0]) {
+    // The subst result is SYNTAX (a string value prints quoted, `"j"`), while
+    // the machine output is what println writes (raw, `j`) — unquote to compare.
+    const substValue = subst.result.startsWith('"') ? JSON.parse(subst.result) : subst.result;
+    if (substValue !== machine.output[0]) {
       fail(name, 'final values differ', `subst: ${subst.result}, machine printed: ${machine.output[0]}`);
       continue;
     }

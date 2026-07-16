@@ -58,6 +58,9 @@ behavior.
 ## Grammar
 
 The BNF source: https://courses.cs.washington.edu/courses/cse401/22au/project/BNF-for-MiniJava.html
+(mirrored in `MiniJava-BNF.md`). The grammar the project actually implements —
+the base BNF plus the String extension and the block editor's operator
+families — is `MiniJava-Adjusted-BNF.md`.
 
 ## Grammar-aware renderer
 
@@ -71,7 +74,7 @@ The project uses the custom Blockly renderer `BMJ-Thrasos`. It subclasses Blockl
 
 A three-layer static type system checks the workspace on every edit (debounced):
 
-- **`Ty` grammar** (`core/types/ty.ts`) — `int`, `boolean`, `int[]`, `String[]`, class types,
+- **`Ty` grammar** (`core/types/ty.ts`) — `int`, `boolean`, `String`, `int[]`, `String[]`, class types,
   method arrows, `Top`/`Bottom` bounds, and a first-class **hole type** in the Hazel style:
   a block whose type cannot be determined yet is consistent with everything, so one incomplete
   block never cascades errors across the program.
@@ -83,6 +86,23 @@ A three-layer static type system checks the workspace on every edit (debounced):
 
 Diagnostics surface twice: as warning icons on the offending blocks and in the inspector's
 **Problems** tab, where clicking an entry selects and centers the block.
+
+### Strings (extension over the BNF)
+
+Beyond the CSE-401 BNF, the language has a first-class `String` type: a `String` type
+block, double-quoted string literals (with `\"` `\\` `\n` `\t` `\r` escapes), and three
+operators — `s.charAt(i)`, `s.concat(t)`, and `s.length()`. `charAt` returns a
+**1-character `String`** (the language has no `char` type) and gets stuck on an
+out-of-bounds index, as Java throws. `concat` is the only string composition — `+` stays
+int-only. `length()` returns `int`; the parens disambiguate as in Java: `a.length` (no
+parens) is array length, `s.length()` (empty parens) is string length, and
+`o.length(args…)` stays an ordinary user method call. `System.out.println` accepts `int`
+or `String`. Like `.length`, `charAt`/`concat` are matched by name in postfix position,
+so user methods cannot shadow those names (any other identifier — including `charAt` as
+a *variable* — stays free). All three semantics carry the type: the CESK machine has a
+`Str` value and `concat`/`char-at`/`str-length` rules under both value models, the
+substitution rewriter treats string literals as values with the same salient rule names,
+and the legacy evaluator prints strings raw, as Java's `println` does.
 
 ## Running programs
 

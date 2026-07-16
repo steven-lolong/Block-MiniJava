@@ -9,12 +9,13 @@
     "dev": "webpack serve --mode=development",
     "clean": "rimraf docs",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:build && node test/run_roundtrip.js && node test/run_typecheck.js && node test/run_machine.js && node test/run_subst.js && node test/dist/smoke.bundle.js",
+    "test": "npm run test:build && node test/run_roundtrip.js && node test/run_typecheck.js && node test/run_machine.js && node test/run_subst.js && node test/run_eval.js && node test/dist/smoke.bundle.js",
     "test:build": "webpack --config webpack.test.config.js",
     "test:roundtrip": "npm run test:build && node test/run_roundtrip.js",
     "test:typecheck": "npm run test:build && node test/run_typecheck.js",
     "test:machine": "npm run test:build && node test/run_machine.js",
     "test:subst": "npm run test:build && node test/run_subst.js",
+    "test:eval": "npm run test:build && node test/run_eval.js",
     "test:smoke": "npm run test:build && node test/dist/smoke.bundle.js"
   },
   "dependencies": {

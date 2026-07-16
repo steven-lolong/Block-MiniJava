@@ -25,7 +25,7 @@ interface ThunkValue {
 }
 
 type RuntimeSlot = RuntimeValue | ThunkValue;
-export type RuntimeValue = number | boolean | null | ObjectValue | IntArrayValue | UnknownValue;
+export type RuntimeValue = number | boolean | string | null | ObjectValue | IntArrayValue | UnknownValue;
 
 export interface ClassInfo {
   name: string;
@@ -68,17 +68,18 @@ const METHOD_INPUTS = {
 } as const;
 
 const EXPR_TYPES = new Set([
-  'mj_expr_and',
-  'mj_expr_less',
-  'mj_expr_plus',
-  'mj_expr_minus',
-  'mj_expr_times',
+  'mj_expr_logic',
+  'mj_expr_compare',
+  'mj_expr_arith',
   'mj_expr_array_lookup',
   'mj_expr_array_length',
+  'mj_expr_char_at',
+  'mj_expr_concat',
+  'mj_expr_str_length',
   'mj_expr_method_call',
   'mj_expr_integer',
-  'mj_expr_true',
-  'mj_expr_false',
+  'mj_expr_string',
+  'mj_expr_boolean',
   'mj_expr_identifier',
   'mj_expr_this',
   'mj_expr_new_int_array',
@@ -137,6 +138,7 @@ function typeName(typeBlock: Blockly.Block | null): string {
   if (!typeBlock) return 'int';
   switch (typeBlock.type) {
     case 'mj_type_boolean': return 'boolean';
+    case 'mj_type_string': return 'String';
     case 'mj_type_int_array': return 'int[]';
     case 'mj_type_identifier': return field(typeBlock, 'NAME', 'Object');
     case 'mj_type_int':
@@ -148,6 +150,7 @@ function typeName(typeBlock: Blockly.Block | null): string {
 function defaultValueForType(typeBlock: Blockly.Block | null): RuntimeValue {
   const name = typeName(typeBlock);
   if (name === 'boolean') return false;
+  if (name === 'String') return '';
   if (name === 'int[]') return { kind: 'intArray', items: [] };
   if (name === 'int') return 0;
   return null;
@@ -191,13 +194,12 @@ export function formatRuntimeValue(value: RuntimeValue | string | undefined): st
 
 export function buildProgramIndex(workspace: Blockly.Workspace): ProgramIndex {
   const classes = new Map<string, ClassInfo>();
-  const classBlocks = workspace.getAllBlocks(false).filter((block) =>
-    block.type === 'mj_class_declaration' || block.type === 'mj_class_extends_declaration'
-  );
+  const classBlocks = workspace.getAllBlocks(false).filter((block) => block.type === 'mj_class_declaration');
 
   for (const block of classBlocks) {
     const name = field(block, 'CLASS', 'ClassName');
-    const parent = block.type === 'mj_class_extends_declaration' ? field(block, 'PARENT', '') || null : null;
+    const parent =
+      block.getFieldValue('HAS_EXTENDS') === 'TRUE' ? field(block, 'PARENT', '') || null : null;
     const methods = new Map<string, Blockly.Block>();
     for (const method of chain(child(block, 'METHODS'))) {
       if (method.type === 'mj_method_declaration') methods.set(field(method, 'NAME', 'method'), method);
@@ -265,6 +267,11 @@ function numberValue(value: RuntimeValue): number | UnknownValue {
 function booleanValue(value: RuntimeValue): boolean | UnknownValue {
   if (typeof value === 'boolean') return value;
   return isUnknown(value) ? value : unknown('expected boolean');
+}
+
+function stringValue(value: RuntimeValue): string | UnknownValue {
+  if (typeof value === 'string') return value;
+  return isUnknown(value) ? value : unknown('expected String');
 }
 
 function valueClass(value: RuntimeValue): string | null {
@@ -443,11 +450,11 @@ export function evaluateExpression(block: Blockly.Block | null, env: RuntimeEnv)
     case 'mj_expr_integer':
       result = numericField(block, 'VALUE');
       break;
-    case 'mj_expr_true':
-      result = true;
+    case 'mj_expr_string':
+      result = String(block.getFieldValue('TEXT') ?? '');
       break;
-    case 'mj_expr_false':
-      result = false;
+    case 'mj_expr_boolean':
+      result = field(block, 'VALUE', 'false') === 'true';
       break;
     case 'mj_expr_identifier':
       result = readSlot(lookupName(env, field(block, 'NAME', 'x')));
@@ -473,7 +480,7 @@ export function evaluateExpression(block: Blockly.Block | null, env: RuntimeEnv)
       result = typeof value === 'boolean' ? !value : value;
       break;
     }
-    case 'mj_expr_and': {
+    case 'mj_expr_logic': {
       const left = booleanValue(evaluateExpression(child(block, 'LEFT'), env));
       if (left === false) result = false;
       else if (left === true) {
@@ -484,20 +491,19 @@ export function evaluateExpression(block: Blockly.Block | null, env: RuntimeEnv)
       }
       break;
     }
-    case 'mj_expr_less': {
+    case 'mj_expr_compare': {
       const left = numberValue(evaluateExpression(child(block, 'LEFT'), env));
       const right = numberValue(evaluateExpression(child(block, 'RIGHT'), env));
       result = typeof left === 'number' && typeof right === 'number' ? left < right : unknown('invalid comparison');
       break;
     }
-    case 'mj_expr_plus':
-    case 'mj_expr_minus':
-    case 'mj_expr_times': {
+    case 'mj_expr_arith': {
       const left = numberValue(evaluateExpression(child(block, 'LEFT'), env));
       const right = numberValue(evaluateExpression(child(block, 'RIGHT'), env));
+      const op = field(block, 'OP', '+');
       if (typeof left !== 'number' || typeof right !== 'number') result = unknown('invalid arithmetic');
-      else if (block.type === 'mj_expr_plus') result = left + right;
-      else if (block.type === 'mj_expr_minus') result = left - right;
+      else if (op === '+') result = left + right;
+      else if (op === '-') result = left - right;
       else result = left * right;
       break;
     }
@@ -512,6 +518,29 @@ export function evaluateExpression(block: Blockly.Block | null, env: RuntimeEnv)
     case 'mj_expr_array_length': {
       const array = evaluateExpression(child(block, 'ARRAY'), env);
       result = isArrayValue(array) ? array.items.length : unknown('invalid array length');
+      break;
+    }
+    // charAt yields a 1-character String: the language has no char type.
+    case 'mj_expr_char_at': {
+      const str = stringValue(evaluateExpression(child(block, 'STR'), env));
+      const index = numberValue(evaluateExpression(child(block, 'INDEX'), env));
+      if (typeof str !== 'string') result = str;
+      else if (typeof index !== 'number') result = index;
+      else {
+        const i = Math.floor(index);
+        result = i >= 0 && i < str.length ? str.charAt(i) : unknown(`string index ${i} out of bounds for length ${str.length}`);
+      }
+      break;
+    }
+    case 'mj_expr_concat': {
+      const left = stringValue(evaluateExpression(child(block, 'LEFT'), env));
+      const right = stringValue(evaluateExpression(child(block, 'RIGHT'), env));
+      result = typeof left === 'string' && typeof right === 'string' ? left + right : unknown('invalid concat');
+      break;
+    }
+    case 'mj_expr_str_length': {
+      const str = stringValue(evaluateExpression(child(block, 'STR'), env));
+      result = typeof str === 'string' ? str.length : str;
       break;
     }
     case 'mj_expr_method_call':
@@ -570,7 +599,8 @@ export function evaluateBlockTree(root: Blockly.Block, env: RuntimeEnv): Runtime
 
 export function valueToBlockState(value: RuntimeValue, fallbackState?: unknown): unknown | null {
   if (typeof value === 'number') return { type: 'mj_expr_integer', fields: { VALUE: value } };
-  if (typeof value === 'boolean') return { type: value ? 'mj_expr_true' : 'mj_expr_false' };
+  if (typeof value === 'string') return { type: 'mj_expr_string', fields: { TEXT: value } };
+  if (typeof value === 'boolean') return { type: 'mj_expr_boolean', fields: { VALUE: value ? 'true' : 'false' } };
   if (isObjectValue(value)) return { type: 'mj_expr_new_object', fields: { CLASS: value.className } };
   if (isArrayValue(value)) {
     return {

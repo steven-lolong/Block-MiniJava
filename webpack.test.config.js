@@ -10,6 +10,7 @@ module.exports = {
     typecheck: path.resolve(__dirname, 'test/typecheck.entry.ts'),
     machine: path.resolve(__dirname, 'test/machine.entry.ts'),
     subst: path.resolve(__dirname, 'test/subst.entry.ts'),
+    eval: path.resolve(__dirname, 'test/eval.entry.ts'),
     smoke: path.resolve(__dirname, 'test/smoke-csesk.entry.ts')
   },
   output: {

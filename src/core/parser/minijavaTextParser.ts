@@ -2,6 +2,7 @@ type MiniJavaTypeAst =
   | { kind: 'intArray' }
   | { kind: 'boolean' }
   | { kind: 'int' }
+  | { kind: 'string' }
   | { kind: 'identifier'; name: string };
 
 type MiniJavaProgramAst = {
@@ -50,8 +51,12 @@ type MiniJavaExpressionAst =
   | { kind: 'binary'; op: BinaryOperator; left: MiniJavaExpressionAst; right: MiniJavaExpressionAst }
   | { kind: 'arrayLookup'; array: MiniJavaExpressionAst; index: MiniJavaExpressionAst }
   | { kind: 'arrayLength'; array: MiniJavaExpressionAst }
+  | { kind: 'charAt'; str: MiniJavaExpressionAst; index: MiniJavaExpressionAst }
+  | { kind: 'concat'; left: MiniJavaExpressionAst; right: MiniJavaExpressionAst }
+  | { kind: 'strLength'; str: MiniJavaExpressionAst }
   | { kind: 'methodCall'; object: MiniJavaExpressionAst; method: string; args: MiniJavaExpressionAst[] }
   | { kind: 'integer'; value: number }
+  | { kind: 'string'; value: string }
   | { kind: 'true' }
   | { kind: 'false' }
   | { kind: 'identifier'; name: string }
@@ -78,7 +83,7 @@ export type MiniJavaWorkspaceState = {
   };
 };
 
-type TokenKind = 'identifier' | 'number' | 'keyword' | 'symbol' | 'eof';
+type TokenKind = 'identifier' | 'number' | 'string' | 'keyword' | 'symbol' | 'eof';
 
 type Token = {
   kind: TokenKind;
@@ -87,9 +92,9 @@ type Token = {
 };
 
 // Structurally reserved words only. `main`, `String`, `System`, `out`,
-// `println` and `length` stay ordinary identifiers (they are valid Java
-// names and the generator can emit them); the parser matches them by value
-// in the few positions where they are meaningful.
+// `println`, `length`, `charAt` and `concat` stay ordinary identifiers
+// (they are valid Java names and the generator can emit them); the parser
+// matches them by value in the few positions where they are meaningful.
 const KEYWORDS = new Set([
   'class', 'public', 'static', 'void', 'extends', 'return',
   'int', 'boolean', 'if', 'else', 'while', 'true', 'false', 'this', 'new'
@@ -161,6 +166,35 @@ function tokenize(source: string): Token[] {
       continue;
     }
 
+    if (char === '"') {
+      // String literal; the token value is the UNESCAPED text (the inverse
+      // of the generator's escapeStringLiteral).
+      const start = index;
+      index += 1;
+      let text = '';
+      while (index < source.length && source[index] !== '"') {
+        const c = source[index];
+        if (c === '\n') throw new MiniJavaTextParseError('Unterminated string literal.', start);
+        if (c === '\\') {
+          const escape = source[index + 1];
+          if (escape === '"') text += '"';
+          else if (escape === '\\') text += '\\';
+          else if (escape === 'n') text += '\n';
+          else if (escape === 't') text += '\t';
+          else if (escape === 'r') text += '\r';
+          else throw new MiniJavaTextParseError(`Unknown escape sequence "\\${escape ?? ''}".`, index);
+          index += 2;
+          continue;
+        }
+        text += c;
+        index += 1;
+      }
+      if (index >= source.length) throw new MiniJavaTextParseError('Unterminated string literal.', start);
+      index += 1;
+      tokens.push({ kind: 'string', value: text, index: start });
+      continue;
+    }
+
     if (source.slice(index, index + 2) === '&&') {
       tokens.push({ kind: 'symbol', value: '&&', index });
       index += 2;
@@ -212,7 +246,11 @@ class Parser {
   }
 
   private matches(value: string): boolean {
-    return this.current().value === value;
+    // Never match a string literal's CONTENT against grammar tokens: the
+    // token "!"—value '!'—must not be taken for the NOT operator, nor
+    // "true" for the boolean keyword.
+    const token = this.current();
+    return token.kind !== 'string' && token.value === value;
   }
 
   private consume(value: string): boolean {
@@ -349,6 +387,8 @@ class Parser {
       return { kind: 'int' };
     }
     if (this.consume('boolean')) return { kind: 'boolean' };
+    // `String` is an ordinary identifier token, matched by value.
+    if (this.consume('String')) return { kind: 'string' };
     return { kind: 'identifier', name: this.expectIdentifier('Expected type.') };
   }
 
@@ -475,6 +515,30 @@ class Parser {
           continue;
         }
 
+        // `.length()` — WITH empty parens, as in Java — is String length.
+        // `o.length(args…)` stays an ordinary user method call.
+        if (this.matches('length') && this.peek().value === '(' && this.peek(2).value === ')') {
+          this.advance();
+          this.advance();
+          this.advance();
+          expression = { kind: 'strLength', str: expression };
+          continue;
+        }
+
+        // `.charAt(e)` and `.concat(e)` are the String operators, matched by
+        // value like `.length` (so user methods cannot shadow these names).
+        if ((this.matches('charAt') || this.matches('concat')) && this.peek().value === '(') {
+          const operator = this.advance().value;
+          this.expectValue('(', `Expected "(" after ${operator}.`);
+          const argument = this.parseExpression();
+          this.expectValue(')', `Expected ")" after the ${operator} argument.`);
+          expression =
+            operator === 'charAt'
+              ? { kind: 'charAt', str: expression, index: argument }
+              : { kind: 'concat', left: expression, right: argument };
+          continue;
+        }
+
         const method = this.expectIdentifier('Expected method name after ".".');
         this.expectValue('(', 'Expected "(" after method name.');
         const args: MiniJavaExpressionAst[] = [];
@@ -497,6 +561,11 @@ class Parser {
     if (token.kind === 'number') {
       this.advance();
       return { kind: 'integer', value: Number(token.value) };
+    }
+
+    if (token.kind === 'string') {
+      this.advance();
+      return { kind: 'string', value: token.value };
     }
 
     // The integer-literal block accepts negative values, so the generated
@@ -564,6 +633,8 @@ function typeState(type: MiniJavaTypeAst): MiniJavaBlockState {
       return { type: 'mj_type_boolean' };
     case 'int':
       return { type: 'mj_type_int' };
+    case 'string':
+      return { type: 'mj_type_string' };
     case 'identifier':
       return { type: 'mj_type_identifier', fields: { NAME: type.name } };
   }
@@ -592,12 +663,14 @@ function methodState(method: MiniJavaMethodAst): MiniJavaBlockState {
 }
 
 function classState(classDeclaration: MiniJavaClassAst): MiniJavaBlockState {
+  // One class-declaration block: the HAS_EXTENDS checkbox mirrors whether
+  // the text had an `extends` clause.
   const state: MiniJavaBlockState = classDeclaration.parentName
     ? {
-      type: 'mj_class_extends_declaration',
-      fields: { CLASS: classDeclaration.className, PARENT: classDeclaration.parentName }
+      type: 'mj_class_declaration',
+      fields: { CLASS: classDeclaration.className, HAS_EXTENDS: 'TRUE', PARENT: classDeclaration.parentName }
     }
-    : { type: 'mj_class_declaration', fields: { CLASS: classDeclaration.className } };
+    : { type: 'mj_class_declaration', fields: { CLASS: classDeclaration.className, HAS_EXTENDS: 'FALSE' } };
 
   setInput(state, 'VARS', sequence(classDeclaration.vars.map(varState)));
   setInput(state, 'METHODS', sequence(classDeclaration.methods.map(methodState)));
@@ -652,14 +725,19 @@ function argumentState(expression: MiniJavaExpressionAst): MiniJavaBlockState {
 function expressionState(expression: MiniJavaExpressionAst): MiniJavaBlockState {
   switch (expression.kind) {
     case 'binary': {
-      const typeByOperator: Record<BinaryOperator, string> = {
-        '&&': 'mj_expr_and',
-        '<': 'mj_expr_less',
-        '+': 'mj_expr_plus',
-        '-': 'mj_expr_minus',
-        '*': 'mj_expr_times'
+      // Consolidated operator blocks: the block type carries the operator
+      // FAMILY, the OP dropdown carries the operator itself.
+      const blockByOperator: Record<BinaryOperator, string> = {
+        '&&': 'mj_expr_logic',
+        '<': 'mj_expr_compare',
+        '+': 'mj_expr_arith',
+        '-': 'mj_expr_arith',
+        '*': 'mj_expr_arith'
       };
-      const state: MiniJavaBlockState = { type: typeByOperator[expression.op] };
+      const state: MiniJavaBlockState = {
+        type: blockByOperator[expression.op],
+        fields: { OP: expression.op }
+      };
       setInput(state, 'LEFT', expressionState(expression.left));
       setInput(state, 'RIGHT', expressionState(expression.right));
       return state;
@@ -675,6 +753,23 @@ function expressionState(expression: MiniJavaExpressionAst): MiniJavaBlockState 
       setInput(state, 'ARRAY', expressionState(expression.array));
       return state;
     }
+    case 'charAt': {
+      const state: MiniJavaBlockState = { type: 'mj_expr_char_at' };
+      setInput(state, 'STR', expressionState(expression.str));
+      setInput(state, 'INDEX', expressionState(expression.index));
+      return state;
+    }
+    case 'concat': {
+      const state: MiniJavaBlockState = { type: 'mj_expr_concat' };
+      setInput(state, 'LEFT', expressionState(expression.left));
+      setInput(state, 'RIGHT', expressionState(expression.right));
+      return state;
+    }
+    case 'strLength': {
+      const state: MiniJavaBlockState = { type: 'mj_expr_str_length' };
+      setInput(state, 'STR', expressionState(expression.str));
+      return state;
+    }
     case 'methodCall': {
       const state: MiniJavaBlockState = { type: 'mj_expr_method_call', fields: { METHOD: expression.method } };
       setInput(state, 'OBJECT', expressionState(expression.object));
@@ -683,10 +778,12 @@ function expressionState(expression: MiniJavaExpressionAst): MiniJavaBlockState 
     }
     case 'integer':
       return { type: 'mj_expr_integer', fields: { VALUE: expression.value } };
+    case 'string':
+      return { type: 'mj_expr_string', fields: { TEXT: expression.value } };
     case 'true':
-      return { type: 'mj_expr_true' };
+      return { type: 'mj_expr_boolean', fields: { VALUE: 'true' } };
     case 'false':
-      return { type: 'mj_expr_false' };
+      return { type: 'mj_expr_boolean', fields: { VALUE: 'false' } };
     case 'identifier':
       return { type: 'mj_expr_identifier', fields: { NAME: expression.name } };
     case 'this':

@@ -9,7 +9,7 @@
  */
 
 import * as Blockly from 'blockly';
-import { classTy, HOLE, INT, INT_ARRAY, BOOL, tyEquals, type Ty } from './ty';
+import { classTy, HOLE, INT, INT_ARRAY, BOOL, STRING, tyEquals, type Ty } from './ty';
 
 export interface TypeDiagnostic {
   blockId: string;
@@ -75,6 +75,8 @@ export function tyFromTypeBlock(block: Blockly.Block | null): Ty {
       return INT;
     case 'mj_type_boolean':
       return BOOL;
+    case 'mj_type_string':
+      return STRING;
     case 'mj_type_int_array':
       return INT_ARRAY;
     case 'mj_type_identifier':
@@ -120,7 +122,13 @@ export function checkTypeAnnotation(
   return ty;
 }
 
-const CLASS_BLOCK_TYPES = new Set(['mj_class_declaration', 'mj_class_extends_declaration']);
+const CLASS_BLOCK_TYPES = new Set(['mj_class_declaration']);
+
+/** The parent name, when the block's `extends` checkbox is on. */
+export function classParentName(block: Blockly.Block): string | null {
+  if (block.getFieldValue('HAS_EXTENDS') !== 'TRUE') return null;
+  return fieldValue(block, 'PARENT', '') || null;
+}
 
 export function buildClassTable(goal: Blockly.Block): ClassTable {
   const mainBlock = inputTarget(goal, 'MAIN');
@@ -152,8 +160,7 @@ export function buildClassTable(goal: Blockly.Block): ClassTable {
       });
       continue;
     }
-    const parent =
-      block.type === 'mj_class_extends_declaration' ? fieldValue(block, 'PARENT', '') || null : null;
+    const parent = classParentName(block);
     table.classes.set(name, { name, parent, fields: new Map(), methods: new Map(), block });
   }
 

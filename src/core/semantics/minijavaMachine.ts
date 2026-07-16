@@ -46,6 +46,7 @@ export type ValueModel = 'A' | 'B';
 export type MachineValue =
   | { tag: 'Int'; n: number }
   | { tag: 'Bool'; b: boolean }
+  | { tag: 'Str'; s: string }
   | { tag: 'Null' }
   | { tag: 'Ref'; loc: Loc } // Model A only: the arrow into the heap
   | { tag: 'Obj'; className: string; fields: Map<string, MachineValue> } // Model B only: inline structure
@@ -57,7 +58,7 @@ export type HeapObj =
   | { tag: 'Obj'; className: string; fields: Map<string, MachineValue>; blockId: string }
   | { tag: 'Arr'; elems: MachineValue[]; blockId: string };
 
-type BinOp = 'add' | 'sub' | 'mul' | 'less' | 'and';
+type BinOp = 'add' | 'sub' | 'mul' | 'less' | 'and' | 'concat';
 
 /** Continuations. One frame's worth of pending work, innermost first. */
 export type Kont =
@@ -76,6 +77,9 @@ export type Kont =
   | { tag: 'KLookupArr'; indexBlock: Blockly.Block | null }
   | { tag: 'KLookupIdx'; arr: MachineValue }
   | { tag: 'KLength' }
+  | { tag: 'KCharAtStr'; indexBlock: Blockly.Block | null }
+  | { tag: 'KCharAtIdx'; str: MachineValue }
+  | { tag: 'KStrLength' }
   | { tag: 'KNewArr'; block: Blockly.Block }
   | { tag: 'KCallRecv'; block: Blockly.Block }
   | { tag: 'KCallArgs'; block: Blockly.Block; recv: MachineValue; remaining: Array<Blockly.Block | null>; done: MachineValue[] };
@@ -138,6 +142,7 @@ export interface MachineState {
 
 export const INT_V = (n: number): MachineValue => ({ tag: 'Int', n });
 export const BOOL_V = (b: boolean): MachineValue => ({ tag: 'Bool', b });
+export const STR_V = (s: string): MachineValue => ({ tag: 'Str', s });
 export const NULL_V: MachineValue = { tag: 'Null' };
 export const REF_V = (loc: Loc): MachineValue => ({ tag: 'Ref', loc });
 
@@ -147,6 +152,9 @@ export function formatMachineValue(value: MachineValue, depth = 0): string {
       return String(value.n);
     case 'Bool':
       return String(value.b);
+    case 'Str':
+      // Raw, as Java's println prints it (matches formatRuntimeValue).
+      return value.s;
     case 'Null':
       return 'null';
     case 'Ref':
@@ -164,7 +172,9 @@ export function formatMachineValue(value: MachineValue, depth = 0): string {
 }
 
 function defaultValueFor(ty: Ty): MachineValue {
-  if (ty.tag === 'Prim') return ty.name === 'Int' ? INT_V(0) : BOOL_V(false);
+  if (ty.tag === 'Prim') {
+    return ty.name === 'Int' ? INT_V(0) : ty.name === 'String' ? STR_V('') : BOOL_V(false);
+  }
   return NULL_V;
 }
 
@@ -355,6 +365,8 @@ function localVarTy(table: ClassTable, varBlock: Blockly.Block): Ty {
       return { tag: 'Prim', name: 'Bool' };
     case 'mj_type_int_array':
       return { tag: 'IntArray' };
+    case 'mj_type_string':
+      return { tag: 'Prim', name: 'String' };
     case 'mj_type_identifier':
       return { tag: 'Class', name: fieldValue(typeBlock, 'NAME', 'ClassName') };
     default:
@@ -362,11 +374,11 @@ function localVarTy(table: ClassTable, varBlock: Blockly.Block): Ty {
   }
 }
 
-const BIN_OPS: Partial<Record<string, BinOp>> = {
-  mj_expr_plus: 'add',
-  mj_expr_minus: 'sub',
-  mj_expr_times: 'mul',
-  mj_expr_less: 'less'
+/** The arith block's OP dropdown value -> machine rule. */
+const ARITH_OPS: Record<string, BinOp> = {
+  '+': 'add',
+  '-': 'sub',
+  '*': 'mul'
 };
 
 function beginStatement(state: MachineState, block: Blockly.Block): MachineState {
@@ -419,13 +431,13 @@ function beginExpression(state: MachineState, block: Blockly.Block): MachineStat
       produce(state, INT_V(Number(block.getFieldValue('VALUE') ?? 0)));
       return state;
     }
-    case 'mj_expr_true':
+    case 'mj_expr_string':
       state.lastRule = 'lit';
-      produce(state, BOOL_V(true));
+      produce(state, STR_V(String(block.getFieldValue('TEXT') ?? '')));
       return state;
-    case 'mj_expr_false':
+    case 'mj_expr_boolean':
       state.lastRule = 'lit';
-      produce(state, BOOL_V(false));
+      produce(state, BOOL_V(block.getFieldValue('VALUE') === 'true'));
       return state;
     case 'mj_expr_this': {
       if (state.model === 'B') {
@@ -472,18 +484,37 @@ function beginExpression(state: MachineState, block: Blockly.Block): MachineStat
       state.lastRule = 'not-operand';
       focusExpr(state, inputTarget(block, 'EXPR'), `'!' has no operand`);
       return state;
-    case 'mj_expr_and':
+    case 'mj_expr_logic':
+      // && is the only logic operator; it keeps its short-circuit kontinuation.
       frame.kont.push({ tag: 'KAnd', rightBlock: inputTarget(block, 'RIGHT') });
       state.lastRule = 'and-left';
       focusExpr(state, inputTarget(block, 'LEFT'), `'&&' has no left operand`);
       return state;
-    case 'mj_expr_plus':
-    case 'mj_expr_minus':
-    case 'mj_expr_times':
-    case 'mj_expr_less':
-      frame.kont.push({ tag: 'KBinL', op: BIN_OPS[block.type]!, rightBlock: inputTarget(block, 'RIGHT') });
+    case 'mj_expr_arith':
+    case 'mj_expr_compare':
+    case 'mj_expr_concat': {
+      const op: BinOp =
+        block.type === 'mj_expr_compare'
+          ? 'less'
+          : block.type === 'mj_expr_concat'
+            ? 'concat'
+            : ARITH_OPS[block.getFieldValue('OP') ?? '+'] ?? 'add';
+      frame.kont.push({ tag: 'KBinL', op, rightBlock: inputTarget(block, 'RIGHT') });
       state.lastRule = 'binop';
       focusExpr(state, inputTarget(block, 'LEFT'), 'the operator has no left operand');
+      return state;
+    }
+    case 'mj_expr_char_at':
+      frame.kont.push({ tag: 'KCharAtStr', indexBlock: inputTarget(block, 'INDEX') });
+      // Administrative: the salient 'char-at' fires only when the fold happens.
+      state.lastRule = 'char-at-str';
+      focusExpr(state, inputTarget(block, 'STR'), `'charAt' has no string`);
+      return state;
+    case 'mj_expr_str_length':
+      frame.kont.push({ tag: 'KStrLength' });
+      // Administrative: the salient 'str-length' fires only at the fold.
+      state.lastRule = 'str-length-str';
+      focusExpr(state, inputTarget(block, 'STR'), `'.length()' has no string`);
       return state;
     case 'mj_expr_array_lookup':
       frame.kont.push({ tag: 'KLookupArr', indexBlock: inputTarget(block, 'INDEX') });
@@ -522,6 +553,14 @@ function beginExpression(state: MachineState, block: Blockly.Block): MachineStat
 }
 
 function applyBinOp(state: MachineState, op: BinOp, left: MachineValue, right: MachineValue): MachineState {
+  if (op === 'concat') {
+    if (left.tag !== 'Str' || right.tag !== 'Str') {
+      return fail(state, `'concat' expects Strings, found ${formatMachineValue(left.tag !== 'Str' ? left : right)}`);
+    }
+    state.lastRule = 'concat';
+    produce(state, STR_V(left.s + right.s));
+    return state;
+  }
   if (op === 'and') {
     const l = asBool(left);
     const r = asBool(right);
@@ -774,6 +813,34 @@ function applyKont(state: MachineState, value: MachineValue | null): MachineStat
       if (typeof target === 'string') return fail(state, target);
       state.lastRule = 'array-length';
       produce(state, INT_V(target.elems.length));
+      return state;
+    }
+    case 'KCharAtStr': {
+      if (value === null) return fail(state, `'charAt' needs a String`);
+      if (value.tag !== 'Str') return fail(state, `'charAt' expects a String, found ${formatMachineValue(value)}`);
+      frame.kont.push({ tag: 'KCharAtIdx', str: value });
+      state.lastRule = 'char-at-index';
+      focusExpr(state, kont.indexBlock, `'charAt' has no index`);
+      return state;
+    }
+    case 'KStrLength': {
+      if (value === null) return fail(state, `'.length()' needs a String`);
+      if (value.tag !== 'Str') return fail(state, `'.length()' expects a String, found ${formatMachineValue(value)}`);
+      state.lastRule = 'str-length';
+      produce(state, INT_V(value.s.length));
+      return state;
+    }
+    case 'KCharAtIdx': {
+      const index = value === null ? null : asInt(value);
+      if (index === null) return fail(state, `the 'charAt' index must be an int`);
+      if (kont.str.tag !== 'Str') return fail(state, `'charAt' expects a String`);
+      const str = kont.str.s;
+      if (index < 0 || index >= str.length) {
+        return fail(state, `string index ${index} out of bounds for length ${str.length}`);
+      }
+      // charAt yields a 1-character String: the language has no char type.
+      state.lastRule = 'char-at';
+      produce(state, STR_V(str.charAt(index)));
       return state;
     }
     case 'KNewArr': {

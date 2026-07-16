@@ -208,6 +208,80 @@ const CASES = [
     ].join('\n'),
     { status: 'error', errorIncludes: 'null dereference', output: [] }
   ],
+  // -- strings -----------------------------------------------------------------
+  ['print string literal', inMain('System.out.println("hello");'), { output: ['hello'] }],
+  [
+    'charAt and concat',
+    inMain('System.out.println("mini".concat("java").charAt(4));'),
+    { output: ['j'], rulesInclude: ['concat', 'char-at'] }
+  ],
+  [
+    'string fields, params and locals through a method',
+    [
+      inMain('System.out.println(new Greeter().greet("world"));'),
+      'class Greeter {',
+      '  String prefix;',
+      '',
+      '  public String greet(String who) {',
+      '    String message;',
+      '    prefix = "hello ";',
+      '    message = prefix.concat(who);',
+      '    return message;',
+      '  }',
+      '}'
+    ].join('\n'),
+    { output: ['hello world'], rulesInclude: ['concat', 'field-write', 'field-read'] }
+  ],
+  [
+    'string escapes survive to output',
+    inMain('System.out.println("a\\"b");'),
+    { output: ['a"b'] }
+  ],
+  [
+    'string length',
+    inMain('System.out.println("mini".concat("java").length());'),
+    { output: ['8'], rulesInclude: ['concat', 'str-length'] }
+  ],
+  [
+    'string length drives a while loop',
+    [
+      inMain('System.out.println(new W().reps("abc"));'),
+      'class W {',
+      '  public String reps(String s) {',
+      '    int i;',
+      '    String out;',
+      '    i = 0;',
+      '    out = "";',
+      '    while (i < s.length()) {',
+      '      out = out.concat(s.charAt(i)).concat(s.charAt(i));',
+      '      i = i + 1;',
+      '    }',
+      '    return out;',
+      '  }',
+      '}'
+    ].join('\n'),
+    { output: ['aabbcc'], rulesInclude: ['str-length', 'char-at', 'concat', 'while-enter', 'while-exit'] }
+  ],
+  [
+    'length of an int is a stuck state',
+    inMain('System.out.println((1).length());'),
+    { status: 'error', errorIncludes: "'.length()' expects a String", output: [] }
+  ],
+  [
+    'charAt out of bounds is a stuck state',
+    inMain('System.out.println("ab".charAt(2));'),
+    { status: 'error', errorIncludes: 'string index 2 out of bounds for length 2', output: [] }
+  ],
+  [
+    'concat of an int is a stuck state',
+    inMain('System.out.println("ab".concat(1));'),
+    { status: 'error', errorIncludes: "'concat' expects Strings", output: [] }
+  ],
+  [
+    'charAt of an int is a stuck state',
+    inMain('System.out.println((1).charAt(0));'),
+    { status: 'error', errorIncludes: "'charAt' expects a String", output: [] }
+  ],
   [
     'this in main is a stuck state',
     inMain('System.out.println(this);'),
@@ -266,6 +340,12 @@ const POKE_PROGRAM = [
 
 /** [name, source, model, expectations] */
 const MODEL_CASES = [
+  [
+    'strings behave identically under Model B',
+    inMain('System.out.println("mini".concat("java").charAt(4));'),
+    'B',
+    { output: ['j'], heapSize: 0, rulesInclude: ['concat', 'char-at'] }
+  ],
   ['contrast program under Model A: aliases observe the write', WITH_PROGRAM, 'A', { output: ['4141'], rulesInclude: ['field-write'] }],
   [
     'contrast program under Model B: rebind changes y, x stays put',

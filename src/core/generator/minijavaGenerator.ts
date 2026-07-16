@@ -20,6 +20,16 @@ function numField(block: Blockly.Block, name: string, fallback = '0'): string {
   return raw === null || raw === undefined || raw === '' ? fallback : String(raw);
 }
 
+/** Emits a MiniJava string literal; the parser's unescape is the inverse. */
+function escapeStringLiteral(raw: string): string {
+  return raw
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\t/g, '\\t')
+    .replace(/\r/g, '\\r');
+}
+
 function target(block: Blockly.Block, inputName: string): Blockly.Block | null {
   return block.getInputTargetBlock(inputName);
 }
@@ -105,19 +115,12 @@ const GEN: Record<string, GenFn> = {
 
   mj_class_declaration(block) {
     const className = field(block, 'CLASS', 'ClassName');
+    const hasExtends = block.getFieldValue('HAS_EXTENDS') === 'TRUE';
+    const extendsCode = hasExtends ? ` extends ${field(block, 'PARENT', 'ParentName')}` : '';
     const vars = stack(block, 'VARS', 1);
     const methods = stack(block, 'METHODS', 1);
     const body = [vars, methods].filter(Boolean).join('\n\n');
-    return `class ${className} {${body ? `\n${body}\n` : '\n'}}`;
-  },
-
-  mj_class_extends_declaration(block) {
-    const className = field(block, 'CLASS', 'ClassName');
-    const parentName = field(block, 'PARENT', 'ParentName');
-    const vars = stack(block, 'VARS', 1);
-    const methods = stack(block, 'METHODS', 1);
-    const body = [vars, methods].filter(Boolean).join('\n\n');
-    return `class ${className} extends ${parentName} {${body ? `\n${body}\n` : '\n'}}`;
+    return `class ${className}${extendsCode} {${body ? `\n${body}\n` : '\n'}}`;
   },
 
   mj_var_declaration(block) {
@@ -152,6 +155,9 @@ const GEN: Record<string, GenFn> = {
   mj_type_int() {
     return 'int';
   },
+  mj_type_string() {
+    return 'String';
+  },
   mj_type_identifier(block) {
     return field(block, 'NAME', 'ClassName');
   },
@@ -181,26 +187,30 @@ const GEN: Record<string, GenFn> = {
     return `${field(block, 'NAME', 'array')}[${expr(block, 'INDEX', '0')}] = ${expr(block, 'VALUE', '0')};`;
   },
 
-  mj_expr_and(block) {
-    return `(${expr(block, 'LEFT', 'true')} && ${expr(block, 'RIGHT', 'true')})`;
+  mj_expr_arith(block) {
+    const op = ['+', '-', '*'].includes(block.getFieldValue('OP')) ? block.getFieldValue('OP') : '+';
+    return `(${expr(block, 'LEFT', '0')} ${op} ${expr(block, 'RIGHT', '0')})`;
   },
-  mj_expr_less(block) {
+  mj_expr_compare(block) {
     return `(${expr(block, 'LEFT', '0')} < ${expr(block, 'RIGHT', '0')})`;
   },
-  mj_expr_plus(block) {
-    return `(${expr(block, 'LEFT', '0')} + ${expr(block, 'RIGHT', '0')})`;
-  },
-  mj_expr_minus(block) {
-    return `(${expr(block, 'LEFT', '0')} - ${expr(block, 'RIGHT', '0')})`;
-  },
-  mj_expr_times(block) {
-    return `(${expr(block, 'LEFT', '0')} * ${expr(block, 'RIGHT', '0')})`;
+  mj_expr_logic(block) {
+    return `(${expr(block, 'LEFT', 'true')} && ${expr(block, 'RIGHT', 'true')})`;
   },
   mj_expr_array_lookup(block) {
     return `${postfixHead(block, 'ARRAY', 'array')}[${expr(block, 'INDEX', '0')}]`;
   },
   mj_expr_array_length(block) {
     return `${postfixHead(block, 'ARRAY', 'array')}.length`;
+  },
+  mj_expr_char_at(block) {
+    return `${postfixHead(block, 'STR', '""')}.charAt(${expr(block, 'INDEX', '0')})`;
+  },
+  mj_expr_concat(block) {
+    return `${postfixHead(block, 'LEFT', '""')}.concat(${expr(block, 'RIGHT', '""')})`;
+  },
+  mj_expr_str_length(block) {
+    return `${postfixHead(block, 'STR', '""')}.length()`;
   },
   mj_expr_method_call(block) {
     return `${postfixHead(block, 'OBJECT', 'this')}.${field(block, 'METHOD', 'method')}(${args(target(block, 'ARGS'))})`;
@@ -211,11 +221,11 @@ const GEN: Record<string, GenFn> = {
   mj_expr_integer(block) {
     return numField(block, 'VALUE');
   },
-  mj_expr_true() {
-    return 'true';
+  mj_expr_string(block) {
+    return `"${escapeStringLiteral(String(block.getFieldValue('TEXT') ?? ''))}"`;
   },
-  mj_expr_false() {
-    return 'false';
+  mj_expr_boolean(block) {
+    return block.getFieldValue('VALUE') === 'true' ? 'true' : 'false';
   },
   mj_expr_identifier(block) {
     return field(block, 'NAME', 'x');

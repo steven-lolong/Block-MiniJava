@@ -26,7 +26,7 @@ import {
   type ClassTable,
   type TypeDiagnostic
 } from './classTable';
-import { BOOL, classTy, formatTy, HOLE, INT, INT_ARRAY, STRING_ARRAY, tyEquals, type Ty } from './ty';
+import { BOOL, classTy, formatTy, HOLE, INT, INT_ARRAY, STRING, STRING_ARRAY, tyEquals, type Ty } from './ty';
 
 export type { TypeDiagnostic } from './classTable';
 
@@ -86,9 +86,19 @@ function checkStatement(ctx: CheckContext, block: Blockly.Block): void {
       expectExpr(ctx, block, 'COND', BOOL);
       checkStatements(ctx, inputTarget(block, 'BODY'));
       return;
-    case 'mj_statement_print':
-      expectExpr(ctx, block, 'VALUE', INT);
+    case 'mj_statement_print': {
+      // println prints int (classic MiniJava) or String (this extension).
+      const valueBlock = inputTarget(block, 'VALUE');
+      const valueTy = checkExpression(ctx, valueBlock);
+      if (
+        valueBlock &&
+        !isAssignable(ctx.table, valueTy, INT) &&
+        !isAssignable(ctx.table, valueTy, STRING)
+      ) {
+        error(ctx, valueBlock.id, `Expected int or String, found ${formatTy(valueTy)}.`);
+      }
       return;
+    }
     case 'mj_statement_assign': {
       const name = fieldValue(block, 'NAME', 'x');
       const slot = lookupVariable(ctx, name);
@@ -173,20 +183,19 @@ function checkExpression(ctx: CheckContext, block: Blockly.Block | null): Ty {
   switch (block.type) {
     case 'mj_expr_integer':
       return INT;
-    case 'mj_expr_true':
-    case 'mj_expr_false':
+    case 'mj_expr_string':
+      return STRING;
+    case 'mj_expr_boolean':
       return BOOL;
-    case 'mj_expr_and':
+    case 'mj_expr_logic':
       expectExpr(ctx, block, 'LEFT', BOOL);
       expectExpr(ctx, block, 'RIGHT', BOOL);
       return BOOL;
-    case 'mj_expr_less':
+    case 'mj_expr_compare':
       expectExpr(ctx, block, 'LEFT', INT);
       expectExpr(ctx, block, 'RIGHT', INT);
       return BOOL;
-    case 'mj_expr_plus':
-    case 'mj_expr_minus':
-    case 'mj_expr_times':
+    case 'mj_expr_arith':
       expectExpr(ctx, block, 'LEFT', INT);
       expectExpr(ctx, block, 'RIGHT', INT);
       return INT;
@@ -201,6 +210,18 @@ function checkExpression(ctx: CheckContext, block: Blockly.Block | null): Ty {
       return INT;
     case 'mj_expr_array_length':
       expectExpr(ctx, block, 'ARRAY', INT_ARRAY);
+      return INT;
+    // charAt yields a 1-character String: the language has no char type.
+    case 'mj_expr_char_at':
+      expectExpr(ctx, block, 'STR', STRING);
+      expectExpr(ctx, block, 'INDEX', INT);
+      return STRING;
+    case 'mj_expr_concat':
+      expectExpr(ctx, block, 'LEFT', STRING);
+      expectExpr(ctx, block, 'RIGHT', STRING);
+      return STRING;
+    case 'mj_expr_str_length':
+      expectExpr(ctx, block, 'STR', STRING);
       return INT;
     case 'mj_expr_new_int_array':
       expectExpr(ctx, block, 'SIZE', INT);

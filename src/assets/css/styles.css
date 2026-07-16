@@ -42,6 +42,7 @@ body[data-theme="dark"] {
   --token-keyword: #f0a36f;
   --token-type: #79ead7;
   --token-number: #deb866;
+  --token-string: #b8e08a;
   --token-identifier: #eee6dc;
   --token-operator: #8ac7ff;
   --token-comment: #82948e;
@@ -74,6 +75,7 @@ body[data-theme="light"] {
   --token-keyword: #a9562c;
   --token-type: #0d8175;
   --token-number: #9b6410;
+  --token-string: #4d7c0f;
   --token-identifier: #2b2926;
   --token-operator: #236c9d;
   --token-comment: #7b756e;
@@ -1094,6 +1096,7 @@ body.code-hidden .code-column {
 .tok-keyword { color: var(--token-keyword); font-weight: 820; }
 .tok-type { color: var(--token-type); font-weight: 800; }
 .tok-number { color: var(--token-number); }
+.tok-string { color: var(--token-string); }
 .tok-identifier { color: var(--token-identifier); }
 .tok-builtin { color: var(--token-builtin); font-weight: 780; }
 .tok-method { color: var(--token-method); }

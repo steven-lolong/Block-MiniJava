@@ -231,7 +231,7 @@ function renderControl(): void {
   }
 }
 
-const BIN_SYMBOL: Record<string, string> = { add: '+', sub: '-', mul: '*', less: '<', and: '&&' };
+const BIN_SYMBOL: Record<string, string> = { add: '+', sub: '-', mul: '*', less: '<', and: '&&', concat: '.concat' };
 
 /**
  * One kontinuation frame's label: the pending work with ▢ marking the hole
@@ -255,6 +255,9 @@ function kontEntry(k: Kont): { parts: (string | MachineValue)[]; blockId: string
     case 'KLookupArr': return { parts: ['▢ [ … ] ▸ evaluate the array'], blockId: k.indexBlock?.id ?? null };
     case 'KLookupIdx': return { parts: [k.arr, ' [ ▢ ]'], blockId: null };
     case 'KLength': return { parts: ['▢ .length'], blockId: null };
+    case 'KCharAtStr': return { parts: ['▢ .charAt( … )'], blockId: k.indexBlock?.id ?? null };
+    case 'KCharAtIdx': return { parts: [k.str, ' .charAt( ▢ )'], blockId: null };
+    case 'KStrLength': return { parts: ['▢ .length()'], blockId: null };
     case 'KNewArr': return { parts: ['new int [ ▢ ]'], blockId: k.block.id };
     case 'KCallRecv': return { parts: ['▢ .method(…) ▸ evaluate the receiver'], blockId: k.block.id };
     case 'KCallArgs':

@@ -12,7 +12,7 @@
  */
 
 export type Ty =
-  | { tag: 'Prim'; name: 'Int' | 'Bool' }
+  | { tag: 'Prim'; name: 'Int' | 'Bool' | 'String' }
   | { tag: 'IntArray' }
   | { tag: 'StringArray' }
   | { tag: 'Class'; name: string }
@@ -23,6 +23,7 @@ export type Ty =
 
 export const INT: Ty = { tag: 'Prim', name: 'Int' };
 export const BOOL: Ty = { tag: 'Prim', name: 'Bool' };
+export const STRING: Ty = { tag: 'Prim', name: 'String' };
 export const INT_ARRAY: Ty = { tag: 'IntArray' };
 export const STRING_ARRAY: Ty = { tag: 'StringArray' };
 export const TOP: Ty = { tag: 'Top' };
@@ -56,7 +57,7 @@ export function tyEquals(a: Ty, b: Ty): boolean {
 export function formatTy(ty: Ty): string {
   switch (ty.tag) {
     case 'Prim':
-      return ty.name === 'Int' ? 'int' : 'boolean';
+      return ty.name === 'Int' ? 'int' : ty.name === 'Bool' ? 'boolean' : 'String';
     case 'IntArray':
       return 'int[]';
     case 'StringArray':

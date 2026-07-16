@@ -76,7 +76,13 @@ type StepOutcome =
   | { kind: 'value' }
   | { kind: 'error'; message: string };
 
-const VALUE_TYPES = new Set(['mj_expr_integer', 'mj_expr_true', 'mj_expr_false', 'mj_value_null', 'mj_value_object']);
+const VALUE_TYPES = new Set([
+  'mj_expr_integer',
+  'mj_expr_string',
+  'mj_expr_boolean',
+  'mj_value_null',
+  'mj_value_object'
+]);
 
 export function isValueNode(node: TreeNode): boolean {
   return VALUE_TYPES.has(node.type);
@@ -106,7 +112,11 @@ function intLit(state: SubstitutionState, n: number): TreeNode {
 }
 
 function boolLit(state: SubstitutionState, b: boolean): TreeNode {
-  return { type: b ? 'mj_expr_true' : 'mj_expr_false', id: freshId(state) };
+  return { type: 'mj_expr_boolean', id: freshId(state), fields: { VALUE: b ? 'true' : 'false' } };
+}
+
+function strLit(state: SubstitutionState, s: string): TreeNode {
+  return { type: 'mj_expr_string', id: freshId(state), fields: { TEXT: s } };
 }
 
 function asIntLit(node: TreeNode): number | null {
@@ -114,9 +124,12 @@ function asIntLit(node: TreeNode): number | null {
 }
 
 function asBoolLit(node: TreeNode): boolean | null {
-  if (node.type === 'mj_expr_true') return true;
-  if (node.type === 'mj_expr_false') return false;
-  return null;
+  if (node.type !== 'mj_expr_boolean') return null;
+  return node.fields?.VALUE === 'true';
+}
+
+function asStrLit(node: TreeNode): string | null {
+  return node.type === 'mj_expr_string' ? String(node.fields?.TEXT ?? '') : null;
 }
 
 function child(node: TreeNode, input: string): TreeNode | null {
@@ -131,10 +144,11 @@ export function formatTree(node: TreeNode): string {
   switch (node.type) {
     case 'mj_expr_integer':
       return String(node.fields?.VALUE ?? 0);
-    case 'mj_expr_true':
-      return 'true';
-    case 'mj_expr_false':
-      return 'false';
+    case 'mj_expr_string':
+      // Quoted: formatTree prints syntax, and a string VALUE is a literal.
+      return JSON.stringify(String(node.fields?.TEXT ?? ''));
+    case 'mj_expr_boolean':
+      return node.fields?.VALUE === 'true' ? 'true' : 'false';
     case 'mj_value_null':
       return 'null';
     case 'mj_value_object': {
@@ -145,18 +159,20 @@ export function formatTree(node: TreeNode): string {
       });
       return `${extra.className}{${fields.join(', ')}}`;
     }
-    case 'mj_expr_plus':
-      return `(${fmtChild(node, 'LEFT')} + ${fmtChild(node, 'RIGHT')})`;
-    case 'mj_expr_minus':
-      return `(${fmtChild(node, 'LEFT')} - ${fmtChild(node, 'RIGHT')})`;
-    case 'mj_expr_times':
-      return `(${fmtChild(node, 'LEFT')} * ${fmtChild(node, 'RIGHT')})`;
-    case 'mj_expr_less':
+    case 'mj_expr_arith':
+      return `(${fmtChild(node, 'LEFT')} ${node.fields?.OP ?? '+'} ${fmtChild(node, 'RIGHT')})`;
+    case 'mj_expr_compare':
       return `(${fmtChild(node, 'LEFT')} < ${fmtChild(node, 'RIGHT')})`;
-    case 'mj_expr_and':
+    case 'mj_expr_logic':
       return `(${fmtChild(node, 'LEFT')} && ${fmtChild(node, 'RIGHT')})`;
     case 'mj_expr_not':
       return `!${fmtChild(node, 'EXPR')}`;
+    case 'mj_expr_char_at':
+      return `${fmtChild(node, 'STR')}.charAt(${fmtChild(node, 'INDEX')})`;
+    case 'mj_expr_concat':
+      return `${fmtChild(node, 'LEFT')}.concat(${fmtChild(node, 'RIGHT')})`;
+    case 'mj_expr_str_length':
+      return `${fmtChild(node, 'STR')}.length()`;
     case 'mj_expr_parens':
       return `(${fmtChild(node, 'EXPR')})`;
     case 'mj_expr_new_object':
@@ -295,9 +311,11 @@ export function injectSubstitution(workspace: Blockly.Workspace): SubstitutionSt
           field.name,
           ty.tag === 'Prim' && ty.name === 'Int'
             ? { type: 'mj_expr_integer', id: '', fields: { VALUE: 0 } }
-            : ty.tag === 'Prim'
-              ? { type: 'mj_expr_false', id: '' }
-              : { type: 'mj_value_null', id: '' }
+            : ty.tag === 'Prim' && ty.name === 'String'
+              ? { type: 'mj_expr_string', id: '', fields: { TEXT: '' } }
+              : ty.tag === 'Prim'
+                ? { type: 'mj_expr_boolean', id: '', fields: { VALUE: 'false' } }
+                : { type: 'mj_value_null', id: '' }
         );
       }
       for (const method of ancestor.methods.values()) {
@@ -454,15 +472,14 @@ function foldArith(
 function stepNode(state: SubstitutionState, node: TreeNode): StepOutcome {
   if (isValueNode(node)) return { kind: 'value' };
   switch (node.type) {
-    case 'mj_expr_plus':
-      return stepBinOp(state, node, (l, r) => foldArith(state, l, r, 'add'));
-    case 'mj_expr_minus':
-      return stepBinOp(state, node, (l, r) => foldArith(state, l, r, 'sub'));
-    case 'mj_expr_times':
-      return stepBinOp(state, node, (l, r) => foldArith(state, l, r, 'mul'));
-    case 'mj_expr_less':
+    case 'mj_expr_arith': {
+      const op = node.fields?.OP;
+      const rule = op === '-' ? 'sub' : op === '*' ? 'mul' : 'add';
+      return stepBinOp(state, node, (l, r) => foldArith(state, l, r, rule));
+    }
+    case 'mj_expr_compare':
       return stepBinOp(state, node, (l, r) => foldArith(state, l, r, 'less'));
-    case 'mj_expr_and': {
+    case 'mj_expr_logic': {
       const left = child(node, 'LEFT');
       if (!left) return { kind: 'error', message: `Incomplete program: '&&' has no left operand` };
       const leftStep = stepNode(state, left);
@@ -483,6 +500,46 @@ function stepNode(state: SubstitutionState, node: TreeNode): StepOutcome {
       if (r === null) return { kind: 'error', message: `'&&' expects booleans` };
       const result = boolLit(state, r);
       return { kind: 'reduced', node: result, rule: 'and', redexId: result.id };
+    }
+    case 'mj_expr_concat':
+      return stepBinOp(state, node, (l, r) => {
+        const ls = asStrLit(l);
+        const rs = asStrLit(r);
+        if (ls === null || rs === null) return { kind: 'error', message: `'concat' expects Strings` };
+        const result = strLit(state, ls + rs);
+        return { kind: 'reduced', node: result, rule: 'concat', redexId: result.id };
+      });
+    case 'mj_expr_char_at': {
+      const str = child(node, 'STR');
+      if (!str) return { kind: 'error', message: `Incomplete program: 'charAt' has no string` };
+      const strStep = stepNode(state, str);
+      if (strStep.kind === 'reduced') return { ...strStep, node: withInput(node, 'STR', strStep.node) };
+      if (strStep.kind === 'error') return strStep;
+      const index = child(node, 'INDEX');
+      if (!index) return { kind: 'error', message: `Incomplete program: 'charAt' has no index` };
+      const indexStep = stepNode(state, index);
+      if (indexStep.kind === 'reduced') return { ...indexStep, node: withInput(node, 'INDEX', indexStep.node) };
+      if (indexStep.kind === 'error') return indexStep;
+      const s = asStrLit(str);
+      const i = asIntLit(index);
+      if (s === null || i === null) return { kind: 'error', message: `'charAt' expects a String and an int` };
+      if (i < 0 || i >= s.length) {
+        return { kind: 'error', message: `string index ${i} out of bounds for length ${s.length}` };
+      }
+      // charAt yields a 1-character String: the language has no char type.
+      const result = strLit(state, s.charAt(i));
+      return { kind: 'reduced', node: result, rule: 'char-at', redexId: result.id };
+    }
+    case 'mj_expr_str_length': {
+      const str = child(node, 'STR');
+      if (!str) return { kind: 'error', message: `Incomplete program: '.length()' has no string` };
+      const strStep = stepNode(state, str);
+      if (strStep.kind === 'reduced') return { ...strStep, node: withInput(node, 'STR', strStep.node) };
+      if (strStep.kind === 'error') return strStep;
+      const s = asStrLit(str);
+      if (s === null) return { kind: 'error', message: `'.length()' expects a String` };
+      const result = intLit(state, s.length);
+      return { kind: 'reduced', node: result, rule: 'str-length', redexId: result.id };
     }
     case 'mj_expr_not': {
       const inner = child(node, 'EXPR');

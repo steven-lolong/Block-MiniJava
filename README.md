@@ -24,10 +24,36 @@ src/
     renderer/    custom BMJ-Thrasos renderer + theme
     types/       type system: Ty grammar, class table, checker
     semantics/   small-step machine (Models A/B), substitution rewriter, legacy evaluator
-    ui/          IDE bootstrap, inspector tabs, stepper panels
+    ui/          IDE bootstrap, workbench shell (activity bar, perspectives,
+                 command palette), inspector tabs, stepper panels
 test/            headless node test suites (see Tests)
 docs/            build output, served as GitHub Pages
 ```
+
+## Workbench
+
+The IDE shell (`src/core/ui/app.ts`, `commandPalette.ts`) is a workbench over
+the existing actions — it adds entry points and layout presets, not new language
+behavior.
+
+- **Activity bar + primary sidebar**: `Blocks`, `Search blocks`,
+  `Run and analysis`, `Settings and layout`.
+- **Perspectives**: `Edit` (blocks, code, focused workspace), `Debug` (machine
+  and execution tools), `Type Analysis` (diagnostics and constraints),
+  `Presentation` (maximized block workspace), plus `Custom` — shown in the
+  status bar and the perspective picker. Adjusting panels by hand switches to
+  `Custom` rather than misreporting a preset.
+- **Command palette** (**Ctrl+Shift+P**): File (new/open/save/export/autosave),
+  Run (**Ctrl+F5** run program), Analysis (CESK machine, Model A vs B compare,
+  rewrite semantics), and View commands, with keyword matching.
+- **Status bar**: perspective, plus the existing autosave/metric indicators.
+- **Persisted layout**: namespaced `block-minijava.layout.*` keys hold sidebar
+  and code visibility/width, the active activity, and the perspective, beside
+  the pre-existing `block-minijava.autosave.v2` / `.theme` keys.
+- **Keyboard**: `Ctrl+N` new, `Ctrl+O` open, `Ctrl+S` save, `Ctrl+J` bottom
+  tools, `Ctrl+Shift+F` search blocks, `Ctrl+F5` run, `Ctrl+Shift+P` palette.
+- Responsive: the shell collapses to tablet and phone layouts, where the bottom
+  panel can be maximized.
 
 ## Grammar
 

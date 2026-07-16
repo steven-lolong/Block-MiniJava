@@ -85,6 +85,70 @@ const CASES = [
     []
   ],
   [
+    // The Shapes example: a subclass override, polymorphic assignment
+    // (Rectangle into a Shape variable), and a subclass reading inherited
+    // fields must all check clean.
+    'shapes: inheritance, override and polymorphic assignment',
+    [
+      inMain('System.out.println(new Setup().Run());'),
+      'class Setup {',
+      '  public int Run() {',
+      '    Shape s2;',
+      '    Rectangle r;',
+      '    int aux;',
+      '    s2 = new Rectangle();',
+      '    r = new Rectangle();',
+      '    aux = s2.Init(5, 10);',
+      '    System.out.println(s2.GetArea());',
+      '    aux = r.SetBorder(2);',
+      '    System.out.println(r.GetAreaWithBorder());',
+      '    return 0;',
+      '  }',
+      '}',
+      'class Shape {',
+      '  int width;',
+      '  int height;',
+      '  public int Init(int w, int h) { width = w; height = h; return 0; }',
+      '  public int GetArea() { return 0; }',
+      '}',
+      'class Rectangle extends Shape {',
+      '  int borderWidth;',
+      '  public int GetArea() { return width * height; }',
+      '  public int SetBorder(int b) { borderWidth = b; return 0; }',
+      '  public int GetAreaWithBorder() {',
+      '    int totalWidth;',
+      '    totalWidth = width + (borderWidth * 2);',
+      '    return totalWidth * (height + (borderWidth * 2));',
+      '  }',
+      '}'
+    ].join('\n'),
+    []
+  ],
+  [
+    // A Shape variable holding a Rectangle exposes only Shape's interface:
+    // the subclass-only method is a static error even though dispatch would
+    // find it at runtime.
+    'subclass-only method is not visible through the base type',
+    [
+      inMain('System.out.println(new Setup().Run());'),
+      'class Setup {',
+      '  public int Run() {',
+      '    Shape s;',
+      '    int aux;',
+      '    s = new Rectangle();',
+      '    aux = s.SetBorder(2);',
+      '    return 0;',
+      '  }',
+      '}',
+      'class Shape { public int GetArea() { return 0; } }',
+      'class Rectangle extends Shape {',
+      '  int borderWidth;',
+      '  public int SetBorder(int b) { borderWidth = b; return 0; }',
+      '}'
+    ].join('\n'),
+    [err("Method 'SetBorder' is not defined in class 'Shape'")]
+  ],
+  [
     'covariant override',
     [
       inMain('System.out.println(0);'),

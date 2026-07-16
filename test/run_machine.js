@@ -424,7 +424,81 @@ const BINARY_SEARCH = [
   '}'
 ].join('\n');
 
+/** The Shapes example: inheritance, an override, and dynamic dispatch. */
+const SHAPES = [
+  inMain('System.out.println(new Setup().Run());'),
+  'class Setup {',
+  '  public int Run() {',
+  '    Shape s1;',
+  '    Shape s2;',
+  '    Rectangle r;',
+  '    int aux;',
+  '    s1 = new Shape();',
+  '    s2 = new Rectangle();',
+  '    r = new Rectangle();',
+  '    aux = s1.Init(5, 10);',
+  '    System.out.println(s1.GetArea());',
+  '    aux = s2.Init(5, 10);',
+  '    System.out.println(s2.GetArea());',
+  '    aux = r.Init(10, 20);',
+  '    aux = r.SetBorder(2);',
+  '    System.out.println(r.GetAreaWithBorder());',
+  '    return 0;',
+  '  }',
+  '}',
+  'class Shape {',
+  '  int width;',
+  '  int height;',
+  '',
+  '  public int Init(int w, int h) {',
+  '    width = w;',
+  '    height = h;',
+  '    return 0;',
+  '  }',
+  '  public int GetArea() {',
+  '    return 0;',
+  '  }',
+  '}',
+  'class Rectangle extends Shape {',
+  '  int borderWidth;',
+  '',
+  '  public int GetArea() {',
+  '    return width * height;',
+  '  }',
+  '  public int SetBorder(int b) {',
+  '    borderWidth = b;',
+  '    return 0;',
+  '  }',
+  '  public int GetAreaWithBorder() {',
+  '    int totalWidth;',
+  '    int totalHeight;',
+  '    totalWidth = width + (borderWidth * 2);',
+  '    totalHeight = height + (borderWidth * 2);',
+  '    return totalWidth * totalHeight;',
+  '  }',
+  '}'
+].join('\n');
+
 const MODEL_CASES = [
+  [
+    // The dispatch proof: s1 is a real Shape (GetArea -> 0), s2 is a Rectangle
+    // held in a Shape variable, so lookup starts at the RECEIVER's class and
+    // finds the override (5 * 10 = 50). Then the bordered area of the 10x20
+    // rectangle with border 2: (10+4) * (20+4) = 336. Run itself returns 0.
+    'shapes under Model A: dynamic dispatch reaches the override',
+    SHAPES,
+    'A',
+    { output: ['0', '50', '336', '0'], rulesInclude: ['field-write', 'field-read', 'call', 'return'] }
+  ],
+  [
+    // Model B: the same call-by-structure contrast as binary search — every
+    // Init/SetBorder writes only its own copy of `this`, so width/height/
+    // borderWidth stay 0 for the caller and every area is 0.
+    'shapes under Model B: the init writes stay in the callee',
+    SHAPES,
+    'B',
+    { output: ['0', '0', '0', '0'], heapSize: 0, rulesExclude: ['field-write'] }
+  ],
   [
     // Model A: Init's field writes mutate the shared heap object, so Start's
     // search runs against the initialized array — 8 is found, 19 is not.

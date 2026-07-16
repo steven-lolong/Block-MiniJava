@@ -424,6 +424,81 @@ const BINARY_SEARCH = [
   '}'
 ].join('\n');
 
+/** The Bubble Sort example: nested loops, swaps through a shared array. */
+const BUBBLE_SORT = [
+  inMain('System.out.println(new BBS().Start(10));'),
+  'class BBS {',
+  '  int[] number;',
+  '  int size;',
+  '',
+  '  public int Start(int sz) {',
+  '    int aux;',
+  '    size = sz;',
+  '    number = new int[sz];',
+  '    aux = this.Init();',
+  '    aux = this.Print();',
+  '    System.out.println(9999);',
+  '    aux = this.Sort();',
+  '    aux = this.Print();',
+  '    return 0;',
+  '  }',
+  '',
+  '  public int Sort() {',
+  '    int i;',
+  '    int j;',
+  '    int t;',
+  '    int aux01;',
+  '    int aux02;',
+  '    int dummy;',
+  '    i = size - 1;',
+  '    while (0 < i) {',
+  '      j = 0;',
+  '      while (j < i) {',
+  '        aux01 = number[j];',
+  '        aux02 = number[j + 1];',
+  '        if (aux02 < aux01) {',
+  '          t = number[j];',
+  '          number[j] = number[j + 1];',
+  '          number[j + 1] = t;',
+  '        } else {',
+  '          dummy = 0;',
+  '        }',
+  '        j = j + 1;',
+  '      }',
+  '      i = i - 1;',
+  '    }',
+  '    return 0;',
+  '  }',
+  '',
+  '  public int Init() {',
+  '    number[0] = 20;',
+  '    number[1] = 7;',
+  '    number[2] = 12;',
+  '    number[3] = 18;',
+  '    number[4] = 2;',
+  '    number[5] = 11;',
+  '    number[6] = 6;',
+  '    number[7] = 9;',
+  '    number[8] = 19;',
+  '    number[9] = 5;',
+  '    return 0;',
+  '  }',
+  '',
+  '  public int Print() {',
+  '    int j;',
+  '    j = 0;',
+  '    while (j < size) {',
+  '      System.out.println(number[j]);',
+  '      j = j + 1;',
+  '    }',
+  '    return 0;',
+  '  }',
+  '}'
+].join('\n');
+
+const UNSORTED = ['20', '7', '12', '18', '2', '11', '6', '9', '19', '5'];
+const SORTED = ['2', '5', '6', '7', '9', '11', '12', '18', '19', '20'];
+
 /**
  * The Palindrome example: two pointers over an int[], equality tested with
  * only `<` (MiniJava has no == / !=). Run writes the fields itself and hands
@@ -542,6 +617,24 @@ const SHAPES = [
 ].join('\n');
 
 const MODEL_CASES = [
+  [
+    // Init fills the shared heap array, Print reads it, Sort swaps in place:
+    // unsorted, 9999, sorted, then Start's 0.
+    'bubble sort under Model A: sorts the shared array in place',
+    BUBBLE_SORT,
+    'A',
+    { output: [...UNSORTED, '9999', ...SORTED, '0'], rulesInclude: ['array-write', 'array-read', 'while-enter'] }
+  ],
+  [
+    // Callee -> caller state again: Init writes only its own copy of `this`,
+    // so Start's array stays all zeros and both Prints show zeros. Sorting
+    // zeros is a no-op, so the "before" and "after" halves are identical —
+    // the bug this contrast is designed to make visible.
+    'bubble sort under Model B: the Init writes stay in Init',
+    BUBBLE_SORT,
+    'B',
+    { output: [...Array(10).fill('0'), '9999', ...Array(10).fill('0'), '0'], heapSize: 0 }
+  ],
   [
     // [1,2,3,2,1] is a palindrome (1); after arr[3] = 9 it is not (0); Run
     // returns 0. Model A mutates the heap array through the reference.

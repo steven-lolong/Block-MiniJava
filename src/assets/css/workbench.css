@@ -1161,6 +1161,7 @@ body:not(.code-hidden) #toggle-code-column {
 .code-editor-pane .grammar-highlight {
   width: max-content;
   min-width: 100%;
+  font: inherit;
   white-space: pre;
   overflow-wrap: normal;
 }
@@ -1555,6 +1556,50 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   background: var(--ide-toolbar-bg);
 }
 
+#example-load-modal .about-header,
+#export-name-modal .about-header,
+#save-name-modal .about-header {
+  grid-template-columns: 1fr auto;
+}
+
+.about-actions {
+  gap: 8px;
+}
+
+.save-name-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.save-name-field > span:first-child {
+  flex: 0 0 auto;
+  color: var(--ide-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.save-name-field input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--ide-border);
+  border-radius: 3px;
+  padding: 8px 10px;
+  background: var(--ide-shell-bg);
+  color: var(--ide-text);
+  font: 12px/1.2 var(--font-code);
+}
+
+.save-name-field input:focus {
+  border-color: var(--ide-accent);
+}
+
+.save-name-ext {
+  flex: 0 0 auto;
+  color: var(--ide-text-muted);
+  font: 12px/1.2 var(--font-code);
+}
+
 /* Compact header actions before their labels can collide with Perspective. */
 @media (max-width: 1480px) {
   .app-header {
@@ -1604,6 +1649,10 @@ body.bottom-maximized .viz-dock[data-open="true"] {
 }
 
 @media (max-width: 1100px) {
+  .perspective-picker {
+    display: none;
+  }
+
   .ide-layout,
   body.toolbox-hidden .ide-layout,
   body.code-hidden .ide-layout,
@@ -1851,6 +1900,12 @@ body.bottom-maximized .viz-dock[data-open="true"] {
     height: min(var(--ide-bottom-panel-height), 62vh);
     margin-left: 0;
     box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  body.bottom-maximized .viz-dock[data-open="true"] {
+    top: var(--header-height);
+    height: auto;
+    max-height: none;
   }
 
   .viz-dock-tabs {

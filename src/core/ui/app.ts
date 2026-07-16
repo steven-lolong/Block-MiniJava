@@ -668,11 +668,33 @@ function makeWorkspaceStateBlob(): Blob {
   return new Blob([JSON.stringify({ version: 1, state }, null, 2)], { type: 'application/json' });
 }
 
-function downloadWorkspace(): void {
-  const requestedName = window.prompt('Workspace file name', workspaceFileDisplayName());
-  if (requestedName === null) return;
+/** Ask for the workspace name without blocking the application UI. */
+function askSaveName(defaultName: string): Promise<string | null> {
+  const modal = document.getElementById('save-name-modal') as HTMLDialogElement | null;
+  const input = document.getElementById('save-name-input') as HTMLInputElement | null;
+  if (!modal || typeof modal.showModal !== 'function' || !input) return Promise.resolve(defaultName);
 
-  const fileName = normalizeBmlFileName(requestedName);
+  input.value = defaultName;
+  return new Promise<string | null>((resolve) => {
+    const onClose = (): void => {
+      modal.removeEventListener('close', onClose);
+      resolve(modal.returnValue === 'save' ? input.value : null);
+    };
+    modal.addEventListener('close', onClose);
+    modal.returnValue = 'cancel';
+    modal.showModal();
+    input.select();
+  });
+}
+
+function downloadWorkspace(): void {
+  askSaveName(workspaceFileDisplayName()).then((requestedName) => {
+    if (requestedName === null) return;
+    writeWorkspaceFile(normalizeBmlFileName(requestedName));
+  });
+}
+
+function writeWorkspaceFile(fileName: string): void {
   const blob = makeWorkspaceStateBlob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -693,10 +715,31 @@ function normalizeJavaFileName(value: string): string {
 }
 
 function exportGeneratedCode(): void {
-  const requestedName = window.prompt('Java file name', `${workspaceFileDisplayName()}.java`);
-  if (requestedName === null) return;
+  askExportName(workspaceFileDisplayName()).then((requestedName) => {
+    if (requestedName === null) return;
+    writeGeneratedCodeFile(normalizeJavaFileName(requestedName));
+  });
+}
 
-  const fileName = normalizeJavaFileName(requestedName);
+function askExportName(defaultName: string): Promise<string | null> {
+  const modal = document.getElementById('export-name-modal') as HTMLDialogElement | null;
+  const input = document.getElementById('export-name-input') as HTMLInputElement | null;
+  if (!modal || typeof modal.showModal !== 'function' || !input) return Promise.resolve(defaultName);
+
+  input.value = defaultName;
+  return new Promise<string | null>((resolve) => {
+    const onClose = (): void => {
+      modal.removeEventListener('close', onClose);
+      resolve(modal.returnValue === 'export' ? input.value : null);
+    };
+    modal.addEventListener('close', onClose);
+    modal.returnValue = 'cancel';
+    modal.showModal();
+    input.select();
+  });
+}
+
+function writeGeneratedCodeFile(fileName: string): void {
   const blob = new Blob([currentCodeText()], { type: 'text/x-java-source;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

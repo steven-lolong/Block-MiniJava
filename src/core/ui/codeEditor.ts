@@ -33,7 +33,6 @@ let lineNumbers: HTMLElement | null = null;
 let status: HTMLElement | null = null;
 let parseTimer: number | null = null;
 let suppressWorkspaceSyncUntil = 0;
-let highlightDirty = false;
 
 function setStatus(message: string, state: EditorStatus = 'idle'): void {
   if (!status) return;
@@ -68,20 +67,13 @@ function syncHighlightMetrics(): void {
   highlightView.style.right = scrollbarWidth > 0 ? `${scrollbarWidth}px` : '0px';
 }
 
-function renderHighlight(force = false): void {
+function renderHighlight(): void {
   if (!editor || !highlight) return;
   renderLineNumbers();
-  // While the editor is focused it renders its own plain text and covers the
-  // highlight layer entirely, so defer the rebuild until it loses focus.
-  if (!force && document.activeElement === editor) {
-    highlightDirty = true;
-    return;
-  }
   const code = editor.value;
   // A trailing newline needs a placeholder or the highlight drops the empty
   // last line the textarea still shows.
   highlight.innerHTML = highlightMiniJava(code.endsWith('\n') ? `${code} ` : code) || '&nbsp;';
-  highlightDirty = false;
   syncHighlightMetrics();
   syncHighlightScroll();
 }
@@ -274,11 +266,6 @@ export function installEditableMiniJavaCodeEditor(
   editor.addEventListener('input', () => scheduleEditorImport(workspace, options));
   editor.addEventListener('scroll', syncHighlightScroll);
   editor.addEventListener('keydown', (event) => handleEditorKeydown(workspace, options, event));
-  // Returning to read mode: rebuild the highlight for whatever was typed.
-  editor.addEventListener('blur', () => {
-    if (highlightDirty) renderHighlight(true);
-    else syncHighlightScroll();
-  });
 
   // Panel resizes change the wrap width and can add/remove the scrollbar.
   if ('ResizeObserver' in window) {

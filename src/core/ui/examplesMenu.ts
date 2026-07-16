@@ -3,15 +3,48 @@ import { MINI_JAVA_EXAMPLES, type MiniJavaExample } from '../examples';
 
 type WorkspaceGetter = () => Blockly.WorkspaceSvg | null;
 
+type LoadChoice = 'replace' | 'merge' | 'cancel';
+
+function askLoadChoice(exampleLabel: string): Promise<LoadChoice> {
+  const modal = document.getElementById('example-load-modal') as HTMLDialogElement | null;
+  if (!modal || typeof modal.showModal !== 'function') return Promise.resolve('replace');
+  const name = document.getElementById('example-load-name');
+  if (name) name.textContent = exampleLabel;
+
+  return new Promise<LoadChoice>((resolve) => {
+    const onClose = (): void => {
+      modal.removeEventListener('close', onClose);
+      const value = modal.returnValue;
+      resolve(value === 'replace' || value === 'merge' ? value : 'cancel');
+    };
+    modal.addEventListener('close', onClose);
+    modal.returnValue = 'cancel';
+    modal.showModal();
+  });
+}
+
 function loadExample(example: MiniJavaExample, getWorkspace: WorkspaceGetter, onLoaded: (example: MiniJavaExample) => void): void {
   const workspace = getWorkspace();
   if (!workspace) return;
 
-  workspace.clear();
-  Blockly.serialization.workspaces.load(example.state, workspace);
-  onLoaded(example);
-  const top = workspace.getTopBlocks(false)[0];
-  if (top) workspace.centerOnBlock(top.id);
+  const proceed = (choice: LoadChoice): void => {
+    if (choice === 'cancel') return;
+    if (choice === 'merge') {
+      const blocks = (example.state as { blocks?: { blocks?: unknown[] } }).blocks?.blocks ?? [];
+      for (const block of blocks) {
+        Blockly.serialization.blocks.append(block as Blockly.serialization.blocks.State, workspace);
+      }
+    } else {
+      workspace.clear();
+      Blockly.serialization.workspaces.load(example.state, workspace);
+    }
+    onLoaded(example);
+    const top = workspace.getTopBlocks(false)[0];
+    if (top) workspace.centerOnBlock(top.id);
+  };
+
+  if (workspace.getAllBlocks(false).length > 0) askLoadChoice(example.label).then(proceed);
+  else proceed('replace');
 }
 
 export function initExamplesMenu(getWorkspace: WorkspaceGetter, onLoaded: (example: MiniJavaExample) => void): void {
@@ -59,4 +92,3 @@ export function initExamplesMenu(getWorkspace: WorkspaceGetter, onLoaded: (examp
     button.setAttribute('aria-expanded', 'false');
   });
 }
-

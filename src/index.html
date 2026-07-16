@@ -414,5 +414,77 @@
         </menu>
       </form>
     </dialog>
+
+    <dialog id="save-name-modal" class="about-modal" aria-labelledby="save-name-title">
+      <form method="dialog" class="about-card">
+        <div class="about-header">
+          <div>
+            <h2 id="save-name-title">Save workspace</h2>
+            <p>Choose a file name</p>
+          </div>
+          <button class="icon-button" value="cancel" aria-label="Cancel" title="Cancel">
+            <span aria-hidden="true">✕</span>
+          </button>
+        </div>
+        <div class="about-body">
+          <label class="save-name-field">
+            <span>File name</span>
+            <input id="save-name-input" type="text" autocomplete="off" spellcheck="false" placeholder="block-minijava-workspace" />
+            <span class="save-name-ext">.bml</span>
+          </label>
+        </div>
+        <menu class="about-actions">
+          <button class="menu-button" value="cancel"><span class="icon icon-close" aria-hidden="true"></span><span>Cancel</span></button>
+          <button class="menu-button" value="save" autofocus><span class="icon icon-save" aria-hidden="true"></span><span>Save</span></button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="export-name-modal" class="about-modal" aria-labelledby="export-name-title">
+      <form method="dialog" class="about-card">
+        <div class="about-header">
+          <div>
+            <h2 id="export-name-title">Export MiniJava code</h2>
+            <p>Choose a file name</p>
+          </div>
+          <button class="icon-button" value="cancel" aria-label="Cancel" title="Cancel">
+            <span aria-hidden="true">✕</span>
+          </button>
+        </div>
+        <div class="about-body">
+          <label class="save-name-field">
+            <span>File name</span>
+            <input id="export-name-input" type="text" autocomplete="off" spellcheck="false" placeholder="Project" />
+            <span class="save-name-ext">.java</span>
+          </label>
+        </div>
+        <menu class="about-actions">
+          <button class="menu-button" value="cancel"><span class="icon icon-close" aria-hidden="true"></span><span>Cancel</span></button>
+          <button class="menu-button" value="export" autofocus><span class="icon icon-export" aria-hidden="true"></span><span>Export</span></button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="example-load-modal" class="about-modal" aria-labelledby="example-load-title">
+      <form method="dialog" class="about-card">
+        <div class="about-header">
+          <div>
+            <h2 id="example-load-title">Load example</h2>
+            <p id="example-load-name">This example</p>
+          </div>
+          <button class="icon-button" value="cancel" aria-label="Cancel" title="Cancel">
+            <span aria-hidden="true">✕</span>
+          </button>
+        </div>
+        <div class="about-body">
+          <p>Your workspace already has blocks. Replace them with this example, or merge the example alongside them?</p>
+        </div>
+        <menu class="about-actions">
+          <button class="menu-button" value="cancel"><span class="icon icon-close" aria-hidden="true"></span><span>Cancel</span></button>
+          <button class="menu-button" value="merge"><span aria-hidden="true">＋</span><span>Merge</span></button>
+          <button class="menu-button" value="replace" autofocus><span class="icon icon-restore" aria-hidden="true"></span><span>Replace</span></button>
+        </menu>
+      </form>
+    </dialog>
   </body>
 </html>

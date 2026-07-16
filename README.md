@@ -185,7 +185,7 @@ docs/block_minijava.js
 
 ## Tests
 
-`npm test` builds node bundles of the real modules (`webpack.test.config.js`) and runs five
+`npm test` builds node bundles of the real modules (`webpack.test.config.js`) and runs seven
 suites, no browser required:
 
 - `test/run_roundtrip.js` — text→blocks→text round-trips for the parser/generator pair
@@ -193,6 +193,14 @@ suites, no browser required:
 - `test/run_machine.js` — machine runs under both value models, including A/B contrast programs
 - `test/run_subst.js` — substitution runs, structure-preservation invariants, and the
   rewrite↔machine correspondence checks
+- `test/run_eval.js` — the legacy CbS/CbV evaluator behind the Structure/Value tabs: every
+  case runs under both strategies and must agree
+- `test/run_fuzz.js` — differential fuzz: 400 seeded random expression programs, each
+  checked for round-trip stability and for agreement across machine A, machine B, CbS, CbV,
+  the substitution rewriter, and an independent JS oracle — including expected-error
+  programs (division by zero, charAt out of bounds), which must be stuck states in the
+  machines/rewriter and unknown values in the evaluator
+  (`node test/run_fuzz.js <seed>` reruns one seed verbosely)
 - `test/smoke-csesk.entry.ts` — the CESK tab driven end-to-end under jsdom: every machine
   column (Control, Stack+Environment, Store, Kontinuation) must render and the machine must
   finish with the right output

@@ -10,7 +10,7 @@
  * Run with: npm run test:machine
  */
 
-const { runSource, runSourceWithEmptiedInput } = require('./dist/machine.bundle.js');
+const { runSource, runSourceWithEmptiedInput, traceSource } = require('./dist/machine.bundle.js');
 
 function inMain(statements) {
   const body = statements
@@ -24,6 +24,8 @@ function inMain(statements) {
  * Cases: [name, source, expectations]
  * expectations: { output, status='done', errorIncludes, rulesInclude,
  *                 rulesExclude, maxStackDepth, heapSize }
+ * NOTE: `report.rules` is the SET of rules seen, so rulesInclude/Exclude are
+ * membership tests. For how OFTEN a rule fired, use traceSource (below).
  */
 const CASES = [
   ['print literal', inMain('System.out.println(42);'), { output: ['42'] }],
@@ -424,6 +426,91 @@ const BINARY_SEARCH = [
   '}'
 ].join('\n');
 
+/** The Dynamic Array example: Add calls this.Grow() to resize. */
+const DYNAMIC_ARRAY = [
+  inMain('System.out.println(new TestApp().Run());'),
+  'class TestApp {',
+  '  public int Run() {',
+  '    ArrayList list;',
+  '    int aux;',
+  '    int i;',
+  '    list = new ArrayList();',
+  '    aux = list.Init(3);',
+  '    aux = list.Add(10);',
+  '    aux = list.Add(20);',
+  '    aux = list.Add(30);',
+  '    aux = list.Add(40);',
+  '    aux = list.Add(50);',
+  '    aux = list.Add(60);',
+  '    i = 0;',
+  '    while (i < list.Size()) {',
+  '      System.out.println(list.Get(i));',
+  '      i = i + 1;',
+  '    }',
+  '    return 0;',
+  '  }',
+  '}',
+  'class ArrayList {',
+  '  int[] data;',
+  '  int count;',
+  '  int capacity;',
+  '',
+  '  public int Init(int initialCapacity) {',
+  '    capacity = initialCapacity;',
+  '    data = new int[capacity];',
+  '    count = 0;',
+  '    return 0;',
+  '  }',
+  '',
+  '  public int Add(int value) {',
+  '    int aux;',
+  '    if (capacity < (count + 1)) {',
+  '      aux = this.Grow();',
+  '    } else {',
+  '      aux = 0;',
+  '    }',
+  '    data[count] = value;',
+  '    count = count + 1;',
+  '    return 1;',
+  '  }',
+  '',
+  '  public int Grow() {',
+  '    int[] newData;',
+  '    int i;',
+  '    int dummy;',
+  '    capacity = capacity * 2;',
+  '    newData = new int[capacity];',
+  '    i = 0;',
+  '    while (i < count) {',
+  '      newData[i] = data[i];',
+  '      i = i + 1;',
+  '    }',
+  '    data = newData;',
+  '    return 0;',
+  '  }',
+  '',
+  '  public int Get(int index) {',
+  '    int val;',
+  '    if (index < 0) {',
+  '      System.out.println(9999);',
+  '      val = 0 - 1;',
+  '    } else {',
+  '      if (count < (index + 1)) {',
+  '        System.out.println(9999);',
+  '        val = 0 - 1;',
+  '      } else {',
+  '        val = data[index];',
+  '      }',
+  '    }',
+  '    return val;',
+  '  }',
+  '',
+  '  public int Size() {',
+  '    return count;',
+  '  }',
+  '}'
+].join('\n');
+
 /** The Stack example: state lives in a SEPARATE object, not in `this`. */
 const STACK = [
   inMain('System.out.println(new StackTest().Run());'),
@@ -721,6 +808,24 @@ const SHAPES = [
 
 const MODEL_CASES = [
   [
+    // Six Adds against an initial capacity of 3: the fourth Add outgrows it,
+    // Grow doubles to 6 and copies the elements across, and the last two fit.
+    // All six survive the resize.
+    'dynamic array under Model A: the resize preserves the elements',
+    DYNAMIC_ARRAY,
+    'A',
+    { output: ['10', '20', '30', '40', '50', '60', '0'], rulesInclude: ['new-array', 'array-read', 'array-write'] }
+  ],
+  [
+    // Model B breaks this one INSIDE the object: Add calls this.Grow(), and
+    // Grow's writes do not reach Add either, so `data` is still Null when Add
+    // indexes it. Even a private helper cannot mutate its own object.
+    'dynamic array under Model B: the this.Grow() writes are lost too',
+    DYNAMIC_ARRAY,
+    'B',
+    { status: 'error', errorIncludes: 'null dereference: the array is null', output: [] }
+  ],
+  [
     // LIFO: 30, 20, 10. The fourth pop underflows, printing the guard code
     // 9999 and returning 0 - 1. Then Run's 0.
     'stack under Model A: LIFO order, then the underflow guard',
@@ -986,6 +1091,27 @@ runCase(
   () => runSourceWithEmptiedInput(inMain('System.out.println(42);'), 'mj_statement_print', 'VALUE')
 );
 
-const total = CASES.length + MODEL_CASES.length + 1;
+// Rule-trace honesty. Each `new int[e]` must log the salient 'new-array'
+// exactly ONCE (the administrative entry step is 'new-array-size'), so the
+// ordered trace can be read quantitatively: the dynamic array allocates in
+// Init and in its single Grow, so 2 — not 4. This is how you tell from a
+// trace how often the list actually grew.
+runCase(
+  'dynamic array: new-array fires once per allocation (Init + one Grow)',
+  {},
+  () => {
+    const trace = traceSource(DYNAMIC_ARRAY, 'A');
+    const count = (rule) => trace.rules.filter((r) => r === rule).length;
+    const allocations = count('new-array');
+    const entries = count('new-array-size');
+    if (allocations !== 2) throw new Error(`expected 2 allocations, trace shows ${allocations}`);
+    if (entries !== allocations) {
+      throw new Error(`expected one 'new-array-size' entry per allocation, got ${entries} vs ${allocations}`);
+    }
+    return { status: trace.status, output: trace.output, error: null, rules: [...new Set(trace.rules)] };
+  }
+);
+
+const total = CASES.length + MODEL_CASES.length + 2;
 console.log(`\n${passed}/${total} machine cases passed${failures ? `, ${failures} FAILED` : ''}`);
 process.exit(failures ? 1 : 0);

@@ -544,7 +544,9 @@ function beginExpression(state: MachineState, block: Blockly.Block): MachineStat
       return state;
     case 'mj_expr_new_int_array':
       frame.kont.push({ tag: 'KNewArr', block });
-      state.lastRule = 'new-array';
+      // Administrative: the salient 'new-array' fires when the array is
+      // actually allocated, so a rule trace counts one per allocation.
+      state.lastRule = 'new-array-size';
       focusExpr(state, inputTarget(block, 'SIZE'), 'the array size is empty');
       return state;
     case 'mj_expr_new_object': {

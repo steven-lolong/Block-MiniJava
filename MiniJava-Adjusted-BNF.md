@@ -44,9 +44,9 @@ everything else is unchanged.
 |     | \|  | "new" Identifier "(" ")" |
 |     | \|  | "!" Expression |
 |     | \|  | "(" Expression ")" |
-| ArithOp **(adjusted)** | ::= | "+" \| "-" \| "\*" |
-| CompareOp **(adjusted)** | ::= | "<" |
-| LogicOp **(adjusted)** | ::= | "&&" |
+| ArithOp **(adjusted)** | ::= | "+" \| "-" \| "\*" \| "/" |
+| CompareOp **(adjusted)** | ::= | "<" \| "<=" \| ">" \| ">=" |
+| LogicOp **(adjusted)** | ::= | "&&" \| "\|\|" |
 | BoolLiteral **(adjusted)** | ::= | "true" \| "false" |
 | Identifier | ::= | <IDENTIFIER> |
 
@@ -94,12 +94,16 @@ with an operator dropdown**; the dropdown's value is the operator text:
 
 | Family | Block | Operators | Typing |
 | --- | --- | --- | --- |
-| ArithOp | `mj_expr_arith` | `+` `-` `*` | `int × int → int` |
-| CompareOp | `mj_expr_compare` | `<` | `int × int → boolean` |
-| LogicOp | `mj_expr_logic` | `&&` | `boolean × boolean → boolean` (short-circuit) |
+| ArithOp | `mj_expr_arith` | `+` `-` `*` `/` | `int × int → int` (`/` truncates toward zero, as in Java; division by zero is a runtime error / stuck state) |
+| CompareOp | `mj_expr_compare` | `<` `<=` `>` `>=` | `int × int → boolean` |
+| LogicOp | `mj_expr_logic` | `&&` `\|\|` | `boolean × boolean → boolean` (both short-circuit) |
 
-Precedence (loosest to tightest): `&&` < `<` < `+ -` < `*` < unary `!` <
-postfix (`[ ]`, `.length`, `.length()`, `.charAt`, `.concat`, method call).
+The unary boolean operator `!` remains its own block (`mj_expr_not`),
+typed `boolean → boolean`.
+
+Precedence (loosest to tightest): `\|\|` < `&&` < relational
+(`< <= > >=`) < `+ -` < `* /` < unary `!` < postfix (`[ ]`, `.length`,
+`.length()`, `.charAt`, `.concat`, method call).
 All binary operators associate to the left. Parentheses group; the block
 structure carries grouping, so redundant parens normalize away on import.
 

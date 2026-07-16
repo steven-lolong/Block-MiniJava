@@ -28,6 +28,27 @@ function inMain(statements) {
 const CASES = [
   ['print literal', inMain('System.out.println(42);'), { output: ['42'] }],
   ['arithmetic precedence', inMain('System.out.println(1 + 2 * 3 - 4);'), { output: ['3'] }],
+  ['division truncates toward zero', inMain('System.out.println(7 / 2);\nSystem.out.println((0 - 7) / 2);'), { output: ['3', '-3'], rulesInclude: ['div'] }],
+  [
+    'relational operators',
+    inMain('if (1 <= 1) {\n  System.out.println(1);\n} else {\n  System.out.println(0);\n}\nif (2 > 3) {\n  System.out.println(1);\n} else {\n  System.out.println(0);\n}\nif (2 >= 2) {\n  System.out.println(1);\n} else {\n  System.out.println(0);\n}'),
+    { output: ['1', '0', '1'], rulesInclude: ['leq', 'gt', 'geq'] }
+  ],
+  [
+    'or short-circuits past a division by zero',
+    inMain('if (true || 1 / 0 < 1) {\n  System.out.println(1);\n} else {\n  System.out.println(0);\n}'),
+    { output: ['1'], rulesInclude: ['or-short-circuit'], rulesExclude: ['div', 'or'] }
+  ],
+  [
+    'or evaluates the right operand when needed',
+    inMain('if (false || 1 < 2) {\n  System.out.println(1);\n} else {\n  System.out.println(0);\n}'),
+    { output: ['1'], rulesInclude: ['or', 'less'] }
+  ],
+  [
+    'division by zero is a stuck state',
+    inMain('System.out.println(1 / 0);'),
+    { status: 'error', errorIncludes: 'division by zero', output: [] }
+  ],
   [
     'two statements in order',
     inMain('System.out.println(1);\nSystem.out.println(2);'),

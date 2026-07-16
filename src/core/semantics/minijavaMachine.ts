@@ -58,7 +58,7 @@ export type HeapObj =
   | { tag: 'Obj'; className: string; fields: Map<string, MachineValue>; blockId: string }
   | { tag: 'Arr'; elems: MachineValue[]; blockId: string };
 
-type BinOp = 'add' | 'sub' | 'mul' | 'less' | 'and' | 'concat';
+type BinOp = 'add' | 'sub' | 'mul' | 'div' | 'less' | 'leq' | 'gt' | 'geq' | 'and' | 'or' | 'concat';
 
 /** Continuations. One frame's worth of pending work, innermost first. */
 export type Kont =
@@ -72,6 +72,7 @@ export type Kont =
   | { tag: 'KArrAssignVal'; name: string; index: MachineValue; block: Blockly.Block }
   | { tag: 'KNot' }
   | { tag: 'KAnd'; rightBlock: Blockly.Block | null }
+  | { tag: 'KOr'; rightBlock: Blockly.Block | null }
   | { tag: 'KBinL'; op: BinOp; rightBlock: Blockly.Block | null }
   | { tag: 'KBinR'; op: BinOp; left: MachineValue }
   | { tag: 'KLookupArr'; indexBlock: Blockly.Block | null }
@@ -374,11 +375,19 @@ function localVarTy(table: ClassTable, varBlock: Blockly.Block): Ty {
   }
 }
 
-/** The arith block's OP dropdown value -> machine rule. */
+/** The arith/compare blocks' OP dropdown value -> machine rule. */
 const ARITH_OPS: Record<string, BinOp> = {
   '+': 'add',
   '-': 'sub',
-  '*': 'mul'
+  '*': 'mul',
+  '/': 'div'
+};
+
+const COMPARE_OPS: Record<string, BinOp> = {
+  '<': 'less',
+  '<=': 'leq',
+  '>': 'gt',
+  '>=': 'geq'
 };
 
 function beginStatement(state: MachineState, block: Blockly.Block): MachineState {
@@ -484,18 +493,25 @@ function beginExpression(state: MachineState, block: Blockly.Block): MachineStat
       state.lastRule = 'not-operand';
       focusExpr(state, inputTarget(block, 'EXPR'), `'!' has no operand`);
       return state;
-    case 'mj_expr_logic':
-      // && is the only logic operator; it keeps its short-circuit kontinuation.
+    case 'mj_expr_logic': {
+      // Both connectives short-circuit, each with its own kontinuation.
+      if (block.getFieldValue('OP') === '||') {
+        frame.kont.push({ tag: 'KOr', rightBlock: inputTarget(block, 'RIGHT') });
+        state.lastRule = 'or-left';
+        focusExpr(state, inputTarget(block, 'LEFT'), `'||' has no left operand`);
+        return state;
+      }
       frame.kont.push({ tag: 'KAnd', rightBlock: inputTarget(block, 'RIGHT') });
       state.lastRule = 'and-left';
       focusExpr(state, inputTarget(block, 'LEFT'), `'&&' has no left operand`);
       return state;
+    }
     case 'mj_expr_arith':
     case 'mj_expr_compare':
     case 'mj_expr_concat': {
       const op: BinOp =
         block.type === 'mj_expr_compare'
-          ? 'less'
+          ? COMPARE_OPS[block.getFieldValue('OP') ?? '<'] ?? 'less'
           : block.type === 'mj_expr_concat'
             ? 'concat'
             : ARITH_OPS[block.getFieldValue('OP') ?? '+'] ?? 'add';
@@ -561,12 +577,12 @@ function applyBinOp(state: MachineState, op: BinOp, left: MachineValue, right: M
     produce(state, STR_V(left.s + right.s));
     return state;
   }
-  if (op === 'and') {
+  if (op === 'and' || op === 'or') {
     const l = asBool(left);
     const r = asBool(right);
-    if (l === null || r === null) return fail(state, `'&&' expects booleans`);
-    state.lastRule = 'and';
-    produce(state, BOOL_V(l && r));
+    if (l === null || r === null) return fail(state, `'${op === 'and' ? '&&' : '||'}' expects booleans`);
+    state.lastRule = op;
+    produce(state, BOOL_V(op === 'and' ? l && r : l || r));
     return state;
   }
   const l = asInt(left);
@@ -587,9 +603,27 @@ function applyBinOp(state: MachineState, op: BinOp, left: MachineValue, right: M
       state.lastRule = 'mul';
       produce(state, INT_V(l * r));
       return state;
+    case 'div':
+      // Java int division truncates toward zero; /0 throws.
+      if (r === 0) return fail(state, 'division by zero');
+      state.lastRule = 'div';
+      produce(state, INT_V(Math.trunc(l / r)));
+      return state;
     case 'less':
       state.lastRule = 'less';
       produce(state, BOOL_V(l < r));
+      return state;
+    case 'leq':
+      state.lastRule = 'leq';
+      produce(state, BOOL_V(l <= r));
+      return state;
+    case 'gt':
+      state.lastRule = 'gt';
+      produce(state, BOOL_V(l > r));
+      return state;
+    case 'geq':
+      state.lastRule = 'geq';
+      produce(state, BOOL_V(l >= r));
       return state;
   }
 }
@@ -774,6 +808,19 @@ function applyKont(state: MachineState, value: MachineValue | null): MachineStat
       frame.kont.push({ tag: 'KBinR', op: 'and', left: BOOL_V(true) });
       state.lastRule = 'and-right';
       focusExpr(state, kont.rightBlock, `'&&' has no right operand`);
+      return state;
+    }
+    case 'KOr': {
+      const left = value === null ? null : asBool(value);
+      if (left === null) return fail(state, `'||' expects booleans`);
+      if (left) {
+        state.lastRule = 'or-short-circuit';
+        produce(state, BOOL_V(true));
+        return state;
+      }
+      frame.kont.push({ tag: 'KBinR', op: 'or', left: BOOL_V(false) });
+      state.lastRule = 'or-right';
+      focusExpr(state, kont.rightBlock, `'||' has no right operand`);
       return state;
     }
     case 'KBinL': {

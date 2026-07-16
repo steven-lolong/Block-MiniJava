@@ -113,9 +113,9 @@ export const MINI_JAVA_CATEGORIES: ToolboxCategory[] = [
     label: 'Expressions',
     icon: 'E',
     blocks: [
-      { type: 'mj_expr_arith', label: 'Arithmetic (+ − ×)', icon: '+' },
-      { type: 'mj_expr_compare', label: 'Compare (<)', icon: '<' },
-      { type: 'mj_expr_logic', label: 'Logic (&&)', icon: '&&' },
+      { type: 'mj_expr_arith', label: 'Arithmetic (+ − × ÷)', icon: '+' },
+      { type: 'mj_expr_compare', label: 'Compare (< ≤ > ≥)', icon: '<' },
+      { type: 'mj_expr_logic', label: 'Logic (&& ||)', icon: '&&' },
       { type: 'mj_expr_array_lookup', label: 'Array Lookup', icon: '[]' },
       { type: 'mj_expr_array_length', label: 'Array Length', icon: 'len' },
       { type: 'mj_expr_char_at', label: 'charAt', icon: '@' },
@@ -349,7 +349,7 @@ export function defineMiniJavaBlocks(): void {
       message0: 'arithmetic %1 %2 %3',
       args0: [
         { type: 'input_value', name: 'LEFT', check: 'Expression' },
-        { type: 'field_dropdown', name: 'OP', options: [['+', '+'], ['-', '-'], ['*', '*']] },
+        { type: 'field_dropdown', name: 'OP', options: [['+', '+'], ['-', '-'], ['*', '*'], ['/', '/']] },
         { type: 'input_value', name: 'RIGHT', check: 'Expression' }
       ],
       inputsInline: true,
@@ -365,7 +365,7 @@ export function defineMiniJavaBlocks(): void {
       message0: 'compare %1 %2 %3',
       args0: [
         { type: 'input_value', name: 'LEFT', check: 'Expression' },
-        { type: 'field_dropdown', name: 'OP', options: [['<', '<']] },
+        { type: 'field_dropdown', name: 'OP', options: [['<', '<'], ['<=', '<='], ['>', '>'], ['>=', '>=']] },
         { type: 'input_value', name: 'RIGHT', check: 'Expression' }
       ],
       inputsInline: true,
@@ -380,7 +380,7 @@ export function defineMiniJavaBlocks(): void {
       message0: 'logic %1 %2 %3',
       args0: [
         { type: 'input_value', name: 'LEFT', check: 'Expression' },
-        { type: 'field_dropdown', name: 'OP', options: [['&&', '&&']] },
+        { type: 'field_dropdown', name: 'OP', options: [['&&', '&&'], ['||', '||']] },
         { type: 'input_value', name: 'RIGHT', check: 'Expression' }
       ],
       inputsInline: true,

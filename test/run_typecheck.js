@@ -181,6 +181,9 @@ const CASES = [
   // -- expression and statement typing errors -----------------------------------
   ['if condition must be boolean', inMain('if (1) {} else {}'), [err('Expected boolean, found int')]],
   ['plus wants ints', inMain('System.out.println(1 + true);'), [err('Expected int, found boolean')]],
+  ['division and relational operators are well-typed', inMain('if (10 / 2 >= 5 || 1 <= 0) {} else {}'), []],
+  ['or wants booleans', inMain('if (1 || true) {} else {}'), [err('Expected boolean, found int')]],
+  ['relational wants ints', inMain('if (1 >= true) {} else {}'), [err('Expected int, found boolean')]],
   ['undeclared variable in main', inMain('x = 1;'), [err("Variable 'x' is not declared")]],
   [
     'assignment type mismatch',

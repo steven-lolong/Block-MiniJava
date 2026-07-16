@@ -27,7 +27,8 @@ function inMain(statements) {
 }
 
 const SALIENT = new Set([
-  'add', 'sub', 'mul', 'less', 'not', 'and', 'and-short-circuit', 'new', 'call',
+  'add', 'sub', 'mul', 'div', 'less', 'leq', 'gt', 'geq', 'not',
+  'and', 'and-short-circuit', 'or', 'or-short-circuit', 'new', 'call',
   'concat', 'char-at', 'str-length'
 ]);
 const salient = (rules) => rules.filter((rule) => SALIENT.has(rule));
@@ -90,6 +91,15 @@ const CASES = [
     inMain('System.out.println(false && 1 < 2);'),
     { result: 'false', rulesInclude: ['and-short-circuit'], rulesExclude: ['less'] }
   ],
+  ['division truncates toward zero', inMain('System.out.println((0 - 7) / 2);'), { result: '-3', rules: ['sub', 'div'] }],
+  ['division by zero is reported', inMain('System.out.println(1 / 0);'), { errorIncludes: 'division by zero' }],
+  ['relational fold', inMain('System.out.println(2 >= 1 && 1 <= 0);'), { result: 'false', rules: ['geq', 'leq', 'and'] }],
+  [
+    'or short-circuits past a division by zero',
+    inMain('System.out.println(true || 1 / 0 < 1);'),
+    { result: 'true', rulesInclude: ['or-short-circuit'], rulesExclude: ['div', 'or'] }
+  ],
+  ['or evaluates the right operand when needed', inMain('System.out.println(false || 2 > 1);'), { result: 'true', rules: ['gt', 'or'] }],
   [
     'boolean chain',
     // The text parser resolves the parentheses structurally, so no parens
@@ -181,6 +191,9 @@ const CORRESPONDENCE = [
     ].join('\n')
   ],
   ['string concat and charAt', inMain('System.out.println("mini".concat("java").charAt(4));')],
+  ['division and relationals', inMain('System.out.println(7 / 2 >= 3 && 1 <= 1);')],
+  ['or short-circuit', inMain('System.out.println(true || 1 / 0 < 1);')],
+  ['or right operand', inMain('System.out.println(false || 2 > 1);')],
   ['string length', inMain('System.out.println("ab".concat("cde").length() + 1);')],
   [
     'string beta and duplication',

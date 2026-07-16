@@ -481,20 +481,26 @@ export function evaluateExpression(block: Blockly.Block | null, env: RuntimeEnv)
       break;
     }
     case 'mj_expr_logic': {
+      // Short-circuit under both operators, as in Java.
+      const op = field(block, 'OP', '&&');
       const left = booleanValue(evaluateExpression(child(block, 'LEFT'), env));
-      if (left === false) result = false;
-      else if (left === true) {
+      if (typeof left !== 'boolean') result = left;
+      else if (op === '||' ? left : !left) result = op === '||';
+      else {
         const right = booleanValue(evaluateExpression(child(block, 'RIGHT'), env));
-        result = typeof right === 'boolean' ? right : right;
-      } else {
-        result = left;
+        result = right;
       }
       break;
     }
     case 'mj_expr_compare': {
       const left = numberValue(evaluateExpression(child(block, 'LEFT'), env));
       const right = numberValue(evaluateExpression(child(block, 'RIGHT'), env));
-      result = typeof left === 'number' && typeof right === 'number' ? left < right : unknown('invalid comparison');
+      const op = field(block, 'OP', '<');
+      if (typeof left !== 'number' || typeof right !== 'number') result = unknown('invalid comparison');
+      else if (op === '<=') result = left <= right;
+      else if (op === '>') result = left > right;
+      else if (op === '>=') result = left >= right;
+      else result = left < right;
       break;
     }
     case 'mj_expr_arith': {
@@ -504,7 +510,10 @@ export function evaluateExpression(block: Blockly.Block | null, env: RuntimeEnv)
       if (typeof left !== 'number' || typeof right !== 'number') result = unknown('invalid arithmetic');
       else if (op === '+') result = left + right;
       else if (op === '-') result = left - right;
-      else result = left * right;
+      else if (op === '/') {
+        // Java int division truncates toward zero; /0 throws.
+        result = right === 0 ? unknown('division by zero') : Math.trunc(left / right);
+      } else result = left * right;
       break;
     }
     case 'mj_expr_array_lookup': {

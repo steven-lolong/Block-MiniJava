@@ -231,7 +231,11 @@ function renderControl(): void {
   }
 }
 
-const BIN_SYMBOL: Record<string, string> = { add: '+', sub: '-', mul: '*', less: '<', and: '&&', concat: '.concat' };
+const BIN_SYMBOL: Record<string, string> = {
+  add: '+', sub: '-', mul: '*', div: '/',
+  less: '<', leq: '<=', gt: '>', geq: '>=',
+  and: '&&', or: '||', concat: '.concat'
+};
 
 /**
  * One kontinuation frame's label: the pending work with ▢ marking the hole
@@ -250,6 +254,7 @@ function kontEntry(k: Kont): { parts: (string | MachineValue)[]; blockId: string
     case 'KArrAssignVal': return { parts: [`${k.name}[`, k.index, '] = ▢'], blockId: k.block.id };
     case 'KNot': return { parts: ['! ▢'], blockId: null };
     case 'KAnd': return { parts: ['▢ && …'], blockId: k.rightBlock?.id ? k.rightBlock.id : null };
+    case 'KOr': return { parts: ['▢ || …'], blockId: k.rightBlock?.id ? k.rightBlock.id : null };
     case 'KBinL': return { parts: [`▢ ${BIN_SYMBOL[k.op] ?? k.op} …`], blockId: k.rightBlock?.id ?? null };
     case 'KBinR': return { parts: [k.left, ` ${BIN_SYMBOL[k.op] ?? k.op} ▢`], blockId: null };
     case 'KLookupArr': return { parts: ['▢ [ … ] ▸ evaluate the array'], blockId: k.indexBlock?.id ?? null };

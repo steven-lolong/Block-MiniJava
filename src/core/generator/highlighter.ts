@@ -16,7 +16,7 @@ const KEYWORDS = new Set([
 
 const TYPES = new Set(['int', 'boolean', 'String']);
 const MEMBER_BUILTINS = new Set(['out', 'println', 'length', 'charAt', 'concat']);
-const OPERATORS = new Set(['&&', '<', '+', '-', '*', '!', '=']);
+const OPERATORS = new Set(['&&', '||', '<', '<=', '>', '>=', '+', '-', '*', '/', '!', '=']);
 
 type RawToken = {
   kind: 'comment' | 'word' | 'number' | 'string' | 'symbol' | 'space' | 'other';
@@ -80,13 +80,15 @@ function tokenize(code: string): RawToken[] {
       continue;
     }
 
-    if (char === '&' && code[index + 1] === '&') {
-      tokens.push({ kind: 'symbol', text: '&&' });
+    const twoChar = code.slice(index, index + 2);
+    if (twoChar === '&&' || twoChar === '||' || twoChar === '<=' || twoChar === '>=') {
+      tokens.push({ kind: 'symbol', text: twoChar });
       index += 2;
       continue;
     }
 
-    if ('{}()[].,;=+-*<!'.includes(char)) {
+    // A lone '/' is division (the comment forms were consumed above).
+    if ('{}()[].,;=+-*/<>!'.includes(char)) {
       tokens.push({ kind: 'symbol', text: char });
       index += 1;
       continue;

@@ -36,6 +36,10 @@ const CASES = [
   // -- values and operators ---------------------------------------------------
   ['print integer', inMain('System.out.println(42);')],
   ['arith precedence', inMain('x = 1 + 2 * 3 - 4;')],
+  ['division precedence', inMain('x = 1 + 6 / 2 * 3;')],
+  ['relational operators', inMain('b = x <= y;\nc = x > y;\nd = x >= y;\ne = x < y;')],
+  ['or and mixed logic precedence', inMain('b = x < 1 || y < 2 && z < 3;')],
+  ['or of relationals', inMain('b = x >= 1 || y > 2 || z <= 3;')],
   ['normalized parens stay stable', inMain('x = ((1 + 2));')],
   ['and less chain', inMain('b = x < y && y < z && b;')],
   ['not and parens', inMain('b = !(x < y) && !b;')],

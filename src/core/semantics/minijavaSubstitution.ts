@@ -162,9 +162,9 @@ export function formatTree(node: TreeNode): string {
     case 'mj_expr_arith':
       return `(${fmtChild(node, 'LEFT')} ${node.fields?.OP ?? '+'} ${fmtChild(node, 'RIGHT')})`;
     case 'mj_expr_compare':
-      return `(${fmtChild(node, 'LEFT')} < ${fmtChild(node, 'RIGHT')})`;
+      return `(${fmtChild(node, 'LEFT')} ${node.fields?.OP ?? '<'} ${fmtChild(node, 'RIGHT')})`;
     case 'mj_expr_logic':
-      return `(${fmtChild(node, 'LEFT')} && ${fmtChild(node, 'RIGHT')})`;
+      return `(${fmtChild(node, 'LEFT')} ${node.fields?.OP ?? '&&'} ${fmtChild(node, 'RIGHT')})`;
     case 'mj_expr_not':
       return `!${fmtChild(node, 'EXPR')}`;
     case 'mj_expr_char_at':
@@ -449,15 +449,14 @@ function stepBinOp(state: SubstitutionState, node: TreeNode, fold: (l: TreeNode,
   return fold(left, right);
 }
 
-function foldArith(
-  state: SubstitutionState,
-  left: TreeNode,
-  right: TreeNode,
-  rule: 'add' | 'sub' | 'mul' | 'less'
-): StepOutcome {
+type IntFoldRule = 'add' | 'sub' | 'mul' | 'div' | 'less' | 'leq' | 'gt' | 'geq';
+
+function foldArith(state: SubstitutionState, left: TreeNode, right: TreeNode, rule: IntFoldRule): StepOutcome {
   const l = asIntLit(left);
   const r = asIntLit(right);
   if (l === null || r === null) return { kind: 'error', message: 'arithmetic expects ints' };
+  // Java int division truncates toward zero; /0 throws.
+  if (rule === 'div' && r === 0) return { kind: 'error', message: 'division by zero' };
   const result =
     rule === 'add'
       ? intLit(state, l + r)
@@ -465,7 +464,15 @@ function foldArith(
         ? intLit(state, l - r)
         : rule === 'mul'
           ? intLit(state, l * r)
-          : boolLit(state, l < r);
+          : rule === 'div'
+            ? intLit(state, Math.trunc(l / r))
+            : rule === 'less'
+              ? boolLit(state, l < r)
+              : rule === 'leq'
+                ? boolLit(state, l <= r)
+                : rule === 'gt'
+                  ? boolLit(state, l > r)
+                  : boolLit(state, l >= r);
   return { kind: 'reduced', node: result, rule, redexId: result.id };
 }
 
@@ -474,32 +481,38 @@ function stepNode(state: SubstitutionState, node: TreeNode): StepOutcome {
   switch (node.type) {
     case 'mj_expr_arith': {
       const op = node.fields?.OP;
-      const rule = op === '-' ? 'sub' : op === '*' ? 'mul' : 'add';
+      const rule: IntFoldRule = op === '-' ? 'sub' : op === '*' ? 'mul' : op === '/' ? 'div' : 'add';
       return stepBinOp(state, node, (l, r) => foldArith(state, l, r, rule));
     }
-    case 'mj_expr_compare':
-      return stepBinOp(state, node, (l, r) => foldArith(state, l, r, 'less'));
+    case 'mj_expr_compare': {
+      const op = node.fields?.OP;
+      const rule: IntFoldRule = op === '<=' ? 'leq' : op === '>' ? 'gt' : op === '>=' ? 'geq' : 'less';
+      return stepBinOp(state, node, (l, r) => foldArith(state, l, r, rule));
+    }
     case 'mj_expr_logic': {
+      // Both connectives short-circuit: && stops on false, || stops on true.
+      const isOr = node.fields?.OP === '||';
+      const opText = isOr ? '||' : '&&';
       const left = child(node, 'LEFT');
-      if (!left) return { kind: 'error', message: `Incomplete program: '&&' has no left operand` };
+      if (!left) return { kind: 'error', message: `Incomplete program: '${opText}' has no left operand` };
       const leftStep = stepNode(state, left);
       if (leftStep.kind === 'reduced') return { ...leftStep, node: withInput(node, 'LEFT', leftStep.node) };
       if (leftStep.kind === 'error') return leftStep;
       const l = asBoolLit(left);
-      if (l === null) return { kind: 'error', message: `'&&' expects booleans` };
-      if (!l) {
-        const result = boolLit(state, false);
-        return { kind: 'reduced', node: result, rule: 'and-short-circuit', redexId: result.id };
+      if (l === null) return { kind: 'error', message: `'${opText}' expects booleans` };
+      if (isOr ? l : !l) {
+        const result = boolLit(state, isOr);
+        return { kind: 'reduced', node: result, rule: isOr ? 'or-short-circuit' : 'and-short-circuit', redexId: result.id };
       }
       const right = child(node, 'RIGHT');
-      if (!right) return { kind: 'error', message: `Incomplete program: '&&' has no right operand` };
+      if (!right) return { kind: 'error', message: `Incomplete program: '${opText}' has no right operand` };
       const rightStep = stepNode(state, right);
       if (rightStep.kind === 'reduced') return { ...rightStep, node: withInput(node, 'RIGHT', rightStep.node) };
       if (rightStep.kind === 'error') return rightStep;
       const r = asBoolLit(right);
-      if (r === null) return { kind: 'error', message: `'&&' expects booleans` };
+      if (r === null) return { kind: 'error', message: `'${opText}' expects booleans` };
       const result = boolLit(state, r);
-      return { kind: 'reduced', node: result, rule: 'and', redexId: result.id };
+      return { kind: 'reduced', node: result, rule: isOr ? 'or' : 'and', redexId: result.id };
     }
     case 'mj_expr_concat':
       return stepBinOp(state, node, (l, r) => {

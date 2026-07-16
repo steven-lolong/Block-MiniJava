@@ -188,14 +188,16 @@ const GEN: Record<string, GenFn> = {
   },
 
   mj_expr_arith(block) {
-    const op = ['+', '-', '*'].includes(block.getFieldValue('OP')) ? block.getFieldValue('OP') : '+';
+    const op = ['+', '-', '*', '/'].includes(block.getFieldValue('OP')) ? block.getFieldValue('OP') : '+';
     return `(${expr(block, 'LEFT', '0')} ${op} ${expr(block, 'RIGHT', '0')})`;
   },
   mj_expr_compare(block) {
-    return `(${expr(block, 'LEFT', '0')} < ${expr(block, 'RIGHT', '0')})`;
+    const op = ['<', '<=', '>', '>='].includes(block.getFieldValue('OP')) ? block.getFieldValue('OP') : '<';
+    return `(${expr(block, 'LEFT', '0')} ${op} ${expr(block, 'RIGHT', '0')})`;
   },
   mj_expr_logic(block) {
-    return `(${expr(block, 'LEFT', 'true')} && ${expr(block, 'RIGHT', 'true')})`;
+    const op = ['&&', '||'].includes(block.getFieldValue('OP')) ? block.getFieldValue('OP') : '&&';
+    return `(${expr(block, 'LEFT', 'true')} ${op} ${expr(block, 'RIGHT', 'true')})`;
   },
   mj_expr_array_lookup(block) {
     return `${postfixHead(block, 'ARRAY', 'array')}[${expr(block, 'INDEX', '0')}]`;

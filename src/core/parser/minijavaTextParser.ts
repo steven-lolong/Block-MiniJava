@@ -45,7 +45,7 @@ type MiniJavaStatementAst =
   | { kind: 'assign'; name: string; value: MiniJavaExpressionAst }
   | { kind: 'arrayAssign'; name: string; index: MiniJavaExpressionAst; value: MiniJavaExpressionAst };
 
-type BinaryOperator = '&&' | '<' | '+' | '-' | '*';
+type BinaryOperator = '&&' | '||' | '<' | '<=' | '>' | '>=' | '+' | '-' | '*' | '/';
 
 type MiniJavaExpressionAst =
   | { kind: 'binary'; op: BinaryOperator; left: MiniJavaExpressionAst; right: MiniJavaExpressionAst }
@@ -195,13 +195,15 @@ function tokenize(source: string): Token[] {
       continue;
     }
 
-    if (source.slice(index, index + 2) === '&&') {
-      tokens.push({ kind: 'symbol', value: '&&', index });
+    const twoChar = source.slice(index, index + 2);
+    if (twoChar === '&&' || twoChar === '||' || twoChar === '<=' || twoChar === '>=') {
+      tokens.push({ kind: 'symbol', value: twoChar, index });
       index += 2;
       continue;
     }
 
-    if ('{}()[].,;=+-*<!'.includes(char)) {
+    // A lone '/' is division (the comment forms were consumed above).
+    if ('{}()[].,;=+-*/<>!'.includes(char)) {
       tokens.push({ kind: 'symbol', value: char, index });
       index += 1;
       continue;
@@ -454,22 +456,32 @@ class Parser {
     return [this.parseStatement()];
   }
 
+  // Java precedence, loosest first: || < && < relational < additive < multiplicative.
   private parseExpression(): MiniJavaExpressionAst {
-    return this.parseAnd();
+    return this.parseOr();
   }
 
-  private parseAnd(): MiniJavaExpressionAst {
-    let left = this.parseLessThan();
-    while (this.consume('&&')) {
-      left = { kind: 'binary', op: '&&', left, right: this.parseLessThan() };
+  private parseOr(): MiniJavaExpressionAst {
+    let left = this.parseAnd();
+    while (this.consume('||')) {
+      left = { kind: 'binary', op: '||', left, right: this.parseAnd() };
     }
     return left;
   }
 
-  private parseLessThan(): MiniJavaExpressionAst {
+  private parseAnd(): MiniJavaExpressionAst {
+    let left = this.parseRelational();
+    while (this.consume('&&')) {
+      left = { kind: 'binary', op: '&&', left, right: this.parseRelational() };
+    }
+    return left;
+  }
+
+  private parseRelational(): MiniJavaExpressionAst {
     let left = this.parseAdditive();
-    while (this.consume('<')) {
-      left = { kind: 'binary', op: '<', left, right: this.parseAdditive() };
+    while (this.matches('<') || this.matches('<=') || this.matches('>') || this.matches('>=')) {
+      const op = this.advance().value as '<' | '<=' | '>' | '>=';
+      left = { kind: 'binary', op, left, right: this.parseAdditive() };
     }
     return left;
   }
@@ -485,8 +497,9 @@ class Parser {
 
   private parseMultiplicative(): MiniJavaExpressionAst {
     let left = this.parseUnary();
-    while (this.consume('*')) {
-      left = { kind: 'binary', op: '*', left, right: this.parseUnary() };
+    while (this.matches('*') || this.matches('/')) {
+      const op = this.advance().value as '*' | '/';
+      left = { kind: 'binary', op, left, right: this.parseUnary() };
     }
     return left;
   }
@@ -729,10 +742,15 @@ function expressionState(expression: MiniJavaExpressionAst): MiniJavaBlockState 
       // FAMILY, the OP dropdown carries the operator itself.
       const blockByOperator: Record<BinaryOperator, string> = {
         '&&': 'mj_expr_logic',
+        '||': 'mj_expr_logic',
         '<': 'mj_expr_compare',
+        '<=': 'mj_expr_compare',
+        '>': 'mj_expr_compare',
+        '>=': 'mj_expr_compare',
         '+': 'mj_expr_arith',
         '-': 'mj_expr_arith',
-        '*': 'mj_expr_arith'
+        '*': 'mj_expr_arith',
+        '/': 'mj_expr_arith'
       };
       const state: MiniJavaBlockState = {
         type: blockByOperator[expression.op],

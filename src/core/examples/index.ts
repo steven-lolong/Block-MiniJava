@@ -5356,6 +5356,983 @@ export const MINI_JAVA_EXAMPLES: MiniJavaExample[] = [
     }
   },
   {
+    id: 'stack',
+    label: 'Stack (Push/Pop)',
+    description: 'A bounded stack object with overflow (8888) and underflow (9999) guards: pushes 10/20/30, pops them LIFO, then pops once too many. Under Model B the Init never reaches the caller, so the stack\u2019s own guards fire on every operation',
+    state: {
+      blocks: {
+        languageVersion: 0,
+        blocks: [
+          {
+            type: 'mj_goal',
+            x: 48,
+            y: 48,
+            deletable: false,
+            movable: false,
+            inputs: {
+              MAIN: {
+                block: {
+                  type: 'mj_main_class',
+                  fields: {
+                    CLASS: 'StackDemo',
+                    ARG: 'a'
+                  },
+                  inputs: {
+                    STATEMENT: {
+                      block: {
+                        type: 'mj_statement_print',
+                        inputs: {
+                          VALUE: {
+                            block: {
+                              type: 'mj_expr_method_call',
+                              fields: {
+                                METHOD: 'Run'
+                              },
+                              inputs: {
+                                OBJECT: {
+                                  block: {
+                                    type: 'mj_expr_new_object',
+                                    fields: {
+                                      CLASS: 'StackTest'
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              CLASSES: {
+                block: {
+                  type: 'mj_class_declaration',
+                  fields: {
+                    CLASS: 'StackTest',
+                    HAS_EXTENDS: 'FALSE'
+                  },
+                  inputs: {
+                    METHODS: {
+                      block: {
+                        type: 'mj_method_declaration',
+                        fields: {
+                          NAME: 'Run'
+                        },
+                        inputs: {
+                          TYPE: {
+                            block: {
+                              type: 'mj_type_int'
+                            }
+                          },
+                          VARS: {
+                            block: {
+                              type: 'mj_var_declaration',
+                              fields: {
+                                NAME: 's'
+                              },
+                              inputs: {
+                                TYPE: {
+                                  block: {
+                                    type: 'mj_type_identifier',
+                                    fields: {
+                                      NAME: 'Stack'
+                                    }
+                                  }
+                                }
+                              },
+                              next: {
+                                block: {
+                                  type: 'mj_var_declaration',
+                                  fields: {
+                                    NAME: 'aux'
+                                  },
+                                  inputs: {
+                                    TYPE: {
+                                      block: {
+                                        type: 'mj_type_int'
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          BODY: {
+                            block: {
+                              type: 'mj_statement_assign',
+                              fields: {
+                                NAME: 's'
+                              },
+                              inputs: {
+                                VALUE: {
+                                  block: {
+                                    type: 'mj_expr_new_object',
+                                    fields: {
+                                      CLASS: 'Stack'
+                                    }
+                                  }
+                                }
+                              },
+                              next: {
+                                block: {
+                                  type: 'mj_statement_assign',
+                                  fields: {
+                                    NAME: 'aux'
+                                  },
+                                  inputs: {
+                                    VALUE: {
+                                      block: {
+                                        type: 'mj_expr_method_call',
+                                        fields: {
+                                          METHOD: 'Init'
+                                        },
+                                        inputs: {
+                                          OBJECT: {
+                                            block: {
+                                              type: 'mj_expr_identifier',
+                                              fields: {
+                                                NAME: 's'
+                                              }
+                                            }
+                                          },
+                                          ARGS: {
+                                            block: {
+                                              type: 'mj_argument_item',
+                                              inputs: {
+                                                EXPR: {
+                                                  block: {
+                                                    type: 'mj_expr_integer',
+                                                    fields: {
+                                                      VALUE: 5
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  next: {
+                                    block: {
+                                      type: 'mj_statement_assign',
+                                      fields: {
+                                        NAME: 'aux'
+                                      },
+                                      inputs: {
+                                        VALUE: {
+                                          block: {
+                                            type: 'mj_expr_method_call',
+                                            fields: {
+                                              METHOD: 'Push'
+                                            },
+                                            inputs: {
+                                              OBJECT: {
+                                                block: {
+                                                  type: 'mj_expr_identifier',
+                                                  fields: {
+                                                    NAME: 's'
+                                                  }
+                                                }
+                                              },
+                                              ARGS: {
+                                                block: {
+                                                  type: 'mj_argument_item',
+                                                  inputs: {
+                                                    EXPR: {
+                                                      block: {
+                                                        type: 'mj_expr_integer',
+                                                        fields: {
+                                                          VALUE: 10
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      next: {
+                                        block: {
+                                          type: 'mj_statement_assign',
+                                          fields: {
+                                            NAME: 'aux'
+                                          },
+                                          inputs: {
+                                            VALUE: {
+                                              block: {
+                                                type: 'mj_expr_method_call',
+                                                fields: {
+                                                  METHOD: 'Push'
+                                                },
+                                                inputs: {
+                                                  OBJECT: {
+                                                    block: {
+                                                      type: 'mj_expr_identifier',
+                                                      fields: {
+                                                        NAME: 's'
+                                                      }
+                                                    }
+                                                  },
+                                                  ARGS: {
+                                                    block: {
+                                                      type: 'mj_argument_item',
+                                                      inputs: {
+                                                        EXPR: {
+                                                          block: {
+                                                            type: 'mj_expr_integer',
+                                                            fields: {
+                                                              VALUE: 20
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          },
+                                          next: {
+                                            block: {
+                                              type: 'mj_statement_assign',
+                                              fields: {
+                                                NAME: 'aux'
+                                              },
+                                              inputs: {
+                                                VALUE: {
+                                                  block: {
+                                                    type: 'mj_expr_method_call',
+                                                    fields: {
+                                                      METHOD: 'Push'
+                                                    },
+                                                    inputs: {
+                                                      OBJECT: {
+                                                        block: {
+                                                          type: 'mj_expr_identifier',
+                                                          fields: {
+                                                            NAME: 's'
+                                                          }
+                                                        }
+                                                      },
+                                                      ARGS: {
+                                                        block: {
+                                                          type: 'mj_argument_item',
+                                                          inputs: {
+                                                            EXPR: {
+                                                              block: {
+                                                                type: 'mj_expr_integer',
+                                                                fields: {
+                                                                  VALUE: 30
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              },
+                                              next: {
+                                                block: {
+                                                  type: 'mj_statement_print',
+                                                  inputs: {
+                                                    VALUE: {
+                                                      block: {
+                                                        type: 'mj_expr_method_call',
+                                                        fields: {
+                                                          METHOD: 'Pop'
+                                                        },
+                                                        inputs: {
+                                                          OBJECT: {
+                                                            block: {
+                                                              type: 'mj_expr_identifier',
+                                                              fields: {
+                                                                NAME: 's'
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  },
+                                                  next: {
+                                                    block: {
+                                                      type: 'mj_statement_print',
+                                                      inputs: {
+                                                        VALUE: {
+                                                          block: {
+                                                            type: 'mj_expr_method_call',
+                                                            fields: {
+                                                              METHOD: 'Pop'
+                                                            },
+                                                            inputs: {
+                                                              OBJECT: {
+                                                                block: {
+                                                                  type: 'mj_expr_identifier',
+                                                                  fields: {
+                                                                    NAME: 's'
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      },
+                                                      next: {
+                                                        block: {
+                                                          type: 'mj_statement_print',
+                                                          inputs: {
+                                                            VALUE: {
+                                                              block: {
+                                                                type: 'mj_expr_method_call',
+                                                                fields: {
+                                                                  METHOD: 'Pop'
+                                                                },
+                                                                inputs: {
+                                                                  OBJECT: {
+                                                                    block: {
+                                                                      type: 'mj_expr_identifier',
+                                                                      fields: {
+                                                                        NAME: 's'
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          },
+                                                          next: {
+                                                            block: {
+                                                              type: 'mj_statement_print',
+                                                              inputs: {
+                                                                VALUE: {
+                                                                  block: {
+                                                                    type: 'mj_expr_method_call',
+                                                                    fields: {
+                                                                      METHOD: 'Pop'
+                                                                    },
+                                                                    inputs: {
+                                                                      OBJECT: {
+                                                                        block: {
+                                                                          type: 'mj_expr_identifier',
+                                                                          fields: {
+                                                                            NAME: 's'
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          RETURN: {
+                            block: {
+                              type: 'mj_expr_integer',
+                              fields: {
+                                VALUE: 0
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  next: {
+                    block: {
+                      type: 'mj_class_declaration',
+                      fields: {
+                        CLASS: 'Stack',
+                        HAS_EXTENDS: 'FALSE'
+                      },
+                      inputs: {
+                        VARS: {
+                          block: {
+                            type: 'mj_var_declaration',
+                            fields: {
+                              NAME: 'data'
+                            },
+                            inputs: {
+                              TYPE: {
+                                block: {
+                                  type: 'mj_type_int_array'
+                                }
+                              }
+                            },
+                            next: {
+                              block: {
+                                type: 'mj_var_declaration',
+                                fields: {
+                                  NAME: 'capacity'
+                                },
+                                inputs: {
+                                  TYPE: {
+                                    block: {
+                                      type: 'mj_type_int'
+                                    }
+                                  }
+                                },
+                                next: {
+                                  block: {
+                                    type: 'mj_var_declaration',
+                                    fields: {
+                                      NAME: 'top'
+                                    },
+                                    inputs: {
+                                      TYPE: {
+                                        block: {
+                                          type: 'mj_type_int'
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        METHODS: {
+                          block: {
+                            type: 'mj_method_declaration',
+                            fields: {
+                              NAME: 'Init'
+                            },
+                            inputs: {
+                              TYPE: {
+                                block: {
+                                  type: 'mj_type_int'
+                                }
+                              },
+                              PARAMS: {
+                                block: {
+                                  type: 'mj_formal_parameter',
+                                  fields: {
+                                    NAME: 'cap'
+                                  },
+                                  inputs: {
+                                    TYPE: {
+                                      block: {
+                                        type: 'mj_type_int'
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              BODY: {
+                                block: {
+                                  type: 'mj_statement_assign',
+                                  fields: {
+                                    NAME: 'capacity'
+                                  },
+                                  inputs: {
+                                    VALUE: {
+                                      block: {
+                                        type: 'mj_expr_identifier',
+                                        fields: {
+                                          NAME: 'cap'
+                                        }
+                                      }
+                                    }
+                                  },
+                                  next: {
+                                    block: {
+                                      type: 'mj_statement_assign',
+                                      fields: {
+                                        NAME: 'data'
+                                      },
+                                      inputs: {
+                                        VALUE: {
+                                          block: {
+                                            type: 'mj_expr_new_int_array',
+                                            inputs: {
+                                              SIZE: {
+                                                block: {
+                                                  type: 'mj_expr_identifier',
+                                                  fields: {
+                                                    NAME: 'cap'
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      next: {
+                                        block: {
+                                          type: 'mj_statement_assign',
+                                          fields: {
+                                            NAME: 'top'
+                                          },
+                                          inputs: {
+                                            VALUE: {
+                                              block: {
+                                                type: 'mj_expr_integer',
+                                                fields: {
+                                                  VALUE: 0
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              RETURN: {
+                                block: {
+                                  type: 'mj_expr_integer',
+                                  fields: {
+                                    VALUE: 0
+                                  }
+                                }
+                              }
+                            },
+                            next: {
+                              block: {
+                                type: 'mj_method_declaration',
+                                fields: {
+                                  NAME: 'Push'
+                                },
+                                inputs: {
+                                  TYPE: {
+                                    block: {
+                                      type: 'mj_type_int'
+                                    }
+                                  },
+                                  PARAMS: {
+                                    block: {
+                                      type: 'mj_formal_parameter',
+                                      fields: {
+                                        NAME: 'val'
+                                      },
+                                      inputs: {
+                                        TYPE: {
+                                          block: {
+                                            type: 'mj_type_int'
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  VARS: {
+                                    block: {
+                                      type: 'mj_var_declaration',
+                                      fields: {
+                                        NAME: 'result'
+                                      },
+                                      inputs: {
+                                        TYPE: {
+                                          block: {
+                                            type: 'mj_type_int'
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  BODY: {
+                                    block: {
+                                      type: 'mj_statement_if',
+                                      inputs: {
+                                        COND: {
+                                          block: {
+                                            type: 'mj_expr_compare',
+                                            fields: {
+                                              OP: '<'
+                                            },
+                                            inputs: {
+                                              LEFT: {
+                                                block: {
+                                                  type: 'mj_expr_identifier',
+                                                  fields: {
+                                                    NAME: 'capacity'
+                                                  }
+                                                }
+                                              },
+                                              RIGHT: {
+                                                block: {
+                                                  type: 'mj_expr_arith',
+                                                  fields: {
+                                                    OP: '+'
+                                                  },
+                                                  inputs: {
+                                                    LEFT: {
+                                                      block: {
+                                                        type: 'mj_expr_identifier',
+                                                        fields: {
+                                                          NAME: 'top'
+                                                        }
+                                                      }
+                                                    },
+                                                    RIGHT: {
+                                                      block: {
+                                                        type: 'mj_expr_integer',
+                                                        fields: {
+                                                          VALUE: 1
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        THEN: {
+                                          block: {
+                                            type: 'mj_statement_print',
+                                            inputs: {
+                                              VALUE: {
+                                                block: {
+                                                  type: 'mj_expr_integer',
+                                                  fields: {
+                                                    VALUE: 8888
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            next: {
+                                              block: {
+                                                type: 'mj_statement_assign',
+                                                fields: {
+                                                  NAME: 'result'
+                                                },
+                                                inputs: {
+                                                  VALUE: {
+                                                    block: {
+                                                      type: 'mj_expr_integer',
+                                                      fields: {
+                                                        VALUE: 0
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        ELSE: {
+                                          block: {
+                                            type: 'mj_statement_array_assign',
+                                            fields: {
+                                              NAME: 'data'
+                                            },
+                                            inputs: {
+                                              INDEX: {
+                                                block: {
+                                                  type: 'mj_expr_identifier',
+                                                  fields: {
+                                                    NAME: 'top'
+                                                  }
+                                                }
+                                              },
+                                              VALUE: {
+                                                block: {
+                                                  type: 'mj_expr_identifier',
+                                                  fields: {
+                                                    NAME: 'val'
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            next: {
+                                              block: {
+                                                type: 'mj_statement_assign',
+                                                fields: {
+                                                  NAME: 'top'
+                                                },
+                                                inputs: {
+                                                  VALUE: {
+                                                    block: {
+                                                      type: 'mj_expr_arith',
+                                                      fields: {
+                                                        OP: '+'
+                                                      },
+                                                      inputs: {
+                                                        LEFT: {
+                                                          block: {
+                                                            type: 'mj_expr_identifier',
+                                                            fields: {
+                                                              NAME: 'top'
+                                                            }
+                                                          }
+                                                        },
+                                                        RIGHT: {
+                                                          block: {
+                                                            type: 'mj_expr_integer',
+                                                            fields: {
+                                                              VALUE: 1
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                next: {
+                                                  block: {
+                                                    type: 'mj_statement_assign',
+                                                    fields: {
+                                                      NAME: 'result'
+                                                    },
+                                                    inputs: {
+                                                      VALUE: {
+                                                        block: {
+                                                          type: 'mj_expr_integer',
+                                                          fields: {
+                                                            VALUE: 1
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  RETURN: {
+                                    block: {
+                                      type: 'mj_expr_identifier',
+                                      fields: {
+                                        NAME: 'result'
+                                      }
+                                    }
+                                  }
+                                },
+                                next: {
+                                  block: {
+                                    type: 'mj_method_declaration',
+                                    fields: {
+                                      NAME: 'Pop'
+                                    },
+                                    inputs: {
+                                      TYPE: {
+                                        block: {
+                                          type: 'mj_type_int'
+                                        }
+                                      },
+                                      VARS: {
+                                        block: {
+                                          type: 'mj_var_declaration',
+                                          fields: {
+                                            NAME: 'val'
+                                          },
+                                          inputs: {
+                                            TYPE: {
+                                              block: {
+                                                type: 'mj_type_int'
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      BODY: {
+                                        block: {
+                                          type: 'mj_statement_if',
+                                          inputs: {
+                                            COND: {
+                                              block: {
+                                                type: 'mj_expr_compare',
+                                                fields: {
+                                                  OP: '<'
+                                                },
+                                                inputs: {
+                                                  LEFT: {
+                                                    block: {
+                                                      type: 'mj_expr_identifier',
+                                                      fields: {
+                                                        NAME: 'top'
+                                                      }
+                                                    }
+                                                  },
+                                                  RIGHT: {
+                                                    block: {
+                                                      type: 'mj_expr_integer',
+                                                      fields: {
+                                                        VALUE: 1
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            THEN: {
+                                              block: {
+                                                type: 'mj_statement_print',
+                                                inputs: {
+                                                  VALUE: {
+                                                    block: {
+                                                      type: 'mj_expr_integer',
+                                                      fields: {
+                                                        VALUE: 9999
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                next: {
+                                                  block: {
+                                                    type: 'mj_statement_assign',
+                                                    fields: {
+                                                      NAME: 'val'
+                                                    },
+                                                    inputs: {
+                                                      VALUE: {
+                                                        block: {
+                                                          type: 'mj_expr_arith',
+                                                          fields: {
+                                                            OP: '-'
+                                                          },
+                                                          inputs: {
+                                                            LEFT: {
+                                                              block: {
+                                                                type: 'mj_expr_integer',
+                                                                fields: {
+                                                                  VALUE: 0
+                                                                }
+                                                              }
+                                                            },
+                                                            RIGHT: {
+                                                              block: {
+                                                                type: 'mj_expr_integer',
+                                                                fields: {
+                                                                  VALUE: 1
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            ELSE: {
+                                              block: {
+                                                type: 'mj_statement_assign',
+                                                fields: {
+                                                  NAME: 'top'
+                                                },
+                                                inputs: {
+                                                  VALUE: {
+                                                    block: {
+                                                      type: 'mj_expr_arith',
+                                                      fields: {
+                                                        OP: '-'
+                                                      },
+                                                      inputs: {
+                                                        LEFT: {
+                                                          block: {
+                                                            type: 'mj_expr_identifier',
+                                                            fields: {
+                                                              NAME: 'top'
+                                                            }
+                                                          }
+                                                        },
+                                                        RIGHT: {
+                                                          block: {
+                                                            type: 'mj_expr_integer',
+                                                            fields: {
+                                                              VALUE: 1
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                next: {
+                                                  block: {
+                                                    type: 'mj_statement_assign',
+                                                    fields: {
+                                                      NAME: 'val'
+                                                    },
+                                                    inputs: {
+                                                      VALUE: {
+                                                        block: {
+                                                          type: 'mj_expr_array_lookup',
+                                                          inputs: {
+                                                            ARRAY: {
+                                                              block: {
+                                                                type: 'mj_expr_identifier',
+                                                                fields: {
+                                                                  NAME: 'data'
+                                                                }
+                                                              }
+                                                            },
+                                                            INDEX: {
+                                                              block: {
+                                                                type: 'mj_expr_identifier',
+                                                                fields: {
+                                                                  NAME: 'top'
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      RETURN: {
+                                        block: {
+                                          type: 'mj_expr_identifier',
+                                          fields: {
+                                            NAME: 'val'
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
     id: 'aliasing-contrast',
     label: 'Aliasing Contrast (A vs B)',
     description: 'Two aliases, one field write: heap references print 4141, inline structures print 41 — load it in the A vs B tab',

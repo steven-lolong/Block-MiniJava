@@ -424,6 +424,64 @@ const BINARY_SEARCH = [
   '}'
 ].join('\n');
 
+/** The Stack example: state lives in a SEPARATE object, not in `this`. */
+const STACK = [
+  inMain('System.out.println(new StackTest().Run());'),
+  'class StackTest {',
+  '  public int Run() {',
+  '    Stack s;',
+  '    int aux;',
+  '    s = new Stack();',
+  '    aux = s.Init(5);',
+  '    aux = s.Push(10);',
+  '    aux = s.Push(20);',
+  '    aux = s.Push(30);',
+  '    System.out.println(s.Pop());',
+  '    System.out.println(s.Pop());',
+  '    System.out.println(s.Pop());',
+  '    System.out.println(s.Pop());',
+  '    return 0;',
+  '  }',
+  '}',
+  'class Stack {',
+  '  int[] data;',
+  '  int capacity;',
+  '  int top;',
+  '',
+  '  public int Init(int cap) {',
+  '    capacity = cap;',
+  '    data = new int[cap];',
+  '    top = 0;',
+  '    return 0;',
+  '  }',
+  '',
+  '  public int Push(int val) {',
+  '    int result;',
+  '    if (capacity < (top + 1)) {',
+  '      System.out.println(8888);',
+  '      result = 0;',
+  '    } else {',
+  '      data[top] = val;',
+  '      top = top + 1;',
+  '      result = 1;',
+  '    }',
+  '    return result;',
+  '  }',
+  '',
+  '  public int Pop() {',
+  '    int val;',
+  '    if (top < 1) {',
+  '      System.out.println(9999);',
+  '      val = 0 - 1;',
+  '    } else {',
+  '      top = top - 1;',
+  '      val = data[top];',
+  '    }',
+  '    return val;',
+  '  }',
+  '}'
+].join('\n');
+
 /** The Sieve example: Init both ALLOCATES and fills the array. */
 const SIEVE = [
   inMain('System.out.println(new Sieve().FindPrimes(30));'),
@@ -662,6 +720,29 @@ const SHAPES = [
 ].join('\n');
 
 const MODEL_CASES = [
+  [
+    // LIFO: 30, 20, 10. The fourth pop underflows, printing the guard code
+    // 9999 and returning 0 - 1. Then Run's 0.
+    'stack under Model A: LIFO order, then the underflow guard',
+    STACK,
+    'A',
+    { output: ['30', '20', '10', '9999', '-1', '0'], rulesInclude: ['field-write', 'array-write', 'array-read'] }
+  ],
+  [
+    // The contrast reaches a SEPARATE object, not just `this`: passing the
+    // receiver copies it structurally, so Init's capacity/data/top never
+    // reach Run's `s`. capacity stays 0, so every Push overflows (8888) and
+    // every Pop underflows (9999, -1). The failure is neither silent nor a
+    // crash here — the stack's OWN guards report it, because a zero-capacity
+    // stack is a perfectly consistent stack.
+    'stack under Model B: the lost Init makes every guard fire',
+    STACK,
+    'B',
+    {
+      output: ['8888', '8888', '8888', '9999', '-1', '9999', '-1', '9999', '-1', '9999', '-1', '0'],
+      heapSize: 0
+    }
+  ],
   [
     'sieve under Model A: every prime below 30',
     SIEVE,

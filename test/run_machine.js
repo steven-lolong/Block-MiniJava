@@ -424,6 +424,68 @@ const BINARY_SEARCH = [
   '}'
 ].join('\n');
 
+/**
+ * The Palindrome example: two pointers over an int[], equality tested with
+ * only `<` (MiniJava has no == / !=). Run writes the fields itself and hands
+ * them DOWN to the callee, which is why — unlike binary search and shapes —
+ * it agrees under both value models.
+ */
+const PALINDROME = [
+  inMain('System.out.println(new PalCheck().Run());'),
+  'class PalCheck {',
+  '  int[] arr;',
+  '  int size;',
+  '',
+  '  public int Run() {',
+  '    int aux;',
+  '    int isPal;',
+  '    size = 5;',
+  '    arr = new int[size];',
+  '    arr[0] = 1;',
+  '    arr[1] = 2;',
+  '    arr[2] = 3;',
+  '    arr[3] = 2;',
+  '    arr[4] = 1;',
+  '    isPal = this.CheckPalindrome();',
+  '    System.out.println(isPal);',
+  '    arr[3] = 9;',
+  '    isPal = this.CheckPalindrome();',
+  '    System.out.println(isPal);',
+  '    return 0;',
+  '  }',
+  '',
+  '  public int CheckPalindrome() {',
+  '    int start;',
+  '    int end;',
+  '    int result;',
+  '    boolean keepGoing;',
+  '    start = 0;',
+  '    end = size - 1;',
+  '    result = 1;',
+  '    keepGoing = true;',
+  '    while (keepGoing) {',
+  '      if (end < start) {',
+  '        keepGoing = false;',
+  '      } else {',
+  '        if (arr[start] < arr[end]) {',
+  '          result = 0;',
+  '          keepGoing = false;',
+  '        } else {',
+  '          if (arr[end] < arr[start]) {',
+  '            result = 0;',
+  '            keepGoing = false;',
+  '          } else {',
+  '            start = start + 1;',
+  '            end = end - 1;',
+  '          }',
+  '        }',
+  '      }',
+  '    }',
+  '    return result;',
+  '  }',
+  '}'
+].join('\n');
+
 /** The Shapes example: inheritance, an override, and dynamic dispatch. */
 const SHAPES = [
   inMain('System.out.println(new Setup().Run());'),
@@ -480,6 +542,25 @@ const SHAPES = [
 ].join('\n');
 
 const MODEL_CASES = [
+  [
+    // [1,2,3,2,1] is a palindrome (1); after arr[3] = 9 it is not (0); Run
+    // returns 0. Model A mutates the heap array through the reference.
+    'palindrome under Model A',
+    PALINDROME,
+    'A',
+    { output: ['1', '0', '0'], rulesInclude: ['array-read', 'array-write', 'field-read'] }
+  ],
+  [
+    // The direction that SURVIVES call-by-structure: Run writes its own copy
+    // of `this` and passes it down, so the callee sees the data and Model B
+    // agrees with Model A. (Binary search and shapes go the other way — the
+    // callee writes for the caller — and diverge.) Model B rebuilds the array
+    // on every write (array-update) instead of mutating a heap cell.
+    'palindrome under Model B: caller-to-callee state survives call-by-structure',
+    PALINDROME,
+    'B',
+    { output: ['1', '0', '0'], heapSize: 0, rulesInclude: ['array-update'], rulesExclude: ['array-write', 'field-write'] }
+  ],
   [
     // The dispatch proof: s1 is a real Shape (GetArea -> 0), s2 is a Rectangle
     // held in a Shape variable, so lookup starts at the RECEIVER's class and

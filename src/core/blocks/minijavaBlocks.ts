@@ -156,12 +156,13 @@ export function defineMiniJavaBlocks(): void {
   Blockly.common.defineBlocksWithJsonArray([
     {
       type: 'mj_goal',
-      message0: 'Program %1 Main Class %2 Class %3',
+      message0: 'Program %1 Main Class %2 Class%3',
       args0: [
         { type: 'input_dummy' },
         { type: 'input_value', name: 'MAIN', check: 'MainClass' },
         { type: 'input_statement', name: 'CLASSES', check: 'ClassDeclaration' }
       ],
+      inputsInline: false,
       style: miniJavaBlockStyle('mj_goal'),
       tooltip: 'Goal ::= MainClass Class Declaration* EOF',
       helpUrl: ''
@@ -452,13 +453,11 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_expr_method_call',
-      message0: 'call %1 object %2 %3 method %4 %5 arguments %6',
+      message0: 'call method %1 %2 in object %3  arguments %4',
       args0: [
-        { type: 'input_dummy' },
-        { type: 'input_value', name: 'OBJECT', check: 'Expression' },
-        { type: 'input_dummy' },
         { type: 'field_input', name: 'METHOD', text: 'name' },
         { type: 'input_dummy' },
+        { type: 'input_value', name: 'OBJECT', check: 'Expression', align: 'RIGHT' },
         { type: 'input_statement', name: 'ARGS', check: 'ExpressionArg' }
       ],
       output: 'Expression',

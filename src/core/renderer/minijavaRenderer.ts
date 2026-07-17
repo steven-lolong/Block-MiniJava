@@ -264,9 +264,39 @@ class MiniJavaConstantProvider extends Blockly.blockRendering.ConstantProvider {
   }
 }
 
+/**
+ * Thrasos centers field labels in the full row height by default. Ported from
+ * the Kolintang renderer (Block-based-MNL): field/icon elements are anchored
+ * to the top of their row instead, so a label stays flush with the top edge
+ * even when the row is tall (e.g. because of an inline or statement input).
+ */
+class MiniJavaRenderInfo extends Blockly.thrasos.RenderInfo {
+  override getElemCenterline_(
+    row: Blockly.blockRendering.Row,
+    elem: Blockly.blockRendering.Measurable
+  ): number {
+    const Types = Blockly.blockRendering.Types;
+    if (Types.isField(elem) || Types.isIcon(elem)) {
+      let result = row.yPos + elem.height / 2;
+      if (
+        (row.hasInlineInput || row.hasStatement) &&
+        elem.height + this.constants_.TALL_INPUT_FIELD_OFFSET_Y <= row.height
+      ) {
+        result += this.constants_.TALL_INPUT_FIELD_OFFSET_Y;
+      }
+      return result;
+    }
+    return super.getElemCenterline_(row, elem);
+  }
+}
+
 class MiniJavaRenderer extends Blockly.thrasos.Renderer {
   override makeConstants_(): Blockly.blockRendering.ConstantProvider {
     return new MiniJavaConstantProvider();
+  }
+
+  override makeRenderInfo_(block: Blockly.BlockSvg): MiniJavaRenderInfo {
+    return new MiniJavaRenderInfo(this, block);
   }
 }
 

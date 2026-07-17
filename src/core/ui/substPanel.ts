@@ -58,7 +58,9 @@ function ensureWorkspace(): Blockly.WorkspaceSvg {
     trashcan: false,
     readOnly: true,
     grid: { spacing: 20, length: 3, snap: false },
-    move: { scrollbars: { horizontal: true, vertical: true }, drag: true, wheel: false },
+    // Same wheel behavior as the main workspace: plain wheel scrolls,
+    // ctrl+wheel zooms.
+    move: { scrollbars: { horizontal: true, vertical: true }, drag: true, wheel: true },
     zoom: { controls: true, wheel: true, startScale: 0.9, maxScale: 2.5, minScale: 0.3, scaleSpeed: 1.2, pinch: true }
   });
   return workspace;

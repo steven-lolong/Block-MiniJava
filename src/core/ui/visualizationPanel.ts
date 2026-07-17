@@ -84,7 +84,10 @@ function injectVisualizationWorkspace(host: HTMLElement): Blockly.WorkspaceSvg {
     collapse: true,
     disable: true,
     grid: { spacing: 20, length: 3, snap: true },
-    move: { scrollbars: { horizontal: true, vertical: true }, drag: true, wheel: false },
+    // Same wheel behavior as the main workspace: with BOTH wheels enabled,
+    // Blockly scrolls on plain wheel and zooms on ctrl+wheel. (move.wheel
+    // false made the plain wheel zoom in these tabs.)
+    move: { scrollbars: { horizontal: true, vertical: true }, drag: true, wheel: true },
     zoom: { controls: true, wheel: true, startScale: 1, maxScale: 3, minScale: 0.3, scaleSpeed: 1.2, pinch: true }
   });
 }

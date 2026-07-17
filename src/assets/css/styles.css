@@ -244,6 +244,22 @@ button {
   padding: 0;
 }
 
+/* The modal's default action (e.g. Replace when loading an example): filled
+   with the IDE accent so the autofocused choice is visibly the primary one.
+   Doubled class keeps it above the generic .menu-button:hover rule below. */
+.menu-button.menu-button-primary {
+  background: var(--ide-accent);
+  border-color: var(--ide-accent);
+  color: var(--bg);
+}
+
+.menu-button.menu-button-primary:hover,
+.menu-button.menu-button-primary:focus-visible {
+  background: var(--aquamarine-strong);
+  border-color: var(--aquamarine-strong);
+  color: var(--bg);
+}
+
 .menu-button:hover,
 .icon-button:hover,
 .zoom-pill:hover,

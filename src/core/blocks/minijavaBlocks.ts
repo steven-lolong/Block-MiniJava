@@ -452,11 +452,13 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_expr_method_call',
-      message0: 'method call %1 object name %2 method %3 arguments %4',
+      message0: 'call %1 object %2 %3 method %4 %5 arguments %6',
       args0: [
         { type: 'input_dummy' },
         { type: 'input_value', name: 'OBJECT', check: 'Expression' },
+        { type: 'input_dummy' },
         { type: 'field_input', name: 'METHOD', text: 'name' },
+        { type: 'input_dummy' },
         { type: 'input_statement', name: 'ARGS', check: 'ExpressionArg' }
       ],
       output: 'Expression',
@@ -497,7 +499,7 @@ export function defineMiniJavaBlocks(): void {
     {
       // One boolean literal; true/false is a dropdown selection.
       type: 'mj_expr_boolean',
-      message0: 'boolean %1',
+      message0: 'bool %1',
       args0: [{ type: 'field_dropdown', name: 'VALUE', options: [['true', 'true'], ['false', 'false']] }],
       output: 'Expression',
       style: miniJavaBlockStyle('mj_expr_boolean'),
@@ -532,7 +534,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_expr_new_object',
-      message0: 'new %1 ( )',
+      message0: 'new object %1',
       args0: [{ type: 'field_input', name: 'CLASS', text: 'ClassName' }],
       output: 'Expression',
       style: miniJavaBlockStyle('mj_expr_new_object'),
@@ -541,7 +543,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_expr_not',
-      message0: '! %1',
+      message0: 'not %1',
       args0: [{ type: 'input_value', name: 'EXPR', check: 'Expression' }],
       output: 'Expression',
       style: miniJavaBlockStyle('mj_expr_not'),
@@ -550,7 +552,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_expr_parens',
-      message0: '( %1 )',
+      message0: 'parentheses  %1',
       args0: [{ type: 'input_value', name: 'EXPR', check: 'Expression' }],
       output: 'Expression',
       style: miniJavaBlockStyle('mj_expr_parens'),

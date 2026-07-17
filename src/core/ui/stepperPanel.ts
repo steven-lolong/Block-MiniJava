@@ -101,7 +101,11 @@ function setHighlight(blockId: string | null): void {
     (workspace.getBlockById(highlightedBlockId) as Blockly.BlockSvg | null)?.setHighlighted(false);
   }
   if (blockId) {
-    (workspace.getBlockById(blockId) as Blockly.BlockSvg | null)?.setHighlighted(true);
+    const block = workspace.getBlockById(blockId) as Blockly.BlockSvg | null;
+    if (block) {
+      block.setHighlighted(true);
+      workspace.centerOnBlock?.(blockId);
+    }
   }
   highlightedBlockId = blockId;
 }

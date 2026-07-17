@@ -2,7 +2,8 @@
 
 - You are a senior Blockly and TypeScript developer
 - Target: keep this language stable, user-friendly, and easy to use.
-- The bnf is from: https://courses.cs.washington.edu/courses/cse401/22au/project/BNF-for-MiniJava.html
+- The original BNF is in the file Minijava-BNF.md
+- The adjusted BNF is in the file Minijava-Adjusted-BNF.md
 - The design document is `block-minijava-value-and-visualisation-design.md`; its artifacts
   (type system §1, Model A stepper §6, substitution rewriter + correspondence §7, A/B
   lockstep §8) are implemented — see the README's "Type system" and "Semantics & steppers"

@@ -1192,6 +1192,16 @@ body.code-hidden .code-column {
   margin: 0;
   padding: 0 18px 18px;
 }
+.about-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0 18px 18px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
 
 .blocklyZoom > image,
 .blocklyScrollbarHandle,

@@ -156,9 +156,8 @@ export function defineMiniJavaBlocks(): void {
   Blockly.common.defineBlocksWithJsonArray([
     {
       type: 'mj_goal',
-      message0: 'Program %1 Main Class %2 Class%3',
+      message0: 'Goal %1 Class%2',
       args0: [
-        { type: 'input_dummy' },
         { type: 'input_value', name: 'MAIN', check: 'MainClass' },
         { type: 'input_statement', name: 'CLASSES', check: 'ClassDeclaration' }
       ],
@@ -169,9 +168,10 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_main_class',
-      message0: 'class %1, method main %2 %3 %4',
+      message0: 'class %1 %2 public static void main ( String [] %3 ) %4 %5',
       args0: [
         { type: 'field_input', name: 'CLASS', text: 'MainClassName' },
+        { type: 'input_dummy' },
         { type: 'field_input', name: 'ARG', text: 'args' },
         { type: 'input_dummy' },
         { type: 'input_statement', name: 'STATEMENT', check: 'Statement' }
@@ -183,10 +183,10 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_var_declaration',
-      message0: 'variable type %1 name %2',
+      message0: 'type %1 name %2',
       args0: [
         { type: 'input_value', name: 'TYPE', check: 'Type' },
-        { type: 'field_input', name: 'NAME', text: 'x' }
+        { type: 'field_input', name: 'NAME', text: 'variable' }
       ],
       previousStatement: 'VarDeclaration',
       nextStatement: 'VarDeclaration',
@@ -196,7 +196,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_method_declaration',
-      message0: 'public method type %1 name %2 %3 parameters %4 %5 variables %6 body %7 return value %8',
+      message0: 'public type %1 name %2 %3 parameters %4 %5 variables %6 body %7 return value %8',
       args0: [
         { type: 'input_value', name: 'TYPE', check: 'Type' },
         { type: 'field_input', name: 'NAME', text: 'method' },
@@ -215,10 +215,10 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_formal_parameter',
-      message0: 'parameter type %1 name %2',
+      message0: 'type %1 name %2',
       args0: [
         { type: 'input_value', name: 'TYPE', check: 'Type' },
-        { type: 'field_input', name: 'NAME', text: 'name' }
+        { type: 'field_input', name: 'NAME', text: 'parameter' }
       ],
       previousStatement: 'FormalParameter',
       nextStatement: 'FormalParameter',
@@ -228,7 +228,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_type_int_array',
-      message0: 'int array',
+      message0: 'int [ ]',
       output: 'Type',
       style: miniJavaBlockStyle('mj_type_int_array'),
       tooltip: 'Type ::= int[]',
@@ -244,7 +244,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_type_int',
-      message0: 'integer',
+      message0: 'int',
       output: 'Type',
       style: miniJavaBlockStyle('mj_type_int'),
       tooltip: 'Type ::= int',
@@ -293,7 +293,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_statement_while',
-      message0: 'while %1 %2',
+      message0: 'while %1 do %2',
       args0: [
         { type: 'input_value', name: 'COND', check: 'Expression' },
         { type: 'input_statement', name: 'BODY', check: 'Statement' }
@@ -306,7 +306,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_statement_print',
-      message0: 'println %1',
+      message0: 'System.out.println %1',
       args0: [{ type: 'input_value', name: 'VALUE', check: 'Expression' }],
       previousStatement: 'Statement',
       nextStatement: 'Statement',
@@ -334,8 +334,8 @@ export function defineMiniJavaBlocks(): void {
         { type: 'input_dummy'},
         { type: 'field_input', name: 'NAME', text: 'array' },
         { type: 'input_dummy' },
-        { type: 'input_value', name: 'INDEX', check: 'Expression' },
-        { type: 'input_value', name: 'VALUE', check: 'Expression' }
+        { type: 'input_value', name: 'INDEX', check: 'Expression', align: 'RIGHT' },
+        { type: 'input_value', name: 'VALUE', check: 'Expression', align: 'RIGHT' }
       ],
       previousStatement: 'Statement',
       nextStatement: 'Statement',
@@ -405,7 +405,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_expr_array_length',
-      message0: 'array %1 length',
+      message0: 'array length %1',
       args0: [{ type: 'input_value', name: 'ARRAY', check: 'Expression' }],
       output: 'Expression',
       style: miniJavaBlockStyle('mj_expr_array_length'),
@@ -428,7 +428,7 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_expr_concat',
-      message0: 'string %1 . concat ( %2 )',
+      message0: 'string %1 concat %2 )',
       args0: [
         { type: 'input_value', name: 'LEFT', check: 'Expression' },
         { type: 'input_value', name: 'RIGHT', check: 'Expression' }
@@ -443,7 +443,7 @@ export function defineMiniJavaBlocks(): void {
       // String length is `s.length()` WITH parens (as in Java), while array
       // length is `a.length` without — the text forms stay distinguishable.
       type: 'mj_expr_str_length',
-      message0: 'string %1 . length ( )',
+      message0: 'string length %1',
       args0: [{ type: 'input_value', name: 'STR', check: 'Expression' }],
       inputsInline: true,
       output: 'Expression',
@@ -498,7 +498,7 @@ export function defineMiniJavaBlocks(): void {
     {
       // One boolean literal; true/false is a dropdown selection.
       type: 'mj_expr_boolean',
-      message0: 'bool %1',
+      message0: 'boolean %1',
       args0: [{ type: 'field_dropdown', name: 'VALUE', options: [['true', 'true'], ['false', 'false']] }],
       output: 'Expression',
       style: miniJavaBlockStyle('mj_expr_boolean'),
@@ -507,8 +507,8 @@ export function defineMiniJavaBlocks(): void {
     },
     {
       type: 'mj_expr_identifier',
-      message0: 'identifier %1',
-      args0: [{ type: 'field_input', name: 'NAME', text: 'x' }],
+      message0: 'id %1',
+      args0: [{ type: 'field_input', name: 'NAME', text: 'identifier' }],
       output: 'Expression',
       style: miniJavaBlockStyle('mj_expr_identifier'),
       tooltip: 'Expression ::= Identifier',

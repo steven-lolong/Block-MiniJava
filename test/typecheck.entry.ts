@@ -9,7 +9,7 @@
 import * as Blockly from 'blockly';
 import { defineMiniJavaBlocks } from '../src/core/blocks/minijavaBlocks';
 import { parseMiniJavaTextToWorkspaceState } from '../src/core/parser/minijavaTextParser';
-import { checkWorkspace } from '../src/core/types/typeChecker';
+import { checkWorkspace, deriveProgram, type MethodDerivation } from '../src/core/types/typeChecker';
 
 defineMiniJavaBlocks();
 
@@ -52,4 +52,10 @@ export function checkSourceWithoutTypeOn(source: string, ownerBlockType: string)
   });
 }
 
-export { Blockly, checkWorkspace, parseMiniJavaTextToWorkspaceState };
+/** Derives the typing forest for MiniJava source (text -> blocks -> derivations). */
+export function deriveSource(source: string): MethodDerivation[] {
+  return withWorkspace(source, (workspace) => deriveProgram(workspace));
+}
+
+export { Blockly, checkWorkspace, deriveProgram, parseMiniJavaTextToWorkspaceState };
+export type { MethodDerivation };

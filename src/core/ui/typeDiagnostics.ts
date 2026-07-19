@@ -33,7 +33,8 @@ function applyBlockWarnings(workspace: Blockly.WorkspaceSvg, diags: TypeDiagnost
   markedBlockIds = new Set(grouped.keys());
 }
 
-function locateBlock(workspace: Blockly.WorkspaceSvg, blockId: string): void {
+/** Centers and selects a block (also used by the Typing tab's judgements). */
+export function locateBlock(workspace: Blockly.WorkspaceSvg, blockId: string): void {
   const block = workspace.getBlockById(blockId) as Blockly.BlockSvg | null;
   if (!block) return;
   workspace.centerOnBlock(blockId);

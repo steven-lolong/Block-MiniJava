@@ -19,6 +19,7 @@ import { initExamplesMenu } from './examplesMenu';
 import type { MiniJavaExample } from '../examples';
 import { installEditableMiniJavaCodeEditor, type EditableMiniJavaCodeEditor } from './codeEditor';
 import { refreshTypeDiagnostics } from './typeDiagnostics';
+import { initTypingPanel, scheduleTypingRender } from './typingPanel';
 import { initStepperPanel } from './stepperPanel';
 import { initComparePanel } from './comparePanel';
 import { initSubstPanel } from './substPanel';
@@ -66,7 +67,7 @@ const BLOCK_WORKSPACE_MUTATION_EVENTS = new Set<string>([
   Blockly.Events.BLOCK_FIELD_INTERMEDIATE_CHANGE,
   Blockly.Events.BLOCK_MOVE
 ]);
-type InspectorPanel = 'code' | 'outline';
+type InspectorPanel = 'code' | 'typing' | 'outline';
 type ActivityKind = 'blocks' | 'search' | 'run' | 'settings';
 type Perspective = 'edit' | 'debug' | 'types' | 'presentation' | 'custom';
 
@@ -360,6 +361,7 @@ function selectInspectorPanel(panel: InspectorPanel): void {
     section.classList.toggle('is-active', section.id === `panel-${panel}`);
   }
   if (panel === 'outline') scheduleOutlineRender();
+  if (panel === 'typing') scheduleTypingRender();
   requestLayoutResize(false);
 }
 
@@ -1102,7 +1104,10 @@ function initBlockly(): void {
   loadInitialSample(workspace);
   ensureRequiredBlocks(workspace);
   workspace.addChangeListener((event) => {
-    if (event.type !== Blockly.Events.VIEWPORT_CHANGE) scheduleOutlineRender();
+    if (event.type !== Blockly.Events.VIEWPORT_CHANGE) {
+      scheduleOutlineRender();
+      scheduleTypingRender();
+    }
     if (event.type === Blockly.Events.FINISHED_LOADING) {
       scheduleRequiredBlockEnforcement();
       return;
@@ -1408,6 +1413,7 @@ export function startBlockMiniJava(): void {
   initStepperPanel(() => workspace);
   initComparePanel(() => workspace);
   initSubstPanel(() => workspace);
+  initTypingPanel(() => workspace);
   initCommandPalette();
   initLayoutResizeCoordinator();
   initExamplesMenu(

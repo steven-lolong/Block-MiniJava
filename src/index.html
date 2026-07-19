@@ -218,11 +218,17 @@
             </div>
             <div class="inspector-tabs" role="tablist" aria-label="Inspector panels">
               <button id="tab-code" class="inspector-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-code" data-panel="code">Editable Code</button>
+              <button id="tab-typing" class="inspector-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-typing" data-panel="typing">Typing</button>
               <button id="tab-outline" class="inspector-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-outline" data-panel="outline">Outline</button>
             </div>
             <div class="inspector-body">
               <section id="panel-code" class="inspector-panel is-active" role="tabpanel" aria-labelledby="tab-code">
                 <pre class="code-view" aria-label="Generated code"><code id="generated-code" class="grammar-highlight"></code></pre>
+              </section>
+              <section id="panel-typing" class="inspector-panel typing-panel" role="tabpanel" aria-labelledby="tab-typing">
+                <div class="typing-toolbar"><label>⊢ Derivation for <select id="typing-method-select" aria-label="Method to derive"></select></label></div>
+                <div id="typing-gamma" class="typing-gamma"></div>
+                <div id="typing-tree" class="typ-tree" aria-label="Typing derivation"></div>
               </section>
               <section id="panel-outline" class="inspector-panel outline-panel" role="tabpanel" aria-labelledby="tab-outline">
                 <div class="outline-toolbar"><span>Program structure</span></div>

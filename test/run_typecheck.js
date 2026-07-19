@@ -10,7 +10,7 @@
  * Run with: npm run test:typecheck
  */
 
-const { checkSource, checkSourceWithoutTypeOn } = require('./dist/typecheck.bundle.js');
+const { checkSource, checkSourceWithoutTypeOn, deriveSource } = require('./dist/typecheck.bundle.js');
 
 /** Wrap statements in the mandatory main class. */
 function inMain(statements) {
@@ -498,6 +498,139 @@ runCase('missing type annotation is a lone warning', [warn('Missing type: connec
   checkSourceWithoutTypeOn(HOLE_SOURCE, 'mj_var_declaration')
 );
 
-const total = CASES.length + 1;
+// --- typing derivations (Typing tab) ---------------------------------------
+
+/** A boolean-assertion case: passes when produce() returns true. */
+function derivCase(name, produce) {
+  try {
+    const result = produce();
+    if (result === true) {
+      passed++;
+      console.log(`ok    ${name}`);
+    } else {
+      fail(name, typeof result === 'string' ? result : 'assertion returned false');
+    }
+  } catch (error) {
+    fail(name, error && error.message ? error.message : String(error));
+  }
+}
+
+const DERIV_SOURCE = [
+  inMain('System.out.println(new Cell().set(41));'),
+  'class Cell {',
+  '  int f;',
+  '  public int set(int v) {',
+  '    int i;',
+  '    f = v;',
+  '    i = 0;',
+  '    while (i < 3) {',
+  '      i = i + 1;',
+  '    }',
+  '    return f;',
+  '  }',
+  '}'
+].join('\n');
+
+derivCase('derivations: main first, then C.m, each rooted at M-OK', () => {
+  const derivs = deriveSource(DERIV_SOURCE);
+  const labels = derivs.map((d) => d.label);
+  if (JSON.stringify(labels) !== JSON.stringify(['main', 'Cell.set'])) {
+    return `labels were ${JSON.stringify(labels)}`;
+  }
+  return derivs.every((d) => d.deriv.rule === 'M-OK') || 'a root rule was not M-OK';
+});
+
+derivCase('derivations: Γ legend lists this, params and locals in order', () => {
+  const setDeriv = deriveSource(DERIV_SOURCE).find((d) => d.label === 'Cell.set');
+  return setDeriv.gamma === 'this:Cell, v:int, i:int' || `gamma was '${setDeriv.gamma}'`;
+});
+
+derivCase('derivations: WF-Assign row over a T-Var premise, with the Γ(x) side condition', () => {
+  const setDeriv = deriveSource(DERIV_SOURCE).find((d) => d.label === 'Cell.set');
+  const assign = setDeriv.deriv.premises.find((p) => p.rule === 'WF-Assign' && p.judgement.includes('f = '));
+  if (!assign) return 'no WF-Assign row for the field write';
+  if (assign.premises.length !== 1 || assign.premises[0].rule !== 'T-Var') {
+    return `premises were ${JSON.stringify(assign.premises.map((p) => p.rule))}`;
+  }
+  // The field write resolves through fields(C), not the local context.
+  return assign.note.includes('fields(Cell)(f) = int') || `note was '${assign.note}'`;
+});
+
+derivCase('derivations: WF-While with T-Cmp condition premise then body rows', () => {
+  const setDeriv = deriveSource(DERIV_SOURCE).find((d) => d.label === 'Cell.set');
+  const loop = setDeriv.deriv.premises.find((p) => p.rule === 'WF-While');
+  if (!loop) return 'no WF-While row';
+  if (loop.judgement !== 'Γ ⊢ while ((i < 3)) … ok') return `judgement was '${loop.judgement}'`;
+  const rules = loop.premises.map((p) => p.rule);
+  return JSON.stringify(rules) === JSON.stringify(['T-Cmp', 'WF-Assign']) || `premises were ${JSON.stringify(rules)}`;
+});
+
+derivCase('derivations: T-Invk carries the mtype note, receiver premise first', () => {
+  const mainDeriv = deriveSource(DERIV_SOURCE).find((d) => d.label === 'main');
+  const print = mainDeriv.deriv.premises.find((p) => p.rule === 'WF-Print');
+  if (!print) return 'no WF-Print row in main';
+  const invk = print.premises[0];
+  if (invk.rule !== 'T-Invk') return `print premise was ${invk.rule}`;
+  if (!invk.note.includes('mtype(set, Cell) = (int) → int')) return `note was '${invk.note}'`;
+  const rules = invk.premises.map((p) => p.rule);
+  return JSON.stringify(rules) === JSON.stringify(['T-New', 'T-Int']) || `premises were ${JSON.stringify(rules)}`;
+});
+
+derivCase('derivations: WF-Return row states the subtype side condition', () => {
+  const setDeriv = deriveSource(DERIV_SOURCE).find((d) => d.label === 'Cell.set');
+  const ret = setDeriv.deriv.premises[setDeriv.deriv.premises.length - 1];
+  if (ret.rule !== 'WF-Return') return `last row was ${ret.rule}`;
+  if (!ret.judgement.includes('return f : int')) return `judgement was '${ret.judgement}'`;
+  return ret.note === 'int <: int' || `note was '${ret.note}'`;
+});
+
+derivCase('derivations: judgements read Γ ⊢ <MiniJava text> : <type>', () => {
+  const mainDeriv = deriveSource(DERIV_SOURCE).find((d) => d.label === 'main');
+  const print = mainDeriv.deriv.premises.find((p) => p.rule === 'WF-Print');
+  const invk = print.premises[0];
+  return (
+    invk.judgement === 'Γ ⊢ new Cell().set(41) : int' || `judgement was '${invk.judgement}'`
+  );
+});
+
+derivCase('derivations: an ill-typed program still derives, with holes at the failure', () => {
+  // 'junk' is undeclared: the assign row survives with a '∉ Γ' note and the
+  // program still produces both derivations without throwing.
+  const derivs = deriveSource(
+    [
+      inMain('System.out.println(0);'),
+      'class C {',
+      '  public int go() {',
+      '    junk = 1;',
+      '    return 0;',
+      '  }',
+      '}'
+    ].join('\n')
+  );
+  const go = derivs.find((d) => d.label === 'C.go');
+  const assign = go.deriv.premises.find((p) => p.rule === 'WF-Assign');
+  if (!assign) return 'no WF-Assign row';
+  return assign.note === 'junk ∉ Γ' || `note was '${assign.note}'`;
+});
+
+derivCase('derivations: deriving does not change the diagnostic set', () => {
+  const source = [
+    inMain('System.out.println(new C().go());'),
+    'class C {',
+    '  public int go() {',
+    '    boolean b;',
+    '    b = 5;',
+    '    return 0;',
+    '  }',
+    '}'
+  ].join('\n');
+  const before = checkSource(source);
+  deriveSource(source);
+  const after = checkSource(source);
+  if (before.length !== 1) return `expected exactly 1 diagnostic, got ${before.length}`;
+  return JSON.stringify(before) === JSON.stringify(after) || 'diagnostics changed';
+});
+
+const total = CASES.length + 1 + 9;
 console.log(`\n${passed}/${total} type-checker cases passed${failures ? `, ${failures} FAILED` : ''}`);
 process.exit(failures ? 1 : 0);

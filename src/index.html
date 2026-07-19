@@ -285,6 +285,13 @@
                   <button id="stepper-back" class="stepper-button" type="button" title="Undo one machine step">◂ Back</button>
                   <button id="stepper-step" class="stepper-button" type="button" title="One machine step">Step ▸</button>
                   <button id="stepper-play" class="stepper-button" type="button" title="Step automatically">⏵ Play</button>
+                  <button id="stepper-gc" class="stepper-button" type="button" title="Mark and sweep the heap now">☠ Run GC</button>
+                  <label class="stepper-gc-auto" title="Automatically run GC after an allocation once the heap exceeds this many objects">
+                    <input id="stepper-gc-auto-enabled" type="checkbox" />
+                    Auto GC over
+                    <input id="stepper-gc-threshold" type="number" min="1" step="1" value="50" />
+                    objects
+                  </label>
                   <span id="stepper-status" class="stepper-status" aria-live="polite"></span>
                 </div>
                 <div class="stepper-panels stepper-panels-csesk">

@@ -1428,6 +1428,24 @@ body.code-hidden .code-column {
   color: var(--aquamarine);
 }
 
+.stepper-status[data-state="gc"] {
+  color: var(--copper-strong);
+}
+
+.stepper-gc-auto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stepper-gc-auto input[type="number"] {
+  width: 3.6em;
+}
+
 /* One column per CESK machine component, in machine order, over an explicit
    activation-frame stack:
    C·ontrol | S·tack + E·nvironment | S·tore | K·ontinuation | output. */
@@ -1618,6 +1636,34 @@ body[data-theme="light"] .stepper-arrowhead {
   to {
     box-shadow: 0 0 0 0 transparent;
   }
+}
+
+/* GC mark phase: a copper ring, deliberately distinct from the gold
+   is-changed flash and the aquamarine is-top frame border — "the collector
+   touched this object," not "the mutator wrote to it." */
+.stepper-heap-box.is-gc-marked {
+  animation: stepper-gc-mark-glow 700ms ease-out;
+}
+
+@keyframes stepper-gc-mark-glow {
+  from {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--copper-strong) 65%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* GC sweep: literally greyed out and faded, then the box disappears on the
+   next full render once the swept heap is committed. Duration must match
+   GC_SWEEP_FADE_MS in stepperPanel.ts — that's when the commit actually
+   happens, so a mismatch would either cut the fade short or hold on an
+   already-committed empty state. */
+.stepper-heap-box.is-gc-swept {
+  transition: opacity 450ms ease-in, filter 450ms ease-in, transform 450ms ease-in;
+  opacity: 0.15;
+  filter: grayscale(1);
+  transform: scale(0.94);
 }
 
 .stepper-panel {

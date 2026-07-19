@@ -17,15 +17,26 @@ import {
   formatMachineValue,
   injectMachine,
   step,
+  REF_V,
   type Frame,
   type Kont,
   type MachineState,
   type MachineValue
 } from '../semantics/minijavaMachine';
+import { markPhase, type Address } from '../semantics/reachability';
+import { sweep } from '../semantics/gc';
 import { mirrorProgramOutput } from './programConsole';
 
 const PLAY_INTERVAL_MS = 550;
 const MAX_HISTORY = 5000;
+
+/** GC animation pacing — deliberately distinct from PLAY_INTERVAL_MS so a
+ * mark-phase pass never looks like it's just another mutator Play run. */
+const GC_MARK_INTERVAL_MS = 300;
+const GC_SWEEP_FADE_MS = 450;
+
+const GC_AUTO_ENABLED_KEY = 'block-minijava.gc.autoEnabled';
+const GC_THRESHOLD_KEY = 'block-minijava.gc.threshold';
 
 type GetWorkspace = () => Blockly.WorkspaceSvg | null;
 
@@ -36,6 +47,17 @@ let stale = false;
 let playTimer: number | null = null;
 let highlightedBlockId: string | null = null;
 let listening = false;
+
+/** Whether an allocation-threshold auto-trigger is armed, and the threshold
+ * itself — both persisted, both independent of any particular MachineState. */
+let autoGcEnabled = false;
+let gcThreshold = 50;
+/** Non-null for the whole duration of an in-flight mark-then-sweep pass. */
+let gcAnimation: { markedSoFar: number } | null = null;
+let gcMarkTimer: number | null = null;
+/** Drives the GC-specific status text; reset on the next step/back/load. */
+let lastTransitionWasGC = false;
+let gcSummary: { marked: number; swept: number; heapAfter: number } | null = null;
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -122,6 +144,7 @@ function markStale(): void {
   if (!current || stale) return;
   stale = true;
   stopPlay();
+  stopGCAnimation();
   setHighlight(null);
   renderAll();
 }
@@ -161,6 +184,16 @@ function renderStatus(): void {
     status.dataset.state = 'stale';
     return;
   }
+  if (gcAnimation) {
+    status.textContent = `☠ marking… (${gcAnimation.markedSoFar} so far)`;
+    status.dataset.state = 'gc';
+    return;
+  }
+  if (lastTransitionWasGC && gcSummary) {
+    status.textContent = `☠ GC complete — marked ${gcSummary.marked}, swept ${gcSummary.swept} (heap now ${gcSummary.heapAfter})`;
+    status.dataset.state = 'gc';
+    return;
+  }
   if (current.status === 'error') {
     status.textContent = `⨯ stuck after ${current.stepCount} step(s): ${current.error}`;
     status.dataset.state = 'error';
@@ -175,10 +208,12 @@ function renderStatus(): void {
 }
 
 function renderButtons(): void {
-  const canStep = !!current && !stale && current.status === 'running';
+  const canStep = !!current && !stale && current.status === 'running' && !gcAnimation;
+  const canGC = !!current && !stale && current.heap.size > 0 && !gcAnimation;
   byId<HTMLButtonElement>('stepper-step').disabled = !canStep;
   byId<HTMLButtonElement>('stepper-play').disabled = !canStep && playTimer === null;
-  byId<HTMLButtonElement>('stepper-back').disabled = history.length === 0 || stale;
+  byId<HTMLButtonElement>('stepper-back').disabled = history.length === 0 || stale || !!gcAnimation;
+  byId<HTMLButtonElement>('stepper-gc').disabled = !canGC;
 }
 
 /** Short readable text for a program block, for the Control card. */
@@ -566,11 +601,185 @@ function drawArrows(pulse: boolean): void {
   }
 }
 
+/* -- Garbage collection: animated mark phase + single sweep step ---------- */
+
+/** Every `Kont` tag that pins a `MachineValue` (the rest carry only
+ * Blockly.Block/string/null control-flow bookkeeping — nothing to root). */
+function kontRoots(kont: Kont[]): MachineValue[] {
+  const values: MachineValue[] = [];
+  for (const k of kont) {
+    switch (k.tag) {
+      case 'KArrAssignVal':
+        values.push(k.index);
+        break;
+      case 'KBinR':
+        values.push(k.left);
+        break;
+      case 'KLookupIdx':
+        values.push(k.arr);
+        break;
+      case 'KCharAtIdx':
+        values.push(k.str);
+        break;
+      case 'KCallArgs':
+        values.push(k.recv, ...k.done);
+        break;
+      default:
+        break;
+    }
+  }
+  return values;
+}
+
+function frameRoots(frame: Frame): { env: MachineValue[]; kont: MachineValue[] } {
+  const env: MachineValue[] = [...frame.locals.values()];
+  if (frame.self !== null) env.push(REF_V(frame.self)); // `this`, Model A
+  return { env, kont: kontRoots(frame.kont) };
+}
+
+/**
+ * Flattens EVERY live frame (not just the top of the call stack) plus the
+ * in-flight control value into (env, kont) roots for `markPhase`.
+ *
+ * The in-flight value matters for correctness: right after `new` allocates,
+ * the fresh `Ref` sits ONLY in `state.control` for exactly one step, before
+ * the pending assign/call-arg continuation consumes it. Miss it here and a
+ * GC pass triggered in that window would collect an object about to be used.
+ */
+function rootsOf(state: MachineState): { env: MachineValue[]; kont: MachineValue[] } {
+  const env: MachineValue[] = [];
+  const kont: MachineValue[] = [];
+  for (const frame of state.stack) {
+    const roots = frameRoots(frame);
+    env.push(...roots.env);
+    kont.push(...roots.kont);
+  }
+  if (state.control.tag === 'Value') env.push(state.control.value);
+  return { env, kont };
+}
+
+/** Flashes a persistent heap box as newly marked — same remove/reflow/re-add
+ * idiom as `revealHeapBox`, since this happens mid-animation, outside a full
+ * `renderAll()`. */
+function flashMarkedBox(loc: Address): void {
+  const box = document.querySelector<HTMLElement>(`#stepper-heap .stepper-heap-box[data-heap-loc="${loc}"]`);
+  if (!box) return;
+  box.classList.remove('is-gc-marked');
+  void box.offsetWidth; // restart the animation
+  box.classList.add('is-gc-marked');
+}
+
+/** The sweep step: grey out every unmarked box, then — after the fade —
+ * commit the swept heap as a single new `MachineState`. Never interleaved
+ * with mutator steps; `stepOnce`'s own `gcAnimation` guard and the disabled
+ * toolbar buttons keep it that way. */
+function finishSweep(marked: Set<Address>): void {
+  const sweptAway = [...current!.heap.keys()].filter((loc) => !marked.has(loc));
+  for (const loc of sweptAway) {
+    document.querySelector<HTMLElement>(`#stepper-heap .stepper-heap-box[data-heap-loc="${loc}"]`)?.classList.add('is-gc-swept');
+  }
+  window.setTimeout(() => {
+    history.push(current!);
+    if (history.length > MAX_HISTORY) history.shift();
+    const newHeap = sweep(current!.heap, marked);
+    // lastEffect/lastRule are explicitly cleared, not carried over from
+    // whatever mutator step last ran — otherwise a surviving box could
+    // re-flash as "just allocated/written" (renderHeap/renderFrames/
+    // drawArrows all key off current.lastEffect) even though GC didn't
+    // touch it. A GC-committed state should render as visually neutral
+    // except for the GC status text below.
+    current = { ...current!, heap: newHeap, lastEffect: null, lastRule: null };
+    lastTransitionWasGC = true;
+    gcSummary = { marked: marked.size, swept: sweptAway.length, heapAfter: newHeap.size };
+    gcAnimation = null;
+    renderAll();
+  }, GC_SWEEP_FADE_MS);
+}
+
+/** Entry point for both the manual "Run GC" button and the allocation
+ * threshold auto-trigger. Drives `markPhase` (reachability.ts) one event per
+ * timer tick, then a single sweep — the same two building blocks `runGC`
+ * (gc.ts) composes synchronously, just paced for animation here. */
+function startGCAnimation(): void {
+  if (!current || stale || gcAnimation || current.heap.size === 0) return;
+  stopPlay(); // GC runs to completion; never interleaved with mutator stepping
+  const { env, kont } = rootsOf(current);
+  const gen = markPhase(env, current.heap, kont);
+  const marked = new Set<Address>();
+  gcAnimation = { markedSoFar: 0 };
+  renderButtons();
+  renderStatus();
+  gcMarkTimer = window.setInterval(() => {
+    const next = gen.next();
+    if (next.done) {
+      window.clearInterval(gcMarkTimer!);
+      gcMarkTimer = null;
+      finishSweep(marked);
+      return;
+    }
+    marked.add(next.value.address);
+    gcAnimation!.markedSoFar = marked.size;
+    flashMarkedBox(next.value.address);
+    renderStatus();
+  }, GC_MARK_INTERVAL_MS);
+}
+
+/** Headless/test environments (and a full or blocked store) have no
+ * `localStorage` — persistence is a nice-to-have, not load-bearing, so it
+ * degrades to "use the in-memory default" rather than crashing panel init. */
+function readPersisted(key: string): string | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writePersisted(key: string, value: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadGcSettings(): void {
+  autoGcEnabled = readPersisted(GC_AUTO_ENABLED_KEY) === 'true';
+  const storedThreshold = Number(readPersisted(GC_THRESHOLD_KEY));
+  if (Number.isFinite(storedThreshold) && storedThreshold >= 1) gcThreshold = storedThreshold;
+  byId<HTMLInputElement>('stepper-gc-auto-enabled').checked = autoGcEnabled;
+  byId<HTMLInputElement>('stepper-gc-threshold').value = String(gcThreshold);
+}
+
+function updateAutoGcEnabled(): void {
+  autoGcEnabled = byId<HTMLInputElement>('stepper-gc-auto-enabled').checked;
+  writePersisted(GC_AUTO_ENABLED_KEY, String(autoGcEnabled));
+}
+
+function updateGcThreshold(): void {
+  const input = byId<HTMLInputElement>('stepper-gc-threshold');
+  const value = Math.max(1, Math.floor(Number(input.value) || 1));
+  gcThreshold = value;
+  input.value = String(value);
+  writePersisted(GC_THRESHOLD_KEY, String(value));
+}
+
+function stopGCAnimation(): void {
+  if (gcMarkTimer !== null) {
+    window.clearInterval(gcMarkTimer);
+    gcMarkTimer = null;
+  }
+  gcAnimation = null;
+}
+
 function loadMachine(): void {
   stopPlay();
+  stopGCAnimation();
   setHighlight(null);
   history = [];
   stale = false;
+  lastTransitionWasGC = false;
+  gcSummary = null;
   const workspace = getWorkspace();
   if (!workspace) return;
   attachWorkspaceListener();
@@ -588,6 +797,7 @@ function loadMachine(): void {
 }
 
 function stepOnce(): void {
+  if (gcAnimation) return; // GC runs to completion; never interleaved with a mutator step
   if (!current || stale || current.status !== 'running') {
     stopPlay();
     renderButtons();
@@ -596,14 +806,24 @@ function stepOnce(): void {
   history.push(current);
   if (history.length > MAX_HISTORY) history.shift();
   current = step(current);
+  lastTransitionWasGC = false;
   if (current.status !== 'running') stopPlay();
   renderAll();
+  if (
+    autoGcEnabled &&
+    current.status === 'running' &&
+    current.lastEffect?.kind === 'new' &&
+    current.heap.size > gcThreshold
+  ) {
+    startGCAnimation();
+  }
 }
 
 function stepBack(): void {
-  if (history.length === 0 || stale) return;
+  if (history.length === 0 || stale || gcAnimation) return;
   stopPlay();
   current = history.pop()!;
+  lastTransitionWasGC = false;
   renderAll();
 }
 
@@ -613,7 +833,7 @@ function togglePlay(): void {
     renderButtons();
     return;
   }
-  if (!current || stale || current.status !== 'running') return;
+  if (!current || stale || current.status !== 'running' || gcAnimation) return;
   byId<HTMLButtonElement>('stepper-play').textContent = '⏸ Pause';
   playTimer = window.setInterval(stepOnce, PLAY_INTERVAL_MS);
 }
@@ -640,6 +860,10 @@ export function initStepperPanel(getter: GetWorkspace): void {
   byId<HTMLButtonElement>('stepper-step').addEventListener('click', stepOnce);
   byId<HTMLButtonElement>('stepper-back').addEventListener('click', stepBack);
   byId<HTMLButtonElement>('stepper-play').addEventListener('click', togglePlay);
+  byId<HTMLButtonElement>('stepper-gc').addEventListener('click', startGCAnimation);
+  byId<HTMLInputElement>('stepper-gc-auto-enabled').addEventListener('change', updateAutoGcEnabled);
+  byId<HTMLInputElement>('stepper-gc-threshold').addEventListener('change', updateGcThreshold);
+  loadGcSettings();
   for (const body of Array.from(document.querySelectorAll('.stepper-panel-body'))) {
     body.addEventListener('scroll', () => scheduleArrowRedraw(false), { passive: true });
   }

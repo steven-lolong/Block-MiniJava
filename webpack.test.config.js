@@ -11,6 +11,8 @@ module.exports = {
     machine: path.resolve(__dirname, 'test/machine.entry.ts'),
     subst: path.resolve(__dirname, 'test/subst.entry.ts'),
     eval: path.resolve(__dirname, 'test/eval.entry.ts'),
+    reachability: path.resolve(__dirname, 'test/reachability.entry.ts'),
+    gc: path.resolve(__dirname, 'test/gc.entry.ts'),
     smoke: path.resolve(__dirname, 'test/smoke-csesk.entry.ts')
   },
   output: {

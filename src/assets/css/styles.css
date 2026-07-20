@@ -1183,20 +1183,33 @@ body.code-hidden .code-column {
   gap: 4px;
 }
 
+/* The inference line is a flex-growing pseudo-element, and the rule name is
+   an ordinary (non-absolute) trailing flex child, NOT position:absolute +
+   translateX(100%) hanging past the node's own box: that earlier design let
+   a long rule name (e.g. WF-ArrAssign, T-CharAt) overlap the *next* sibling
+   premise's rule name, since nothing accounted for its width when sizing
+   this node. Keeping it in normal flow means a long rule name instead grows
+   this node's own reserved width, which the parent's flex layout already
+   handles correctly for every sibling. */
 .typ-bar {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   width: 100%;
+  min-width: 24px;
+  gap: 6px;
+}
+
+.typ-bar::before {
+  content: '';
+  flex: 1 1 auto;
+  min-width: 10px;
+  align-self: center;
   border-top: 1px solid var(--border-strong);
-  padding-top: 1px;
 }
 
 .typ-rule {
-  position: absolute;
-  right: -4px;
-  transform: translateX(100%);
+  flex: none;
   color: var(--aquamarine);
   font: 9.5px/1 var(--font-code);
   font-weight: 700;

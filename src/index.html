@@ -212,6 +212,7 @@
               <div class="column-title"><span class="icon icon-code" aria-hidden="true"></span><span>MiniJava Inspector</span></div>
               <div class="code-actions">
                 <button id="copy-code" class="icon-button" type="button" title="Copy MiniJava code" aria-label="Copy MiniJava code"><span class="icon icon-copy" aria-hidden="true"></span></button>
+                <button id="print-typing" class="icon-button" type="button" title="Print typing derivation" aria-label="Print typing derivation" hidden><span aria-hidden="true">⎙</span></button>
                 <button id="toggle-code-maximize" class="icon-button" type="button" title="Maximize inspector" aria-label="Maximize inspector" aria-pressed="false"><span class="toolbar-glyph" aria-hidden="true">□</span></button>
                 <button id="toggle-code-column" class="icon-button visibility-toggle" type="button" title="Hide inspector" aria-label="Hide inspector"><span class="panel-collapse-glyph" aria-hidden="true">›</span></button>
               </div>
@@ -227,6 +228,11 @@
               </section>
               <section id="panel-typing" class="inspector-panel typing-panel" role="tabpanel" aria-labelledby="tab-typing">
                 <div class="typing-toolbar"><label>⊢ Derivation for <select id="typing-method-select" aria-label="Method to derive"></select></label></div>
+                <div id="typing-print-header" class="typ-print-header" aria-hidden="true">
+                  <div class="typ-print-kicker">Block MiniJava — Typing Derivation</div>
+                  <div id="typing-print-title" class="typ-print-title"></div>
+                  <div id="typing-print-meta" class="typ-print-meta"></div>
+                </div>
                 <div id="typing-gamma" class="typing-gamma"></div>
                 <div id="typing-tree" class="typ-tree" aria-label="Typing derivation"></div>
               </section>

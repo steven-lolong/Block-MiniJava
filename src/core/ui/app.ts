@@ -19,7 +19,7 @@ import { initExamplesMenu } from './examplesMenu';
 import type { MiniJavaExample } from '../examples';
 import { installEditableMiniJavaCodeEditor, type EditableMiniJavaCodeEditor } from './codeEditor';
 import { refreshTypeDiagnostics } from './typeDiagnostics';
-import { initTypingPanel, scheduleTypingRender } from './typingPanel';
+import { initTypingPanel, scheduleTypingRender, printTyping } from './typingPanel';
 import { initStepperPanel } from './stepperPanel';
 import { initComparePanel } from './comparePanel';
 import { initSubstPanel } from './substPanel';
@@ -362,6 +362,7 @@ function selectInspectorPanel(panel: InspectorPanel): void {
   }
   if (panel === 'outline') scheduleOutlineRender();
   if (panel === 'typing') scheduleTypingRender();
+  byId<HTMLButtonElement>('print-typing').hidden = panel !== 'typing';
   requestLayoutResize(false);
 }
 
@@ -1251,6 +1252,7 @@ function wireEvents(): void {
   byId<HTMLButtonElement>('sidebar-scrim').addEventListener('click', () => setToolboxHidden(true));
   byId<HTMLButtonElement>('code-scrim').addEventListener('click', () => setCodeHidden(true));
   byId<HTMLButtonElement>('copy-code').addEventListener('click', copyCode);
+  byId<HTMLButtonElement>('print-typing').addEventListener('click', printTyping);
   byId<HTMLButtonElement>('run-program').addEventListener('click', runProgram);
   byId<HTMLButtonElement>('sidebar-run-program').addEventListener('click', runProgram);
   byId<HTMLButtonElement>('sidebar-open-cesk').addEventListener('click', () => openAnalysisTool('machine'));

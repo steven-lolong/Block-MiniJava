@@ -1101,6 +1101,13 @@ body.code-hidden .code-column {
   overflow-wrap: anywhere;
 }
 
+/* Print-only masthead (see `printTyping()` in typingPanel.ts): the on-screen
+   dropdown picker becomes this title block on paper. Hidden here; shown
+   under `.printing-typing` in the print stylesheet below. */
+.typ-print-header {
+  display: none;
+}
+
 .typ-tree {
   flex: 1;
   min-height: 0;
@@ -1235,6 +1242,200 @@ body.code-hidden .code-column {
   padding: 14px;
   color: var(--muted);
   font-size: 12px;
+}
+
+/* Print the Typing tab's derivation tree (ported from Block-based-MNL's
+   Typing tab print feature). Only the chrome needs hiding: every row's tree
+   is plain <div>s, so it paginates fine as-is once `.typ-row-tree` is forced
+   open — the row-level collapse is the only thing hiding a derivation here
+   (unlike MNL, there is no separate per-node collapse to force open too). */
+@media print {
+  /* Landscape gives a nowrap proof tree more usable width by default; users
+     can still override it from the print dialog. */
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  html.printing-typing,
+  body.printing-typing,
+  body.printing-typing #app {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #fff;
+  }
+
+  /* !important throughout: workbench.css's compact/mobile layout — which
+     turns .toolbox-column/.code-column into display:none overlay drawers
+     below a 1100px viewport — is injected as a later stylesheet than this
+     file, so at EQUAL selector specificity (both are two-class selectors)
+     it wins document-order ties regardless of where this rule sits within
+     *this* file. And a print page's own reflow width is well under 1100px
+     for any common paper size, so that breakpoint is always active while
+     printing — without !important here, the derivation silently vanishes
+     from the printed output on every standard page size (confirmed: it
+     rendered fine on an artificially oversized page and disappeared on
+     Letter/A4). */
+  body.printing-typing .app-shell,
+  body.printing-typing .ide-workbench,
+  body.printing-typing .ide-layout,
+  body.printing-typing .code-column,
+  body.printing-typing .inspector-body {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body.printing-typing .typing-panel {
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    color: #000;
+    background: #fff;
+  }
+
+  /* The masthead that replaces the on-screen dropdown picker: a small caps
+     kicker, the method name as the actual title, a muted timestamp — the
+     conventional three-line header of a printed technical document, not a
+     screenshot of a toolbar. */
+  body.printing-typing .typ-print-header {
+    display: block !important;
+    padding: 0 14px 10px;
+    border-bottom: 2px solid #000;
+    margin-bottom: 10px;
+  }
+
+  body.printing-typing .typ-print-kicker {
+    font: 700 9.5px/1.4 var(--font-ui);
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: #555;
+  }
+
+  body.printing-typing .typ-print-title {
+    font: 700 20px/1.3 var(--font-ui);
+    color: #000;
+  }
+
+  body.printing-typing .typ-print-meta {
+    font: 400 9.5px/1.4 var(--font-ui);
+    color: #666;
+  }
+
+  /* The interactive picker itself has nothing to say on paper — the
+     masthead above stands in for it. */
+  body.printing-typing .typing-toolbar {
+    display: none !important;
+  }
+
+  /* Γ as a labelled context card rather than a bare muted line: a light,
+     bordered box reads as "here is the fixed context" the way a boxed
+     hypothesis list would in a typeset proof. */
+  body.printing-typing .typing-gamma {
+    margin: 0 14px 14px;
+    padding: 8px 12px;
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    background: #f7f7f7;
+    font-size: 11px;
+  }
+
+  body.printing-typing .typ-tree {
+    overflow: visible;
+    color: #000;
+    padding: 0 14px 14px;
+  }
+
+  /* overflow-x: visible, NOT just display: block: `.typ-row-tree`'s own
+     overflow-x: auto (styles.css base rule) clips its content to its own
+     *pre-transform* layout box — transform is a paint-time operation on the
+     ancestor `#typing-tree` (typingPanel.ts's shrink-to-fit), so it scales
+     whatever already survived this element's own overflow clip, not the
+     original content. A wide row silently lost everything past its
+     unscaled width this way, no matter how aggressively the ancestor was
+     scaled down afterward. */
+  body.printing-typing .typ-row-tree {
+    display: block !important;
+    overflow-x: visible !important;
+  }
+
+  body.printing-typing .typ-row-toggle {
+    display: none;
+  }
+
+  /* One statement per visual block, clearly separated and — where it fits
+     within a single page — kept whole rather than split across a page
+     break mid-tree. */
+  body.printing-typing .typ-row {
+    border-bottom: 1px solid #ccc;
+    padding: 4px 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.printing-typing .typ-row:last-child {
+    border-bottom: 0;
+  }
+
+  body.printing-typing .typ-row-head {
+    padding: 6px 4px;
+  }
+
+  body.printing-typing .typ-bar::before {
+    border-top-color: #000;
+  }
+
+  /* Print resolution makes the screen-sized 9.5px/12px type look cramped;
+     bump both up a step. The shrink-to-fit transform (typingPanel.ts) still
+     applies on top of this when a derivation is too wide for the page, so
+     large trees end up correctly sized rather than needlessly tiny. */
+  body.printing-typing .typ-rule,
+  body.printing-typing .typ-row-rule {
+    font-size: 11px;
+    color: #000;
+  }
+
+  body.printing-typing .typ-judgement,
+  body.printing-typing .typ-row-judgement {
+    font-size: 13.5px;
+    color: #000;
+  }
+
+  body.printing-typing .app-header,
+  body.printing-typing .activity-bar,
+  body.printing-typing .toolbox-column,
+  body.printing-typing .sidebar-resizer,
+  body.printing-typing .sidebar-scrim,
+  body.printing-typing .workspace-column,
+  body.printing-typing .code-resizer,
+  body.printing-typing .code-scrim,
+  body.printing-typing .code-header,
+  body.printing-typing .inspector-tabs,
+  body.printing-typing #panel-code,
+  body.printing-typing #panel-outline,
+  body.printing-typing .viz-dock {
+    display: none !important;
+  }
+
+  /* NOT display:none/visibility:hidden/opacity:0 here: hiding this element
+     by any means, in the same print pass as hiding .workspace-column (the
+     Blockly SVG canvas — itself heavy with <filter> defs for glow/shadow),
+     reproducibly renders the ENTIRE printed page blank in Chromium's print
+     pipeline (confirmed in both real print preview and headless
+     Page.printToPDF — a genuine engine bug, not a layout mistake here: the
+     footer keeps rendering fine on its own, and .workspace-column keeps
+     hiding fine on its own, only the *combination* blanks the page). Restyle
+     it for print instead of removing it.  */
+  body.printing-typing .workspace-footer {
+    background: #fff !important;
+    color: #000 !important;
+    border-top-color: rgba(0, 0, 0, 0.2) !important;
+  }
 }
 
 .code-view,

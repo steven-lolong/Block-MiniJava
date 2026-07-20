@@ -1,0 +1,455 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{xcolor}
+\usepackage[export]{adjustbox}
+\usepackage{microtype}
+\usepackage{seqsplit}
+\emergencystretch=2.5em
+
+\title{The Bottom Panel (Viz-Dock): Implementation and Workspace Sync\\
+\large How Seven Tools Share One Dock, and How Each Links Back to the Blocks}
+\author{Research note --- Block-MiniJava}
+\date{2026-07-20}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The bottom panel --- \texttt{<section id="viz-dock">}
+(\texttt{src/index.html:243--327}), internally called the \emph{viz-dock}
+--- hosts seven tools behind one tab strip: \textbf{Problems},
+\textbf{Output}, \textbf{Call-by-Structure}, \textbf{Call-by-Value},
+\textbf{CESK}, \textbf{A~vs~B}, and \textbf{Rewrite}. All seven share one
+shell (\texttt{src/core/ui/visualizationPanel.ts}) for opening, closing,
+resizing, and tab-switching, but they fall into three genuinely different
+\emph{synchronization regimes} with the main Blockly workspace: two tools
+highlight the live, original blocks; three tools render an independent
+\emph{copy} of a block subtree in their own private workspace and never
+touch the original; and one tool is not block-based at all. This note
+explains the shared shell first, then each regime with the exact functions
+that implement it.
+\end{abstract}
+
+\tableofcontents
+
+% =============================================================================
+\section{The shared shell}
+
+\texttt{src/core/ui/visualizationPanel.ts} (313 lines) owns everything
+about the dock that is common to all seven tools: which one is active,
+whether the dock is open, its height, and where each tool's DOM host lives.
+It does not itself know how to run a machine or check types --- those are
+injected as callbacks or driven by other modules that this one only calls
+into.
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{VizKind} &
+  \texttt{visualizationPanel.ts:15} --- the closed union
+  \texttt{ReductionKind | 'machine' | 'compare' | 'subst' | 'problems' |
+  'output'}, i.e. \texttt{'structure' | 'value' | 'machine' | 'compare' |
+  'subst' | 'problems' | 'output'} --- one tag per tab. \\
+\texttt{ALL\_KINDS} &
+  \texttt{visualizationPanel.ts:18} --- the tab order as rendered:
+  \texttt{problems, output, structure, value, machine, compare, subst}. \\
+\texttt{TITLE} &
+  \texttt{visualizationPanel.ts:19--27} --- one human-readable description
+  per kind, shown in \texttt{\#viz-dock-info} (\S\ref{sec:info}). \\
+\texttt{hostOf(kind)} / \texttt{tabOf(kind)} &
+  \texttt{visualizationPanel.ts:62--72} --- look up
+  \texttt{.viz-host[data-kind=kind]} / \texttt{.viz-tab[data-kind=kind]} in
+  the DOM; every other function addresses a tab/host pair only through
+  these two, so the seven tools never need seven special cases. \\
+\texttt{setActive(kind)} &
+  \texttt{visualizationPanel.ts:128--146} --- the single tab-switch
+  function: toggles \texttt{data-active}/\texttt{hidden}/\texttt{aria-*}
+  on every host and tab, calls \texttt{setStepperTabVisible} /
+  \texttt{setCompareTabVisible} / \texttt{setSubstTabVisible} so the
+  newly-hidden or newly-shown stepper can pause its \textbf{Play} loop or
+  redraw its SVG overlay (companion note
+  \texttt{cesk-machine-and-stepper.tex}, \S4.1), persists the choice to
+  \texttt{localStorage}, and resizes the active tab's own Blockly
+  instance. \\
+\texttt{\seqsplit{openBottomTool(kind)}} &
+  \texttt{visualizationPanel.ts:148--151} --- \texttt{setActive(kind)} then
+  force-opens the dock; the single entry point every "jump to a specific
+  bottom tool" call site uses (Problems from the status bar,
+  \S\ref{sec:problems}; \texttt{Run} opening Output,
+  \texttt{app.ts:340}). \\
+\texttt{setVizOpen(open)} &
+  \texttt{visualizationPanel.ts:157--173} --- shows/hides the whole dock
+  (\texttt{dock().dataset.open}), clears "maximized" state on close,
+  persists to \texttt{localStorage}, and calls the shell's
+  \texttt{onLayoutChange} callback (installed by
+  \texttt{initVisualizationPanel}, wired from \texttt{app.ts}'s layout
+  coordinator --- see \texttt{ui-design-and-layout.tex}). \\
+\texttt{initResizer()} &
+  \texttt{visualizationPanel.ts:216--251} --- pointer-drag height resize
+  on \texttt{\#viz-resizer}, plus \texttt{ArrowUp}/\texttt{ArrowDown}
+  keyboard resize (l.245--250); persists height to \texttt{localStorage}. \\
+\texttt{\seqsplit{initVisualizationPanel(layoutChange)}} &
+  \texttt{visualizationPanel.ts:253--313} --- called once from
+  \texttt{app.ts}; wires every tab's click/keyboard-arrow navigation
+  (l.255--273), the toolbar's \textbf{Re-run}/\textbf{Arrange}/\textbf{Collapse}/
+  \textbf{Maximize} buttons, restores the persisted height/open/active-tab
+  state, and installs the resizer. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{The info line and passive vs.\ active tools}
+\label{sec:info}
+
+\texttt{updateInfo()} (\texttt{visualizationPanel.ts:111--118}) writes
+\texttt{TITLE[active]} into \texttt{\#viz-dock-info}, appending the
+currently-visualized block's type for Structure/Value.
+\texttt{updateToolActions()} (l.120--126) hides the \textbf{Re-run} button
+for the two tools that have nothing to re-run (\texttt{problems},
+\texttt{output} --- both are "passive": they mirror state pushed into them
+rather than owning a run of their own) and hides \textbf{Arrange} for every
+tool except Structure/Value (only they lay out a tree of copied blocks that
+benefits from re-arranging).
+
+% =============================================================================
+\section{The three sync regimes}
+
+Every artifact rendered in the bottom panel is, in principle, a candidate
+for "click it to jump to the block it came from." Which workspace it jumps
+\emph{to} is what separates the three regimes below.
+
+\begin{center}
+\begin{longtable}{@{}p{2.6cm}p{4.4cm}p{7.6cm}@{}}
+\toprule
+\textbf{Regime} & \textbf{Tabs} & \textbf{Sync target} \\
+\midrule
+\endhead
+Live highlight &
+  Problems, CESK, A~vs~B &
+  The \emph{original, live} main workspace --- the same
+  \texttt{Blockly.WorkspaceSvg} the user is editing. Clicking an artifact
+  centers and selects the real block; a running machine continuously
+  highlights its current focus block there too. \\
+Independent copy &
+  Call-by-Structure, Call-by-Value, Rewrite &
+  A \emph{separate} Blockly workspace injected inside the dock, showing a
+  freshly rendered copy of a block subtree. Clicking inside these tabs
+  never touches the main workspace, because the tree on screen is not the
+  same object as the blocks it was copied from. \\
+Text only &
+  Output &
+  Not block-based at all --- a plain \texttt{<pre>} console; there is
+  nothing to click-to-locate. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Live highlight: Problems}
+\label{sec:problems}
+
+\texttt{src/core/ui/typeDiagnostics.ts} (104 lines) is the smallest and
+clearest example of the pattern every other live-highlight tool follows.
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{refreshTypeDiagnostics(workspace)}} &
+  \texttt{typeDiagnostics.ts:99--104} --- the one exported entry point:
+  runs \texttt{checkWorkspace} (the type checker, documented in
+  \texttt{typing-and-evaluation-rules.tex}), then refreshes \emph{both}
+  surfaces from the same diagnostic list, so they cannot disagree. Called
+  from the workspace's debounced type-check timer
+  (\texttt{app.ts}) and from \texttt{showProblems()}
+  (\texttt{app.ts:480--483}). \\
+\texttt{\seqsplit{applyBlockWarnings(workspace, diags)}} &
+  \texttt{typeDiagnostics.ts:23--34} --- surface \#1: a warning icon
+  \emph{on the block itself}, via \texttt{block.setWarningText(...,
+  WARNING\_OWNER\_ID)}. Tracks \texttt{markedBlockIds} (l.11) across calls
+  so a block whose diagnostic disappeared gets its warning explicitly
+  cleared (l.25--29) rather than accumulating stale icons. \\
+\texttt{\seqsplit{renderProblemsPanel(workspace, diags)}} &
+  \texttt{typeDiagnostics.ts:76--96} --- surface \#2: the Problems list
+  itself (\texttt{\#bottom-problems-list}) plus two badge counters
+  (\texttt{\#bottom-problems-count} on the tab, \texttt{\#status-problems-count}
+  in the status bar (see \texttt{ui-design-and-layout.tex}), both toggling
+  a \texttt{has-errors} class when at least one
+  diagnostic is an error rather than a warning. \\
+\texttt{\seqsplit{renderProblemList(list, workspace, diags)}} &
+  \texttt{typeDiagnostics.ts:46--74} --- builds one
+  \texttt{button.problem-item} per diagnostic, sorted errors-first
+  (l.56--58); each button's click handler is exactly
+  \texttt{locateBlock(workspace, diag.blockId)}. \\
+\texttt{\seqsplit{locateBlock(workspace, blockId)}} &
+  \texttt{typeDiagnostics.ts:37--44} --- \textbf{the canonical
+  click-to-locate implementation}, reused verbatim by the Typing tab
+  (\texttt{typingPanel.ts:26--30}, per \texttt{typing-code-outline-tabs.tex}):
+  \texttt{workspace.getBlockById(blockId)}, then
+  \texttt{workspace.centerOnBlock(blockId)}, then
+  \texttt{Blockly.common.setSelected(block)} (which, unlike
+  \texttt{BlockSvg.select()}, first clears whatever was previously
+  selected), and finally dispatches a \texttt{'bmj:problem-located'}
+  \texttt{CustomEvent} on \texttt{window} so other listeners (if any) can
+  react to a problem having been jumped to. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Live highlight: CESK and A vs B}
+
+The two machine steppers extend the same idea from "click once to
+locate" to "continuously highlight the machine's current focus, and make
+\emph{every} rendered value/frame/kontinuation entry individually
+clickable." Both are documented in full implementation depth in
+\texttt{cesk-machine-and-stepper.tex}; this section gives only the sync
+mechanism, for completeness of the bottom-panel inventory.
+
+\begin{center}
+\begin{longtable}{@{}p{3.4cm}p{4.4cm}p{6.8cm}@{}}
+\toprule
+\textbf{Tab} & \textbf{Function} & \textbf{What it does} \\
+\midrule
+\endhead
+CESK &
+  \texttt{\seqsplit{locateProvenance(blockId)}} ---
+  \texttt{\seqsplit{stepperPanel.ts:90--100}} &
+  Click-to-locate on any \texttt{.stepper-provenance} element (control
+  text, a frame's method name, a heap box's title, a kontinuation entry) ---
+  identical three-call idiom to \texttt{locateBlock} above. \\
+CESK &
+  \texttt{\seqsplit{setHighlight(blockId)}} ---
+  \texttt{\seqsplit{stepperPanel.ts:119--133}} &
+  \emph{Continuous} highlight: called from \texttt{renderAll()}
+  (l.488) after every step with \texttt{current.focusBlockId}, so the
+  program surface always shows exactly where the machine currently is,
+  independent of any click. Un-highlights the previous focus block first
+  (l.122--124). \\
+A vs B &
+  \texttt{\seqsplit{setHighlights(blockIds)}} ---
+  \texttt{\seqsplit{comparePanel.ts:71--83}} &
+  The two-machine analogue: both models' current focus blocks are
+  highlighted \emph{simultaneously} on the one shared main workspace
+  (\texttt{getWorkspace()} at l.72 is the same closure passed to
+  \texttt{stepperPanel}), so a user watching the lockstep view sees both
+  machines' positions in the same program surface at once. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Both stepper panels take a \texttt{GetWorkspace} closure returning the
+\emph{live} main \texttt{Blockly.WorkspaceSvg} at \texttt{init} time
+(\texttt{stepperPanel.ts:857}, \texttt{comparePanel.ts}'s equivalent) ---
+this is what makes "live highlight" possible at all: the machine
+(\texttt{injectMachine(workspace, model)}) is built by reading the real
+workspace's blocks, so the \texttt{Blockly.Block} references a
+\texttt{MachineState}'s control/frames/heap carry (as \texttt{blockId}
+strings, resolved back via \texttt{getBlockById}) always resolve in that
+same live workspace.
+
+\subsection{Independent copy: Call-by-Structure and Call-by-Value}
+\label{sec:cbs-cbv}
+
+These two tabs are invoked differently from everything else in the dock:
+not from a tab click, but from a \textbf{right-click context menu} on a
+specific method-call block in the main workspace.
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{registerMiniJavaContextMenus()}} &
+  \texttt{contextMenus.ts:17--62} --- registers two
+  \texttt{Blockly.ContextMenuRegistry} items, \texttt{miniJavaVizStructure}
+  and \texttt{miniJavaVizValue}, scoped to \texttt{ScopeType.BLOCK} and
+  shown only when the right-clicked block is \texttt{mj\_expr\_method\_call}
+  (\texttt{contextMenus.ts:28,38}); each callback calls
+  \texttt{openVisualization(kind, scope.block)}. \\
+\texttt{\seqsplit{openVisualization(kind, block)}} &
+  \texttt{visualizationPanel.ts:192--197} --- stores the seed
+  \texttt{block} in \texttt{views[kind].block}, activates that tab, opens
+  the dock, and calls \texttt{renderView(kind)}. \\
+\texttt{renderView(kind)} &
+  \texttt{visualizationPanel.ts:175--190} --- clears (or lazily creates via
+  \texttt{ensureWorkspace}, l.95--98) a \emph{brand-new}
+  \texttt{Blockly.WorkspaceSvg} injected into that tab's own
+  \texttt{.viz-host} (\texttt{injectVisualizationWorkspace}, l.78--93,
+  with its own zoom/grid/theme settings), then calls
+  \texttt{renderMiniJavaReduction} or \texttt{renderCopiedReductionRoot}
+  (\texttt{core/semantics/minijavaReduction.ts}) to populate it with a
+  \emph{copy} of the reduction tree rooted at the seed block. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\textbf{Why no click-to-locate back to the main workspace:} the blocks
+inside the Structure/Value workspace are independent copies (fresh block
+ids, via \texttt{Blockly.serialization.blocks}-style duplication inside
+\texttt{minijavaReduction.ts}) --- this is a direct visual consequence of
+the substitution semantics these tabs illustrate (\texttt{typing-and-
+evaluation-rules.tex}, \S4.3): each reduction step is rendered as its own
+\emph{self-contained} block tree, and two occurrences of a substituted
+value are, by the structure-preservation invariant, never the same node.
+There is accordingly no single "the" main-workspace block a click inside
+this copy could unambiguously jump back to. \texttt{disposeVizWorkspaces()}
+(\texttt{visualizationPanel.ts:199--214}) tears down and, if that tab was
+open, re-renders these private workspaces on a theme switch, confirming
+they are wholly owned by the dock and carry no reference back into the
+main workspace's block set.
+
+\subsection{Independent copy: Rewrite}
+
+The Rewrite (substitution stepper) tab, \texttt{src/core/ui/substPanel.ts}
+(295 lines), follows the same "own private workspace" pattern as
+\S\ref{sec:cbs-cbv}, but is entered from the tab strip directly (like CESK)
+rather than from a context menu, and highlights within that private
+workspace continuously as it steps.
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{getWorkspace} (main) &
+  \texttt{substPanel.ts:32} --- used \emph{only} to seed the initial tree
+  (from the \texttt{println} argument in \texttt{main}, per
+  \texttt{typing-and-evaluation-rules.tex} \S4.3.1) and to detect
+  staleness on a live edit (\texttt{attachWorkspaceListener},
+  \texttt{substPanel.ts:97--118} --- same \texttt{BLOCK\_CREATE/DELETE/
+  CHANGE/MOVE} listener shape as every other stepper). It is
+  \textbf{never} the target of a click-to-locate. \\
+own highlight (redex) &
+  \texttt{substPanel.ts:176} --- \texttt{\seqsplit{host.getBlockById(current.redexId).setHighlighted(true)}},
+  where \texttt{host} is the tab's own private workspace (populated by
+  re-rendering \texttt{current.tree} --- a \texttt{TreeNode}, not a
+  \texttt{Blockly.Block} --- into fresh blocks each step). The highlighted
+  block is always inside \emph{that} tree, never the main program's. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+This is the clearest illustration of the regime split in this note: CESK
+and A~vs~B evaluate the \emph{actual program blocks by reference}
+(\texttt{Blockly.Block} objects looked up live by id), so highlighting them
+\emph{is} highlighting the main workspace; Structure/Value/Rewrite evaluate
+a \emph{copied, self-contained syntax tree} (the substitution semantics'
+own state representation, per the companion evaluation-rules note), so
+their highlight necessarily targets their own private copy.
+
+\subsection{Text only: Output}
+
+\texttt{src/core/ui/programConsole.ts} (50 lines) is the simplest tool in
+the dock and syncs with nothing block-related at all --- its "source of
+truth" is a plain string log, not a workspace.
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{mirrorProgramOutput(source, lines, note)}} &
+  \texttt{programConsole.ts:24--40} --- overwrites
+  \texttt{\#bottom-program-output} with \texttt{[source]} plus the joined
+  \texttt{println} lines, flashing \texttt{is-console-changed} when the
+  body actually changed (l.31--34). \textbf{Whichever tool produced output
+  most recently owns the console}: \textbf{Run} (\texttt{app.ts:340--351}),
+  the CESK stepper (\texttt{stepperPanel.ts:477}), and A~vs~B all call
+  this same function, so the Output tab is a shared monitor, not one
+  tool's private log. \\
+\texttt{\seqsplit{appendConsoleLog(message)}} &
+  \texttt{programConsole.ts:43--50} --- appends one line (used for
+  editor-action notices like export/clipboard) without replacing the
+  mirrored run output. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section{Full tab inventory}
+
+\begin{center}
+\begin{longtable}{@{}p{2.4cm}p{2.8cm}p{3.2cm}p{6.0cm}@{}}
+\toprule
+\textbf{Tab} & \textbf{\texttt{data-kind}} & \textbf{Sync regime} & \textbf{Owning module} \\
+\midrule
+\endhead
+Problems & \texttt{problems} & Live highlight & \texttt{typeDiagnostics.ts} \\
+Output & \texttt{output} & Text only & \texttt{programConsole.ts} \\
+Call-by-Structure & \texttt{structure} & Independent copy & \texttt{visualizationPanel.ts} + \texttt{minijavaReduction.ts} \\
+Call-by-Value & \texttt{value} & Independent copy & \texttt{visualizationPanel.ts} + \texttt{minijavaReduction.ts} \\
+CESK & \texttt{machine} & Live highlight & \texttt{stepperPanel.ts} \\
+A vs B & \texttt{compare} & Live highlight & \texttt{comparePanel.ts} \\
+Rewrite & \texttt{subst} & Independent copy & \texttt{substPanel.ts} \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section{HTML wiring}
+
+\begin{center}
+\begin{longtable}{@{}p{3.6cm}p{10.6cm}@{}}
+\toprule
+\textbf{Element} & \textbf{Location} \\
+\midrule
+\endhead
+\texttt{\#viz-dock} &
+  \texttt{index.html:243} --- the dock root; \texttt{data-open} toggled by
+  \texttt{setVizOpen}. \\
+\texttt{.viz-dock-tabs} &
+  \texttt{index.html:247--268} --- the seven \texttt{button.viz-tab[data-kind]}
+  elements, in \texttt{ALL\_KINDS} order. \\
+\texttt{\#viz-dock-info} &
+  \texttt{index.html:270} --- the per-tab description line
+  (\S\ref{sec:info}). \\
+\texttt{.viz-dock-tools} &
+  \texttt{index.html:271--276} --- \textbf{Re-run}
+  (\texttt{\#viz-rerun}), \textbf{Arrange} (\texttt{\#viz-arrange}),
+  \textbf{Maximize} (\texttt{\#viz-maximize}), \textbf{Hide}
+  (\texttt{\#viz-collapse}). \\
+\texttt{\seqsplit{.viz-host[data-kind]}} &
+  \texttt{index.html:279--328} --- seven host
+  containers, one per tab; \texttt{problems}/\texttt{output} are
+  \texttt{.bottom-passive-host} (plain content, no injected Blockly
+  workspace); \texttt{structure}/\texttt{value}/\texttt{machine}/\texttt{compare}/\texttt{subst}
+  each host either an injected reduction workspace or the CESK/Compare/Rewrite
+  stepper layout (documented in \texttt{cesk-machine-and-stepper.tex} and
+  \texttt{typing-and-evaluation-rules.tex} respectively). \\
+\texttt{\#viz-resizer} &
+  \texttt{index.html:244} --- the drag handle for dock height
+  (\S1, \texttt{initResizer}). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section*{Note on scope}
+\addcontentsline{toc}{section}{Note on scope}
+This note covers the bottom panel's \emph{shell} (tab switching, open/close,
+resize) and its \emph{synchronization} with the workspace. The CESK and A~vs~B
+tabs' machine semantics and internal rendering (Control/Environment/Store/Kontinuation
+columns, SVG heap arrows, garbage collection) are covered in
+\texttt{cesk-machine-and-stepper.tex} and \texttt{garbage-collection.tex}. The
+Rewrite tab's substitution semantics are covered in
+\texttt{typing-and-evaluation-rules.tex}. The three inspector-column tabs
+(Editable Code, Typing, Outline) are a separate panel, covered in
+\texttt{typing-code-outline-tabs.tex}. The workbench shell the dock sits
+inside (activity bar, perspectives, responsive layout) is covered in
+\texttt{ui-design-and-layout.tex}.
+
+\end{document}

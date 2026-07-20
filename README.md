@@ -87,6 +87,16 @@ A three-layer static type system checks the workspace on every edit (debounced):
 Diagnostics surface twice: as warning icons on the offending blocks and in the inspector's
 **Problems** tab, where clicking an entry selects and centers the block.
 
+### Typing tab
+
+The checker also builds a `Derivation` (rule, judgement, premises, note) alongside every
+diagnostic, from the same walk — `deriveProgram` (`core/types/typeChecker.ts`) and the
+Problems tab can never disagree. The inspector's **Typing** tab (`core/ui/typingPanel.ts`,
+after Editable Code) picks a method from a dropdown — `main` plus every `C.m` — shows its Γ
+once, and lists its statements as `Γ ⊢ s ok` rows that expand into classic
+premises-over-bar proof trees (`T-Var`, `T-Invk`, `T-New`, …). Every judgement is a button
+that centers and selects its block.
+
 ### Strings (extension over the BNF)
 
 Beyond the CSE-401 BNF, the language has a first-class `String` type: a `String` type

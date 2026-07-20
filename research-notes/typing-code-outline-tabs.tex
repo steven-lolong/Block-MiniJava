@@ -1,0 +1,418 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{xcolor}
+\usepackage[export]{adjustbox}
+\usepackage{microtype}
+\usepackage{seqsplit}
+\emergencystretch=2.5em
+
+\title{The Inspector Column: Editable Code, Typing, and Outline\\
+\large Implementation of Block-MiniJava's Three Program-View Tabs}
+\author{Research note --- Block-MiniJava}
+\date{2026-07-20}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The inspector column (\texttt{<aside id="code-column">}, \texttt{src/index.html:210--238})
+is Block-MiniJava's dedicated "view the program as something other than
+blocks" panel. It hosts three tabs that all read the \emph{same} live
+workspace and never own a separate copy of the program: \textbf{Editable
+Code} (a bidirectional MiniJava text $\leftrightarrow$ blocks editor),
+\textbf{Typing} (the on-demand natural-deduction derivation viewer
+documented separately in \texttt{typing-and-evaluation-rules.tex}), and
+\textbf{Outline} (a collapsible tree of the block program's structure).
+This note explains how each tab is implemented and kept synchronized with
+workspace edits, with every mechanism traced to its file and line.
+\end{abstract}
+
+\tableofcontents
+
+% =============================================================================
+\section{The inspector column and its tab switch}
+
+\begin{center}
+\begin{longtable}{@{}p{3.6cm}p{11.6cm}@{}}
+\toprule
+\textbf{Element} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{.inspector-tabs} &
+  \texttt{index.html:219--223} --- three \texttt{<button role="tab">}s:
+  \texttt{tab-code}, \texttt{tab-typing}, \texttt{tab-outline}, each with
+  \texttt{data-panel} naming the panel it controls. \\
+\texttt{.inspector-panel} &
+  \texttt{index.html:225--236} --- three \texttt{<section role="tabpanel">}s:
+  \texttt{panel-code}, \texttt{panel-typing}, \texttt{panel-outline}; the
+  active one carries class \texttt{is-active}. \\
+\texttt{InspectorPanel} type &
+  \texttt{app.ts:70} --- \texttt{'code' | 'typing' | 'outline'}, the closed
+  set \texttt{selectInspectorPanel} dispatches on. \\
+\texttt{\seqsplit{selectInspectorPanel(panel)}} &
+  \texttt{app.ts:353--366} --- the one function every tab click routes
+  through: toggles \texttt{is-active}/\texttt{aria-selected} on the matching
+  tab and panel pair, then triggers that panel's own on-activate render
+  (\texttt{scheduleOutlineRender} for \texttt{'outline'},
+  \texttt{scheduleTypingRender} for \texttt{'typing'} --- Editable Code
+  needs no such call, since it stays synchronized continuously,
+  \S\ref{sec:code}), and finally calls \texttt{requestLayoutResize(false)}
+  since a newly-shown panel can change scrollbar/wrap width. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Only \emph{Typing} and \emph{Outline} defer their rendering to tab
+activation (\texttt{scheduleTypingRender}/\texttt{scheduleOutlineRender}
+both \texttt{return} immediately if their panel is not the active one ---
+see \texttt{typingPanel.ts:163--166} and \S\ref{sec:outline-render} ---
+this is a cheap no-op check against needlessly rebuilding an invisible
+DOM tree). \textbf{Editable Code} keeps no such guard: its textarea is the
+one surface a user can type into at any time, so it must always reflect
+(or be reflected onto) the workspace regardless of which tab is currently
+showing.
+
+% =============================================================================
+\section{Editable Code}
+\label{sec:code}
+
+\texttt{src/core/ui/codeEditor.ts} (307 lines) implements a full
+bidirectional editor: blocks $\to$ text is a pure, always-available
+function (\texttt{generateMiniJava}); text $\to$ blocks is a debounced,
+validated import that only ever fires from a real keystroke, never from a
+workspace-originated change, so the two directions cannot feed each other
+in a loop.
+
+\subsection{Blocks $\to$ text}
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{generateMiniJava(workspace)}} &
+  \texttt{core/generator/minijavaGenerator.ts} (271 lines) --- walks the
+  block tree from the \texttt{mj\_goal} block and emits MiniJava source
+  text; the single source of truth both the read-only highlighted view and
+  the editable textarea are kept in sync with. \\
+\texttt{\seqsplit{highlightMiniJava(code)}} &
+  \texttt{core/generator/highlighter.ts} (193 lines) --- a small MiniJava
+  syntax highlighter (keywords, literals, comments) that renders the
+  \emph{overlay} layer behind the transparent textarea (\S\ref{sec:code-dom}). \\
+\texttt{\seqsplit{syncEditorFromWorkspace(workspace, code, message)}} &
+  \texttt{codeEditor.ts:94--112} --- called by \texttt{app.ts}'s
+  \texttt{updateCode()} (\texttt{app.ts:212--219}) after every workspace
+  mutation. Two guards make it safe to call unconditionally: it is a no-op
+  while the user is actively focused in the textarea
+  (\texttt{document.activeElement === editor}, l.104), and it never
+  overwrites text that already \emph{means} the same program
+  (\S\ref{sec:structural-guard}). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{The overlay DOM: line numbers, syntax color, and a transparent textarea}
+\label{sec:code-dom}
+
+\texttt{createEditorDom()} (\texttt{codeEditor.ts:218--258}) builds the
+editor lazily, the first time \texttt{installEditableMiniJavaCodeEditor}
+runs, by rearranging the read-only \texttt{<pre id="generated-code">}
+element (\texttt{index.html:226}) that a headless/no-JS fallback would
+otherwise just display statically:
+
+\begin{enumerate}
+  \item A new \texttt{.code-editor-pane} wraps a \texttt{.code-editor-line-numbers}
+        \texttt{<pre>} (l.232--235, rebuilt by \texttt{renderLineNumbers},
+        l.56--60) and the original \texttt{<pre class="code-view">} —
+        the latter is repurposed as the syntax-\emph{highlight} layer, not
+        removed.
+  \item A real \texttt{<textarea id="generated-code-editor">} is stacked
+        \emph{on top} of the highlight \texttt{<pre>} (l.238--246): the
+        textarea is what the user actually types into and is visually
+        transparent, while the \texttt{<pre>} underneath (kept in sync by
+        \texttt{renderHighlight}, l.70--79) supplies the colored text the
+        user sees through it.
+  \item \texttt{syncHighlightScroll}/\texttt{syncHighlightMetrics}
+        (l.50--54, l.64--68) keep the highlight layer's scroll offset and
+        right-edge padding pixel-identical to the textarea's, including
+        compensating for whichever browser's scrollbar happens to be
+        present — a \texttt{ResizeObserver} (l.271--276) re-syncs on any
+        panel resize.
+\end{enumerate}
+This "transparent textarea over a colored \texttt{<pre>}" construction is
+the standard technique for a lightweight syntax-highlighting editor without
+a full editor component (no CodeMirror/Monaco dependency): the browser's
+native textarea supplies cursor, selection, undo, and IME handling for
+free, and only the \emph{visual} rendering is swapped out underneath it.
+
+\subsection{The import pipeline: debounce, parse, validate}
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{scheduleEditorImport(workspace, options)}} &
+  \texttt{codeEditor.ts:191--200} --- fired on every \texttt{input} event
+  (wired at l.266). Re-renders the highlight layer and status text
+  immediately (so the view never looks stale), then debounces the actual
+  import by \texttt{TEXT\_IMPORT\_DELAY\_MS = 650}ms (l.6) via
+  \texttt{window.setTimeout}, restarting the timer on every keystroke ---
+  so a workspace rebuild only happens once typing pauses, not on every
+  character. \\
+\texttt{\seqsplit{applyEditorTextToWorkspace(...)}} &
+  \texttt{codeEditor.ts:157--189} --- parses the trimmed textarea contents
+  with \texttt{parseMiniJavaTextToWorkspaceState}
+  (\texttt{core/parser/minijavaTextParser.ts}, 853 lines); on a parse
+  error, catches \texttt{MiniJavaTextParseError} and reports it in the
+  status line and via \texttt{options.onImportError} rather than throwing
+  through to the caller — an in-progress, syntactically incomplete edit is
+  an expected state, not a bug. \\
+\texttt{\seqsplit{importEditorTextToWorkspace(...)}} &
+  \texttt{codeEditor.ts:138--155} --- the actual rebuild: sets a
+  re-entrancy guard (\S\ref{sec:suppression}), \texttt{workspace.clear()},
+  loads the parsed \texttt{Blockly.serialization.workspaces} state, and
+  calls \texttt{workspace.cleanUp()} to re-lay-out top blocks. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{The structural-equality guard: never delete what the user just typed}
+\label{sec:structural-guard}
+
+Two problems have to be solved together for a bidirectional editor to feel
+safe to type in: (a) the generator's output is not necessarily
+byte-identical to what the user wrote (whitespace, comments, formatting
+choices), and (b) a full \texttt{workspace.clear()} + rebuild on every
+keystroke would destroy block ids, undo history, and manual layout for a
+change that produces the \emph{same program}. \texttt{codeEditor.ts} solves
+both with one idea: compare \emph{parsed structure}, not text.
+
+\begin{center}
+\begin{longtable}{@{}p{4.4cm}p{9.8cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{workspaceStructureSignature(ws)}} &
+  \texttt{codeEditor.ts:116--122} --- re-generates the workspace's own code
+  and re-parses \emph{that}, then \texttt{JSON.stringify}s the resulting
+  serialization state: the workspace's canonical structural signature. \\
+\texttt{\seqsplit{editorTextMatchesCode(text, code)}} &
+  \texttt{codeEditor.ts:128--136} --- true iff the editor's raw text parses
+  to the identical structure as \texttt{code} (an exact string match short-circuits
+  first, l.129). Used by \texttt{syncEditorFromWorkspace}
+  (\texttt{blocks$\to$text} direction, l.107) to decide whether to
+  overwrite the textarea at all: comment/whitespace-only edits are left
+  alone. \\
+\texttt{\seqsplit{applyEditorTextToWorkspace}}'s skip check &
+  \texttt{codeEditor.ts:176--179} (\texttt{text$\to$blocks} direction) ---
+  compares the freshly parsed state against
+  \texttt{workspaceStructureSignature(workspace)} \emph{before} rebuilding;
+  on a match it reports "already matches the blocks" and returns without
+  touching the workspace at all. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Breaking the sync feedback loop}
+\label{sec:suppression}
+
+A naive bidirectional sync is prone to an infinite (or at least
+user-visible flicker) loop: importing text mutates the workspace, the
+workspace's change listener calls \texttt{updateCode()}
+(\texttt{app.ts:1122}), which calls \texttt{syncEditorFromWorkspace}, which
+could re-touch the very textarea that triggered the import in the first
+place. \texttt{suppressWorkspaceSyncUntil} (\texttt{codeEditor.ts:35}) is a
+simple timestamp guard: \texttt{importEditorTextToWorkspace} sets it 1500ms
+into the future (l.146) before mutating the workspace, and
+\texttt{syncEditorFromWorkspace} bails out immediately (l.100) while
+"now" is still before that deadline. Combined with the
+\texttt{document.activeElement === editor} check (\S\ref{sec:code}),
+this means: while the user is typing, nothing else may touch the textarea;
+immediately after an import, nothing may touch it either, until the
+workspace's own settling mutations (autosave, required-block enforcement)
+have had time to finish.
+
+\subsection{Other editor entry points}
+
+\texttt{EditableMiniJavaCodeEditor}'s public surface
+(\texttt{codeEditor.ts:21--27}) exposes \texttt{loadText} in addition to
+the input-driven path: called from \textbf{Open} (\texttt{app.ts:766}) to
+force-import a loaded \texttt{.java}/\texttt{.txt} file even when its
+structure happens to already match the current blocks (the file's
+\emph{label} must still update, l.291--302, hence
+\texttt{allowSkipWhenUnchanged = false} there). \texttt{resize()} is called
+by the shared layout coordinator (\texttt{app.ts}'s
+\texttt{requestLayoutResize}, cross-referenced in
+\texttt{ui-design-and-layout.tex}) whenever the inspector column changes
+width.
+
+% =============================================================================
+\section{Typing}
+
+The Typing tab's implementation --- \texttt{deriveProgram} in
+\texttt{core/types/typeChecker.ts} and the renderer in
+\texttt{core/ui/typingPanel.ts} --- is documented in full in
+\texttt{typing-and-evaluation-rules.tex} (the typing-rule inference-rule
+reconstruction) and was the subject of the project's most recent commit.
+This note gives only the piece that document does not: how it fits into
+the shared inspector-tab machinery of \S1.
+
+\begin{center}
+\begin{longtable}{@{}p{4.2cm}p{10.0cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{scheduleTypingRender()}} &
+  \texttt{typingPanel.ts:163--171} --- rAF-debounced; \texttt{returns}
+  immediately unless \texttt{\#panel-typing} currently carries
+  \texttt{is-active} (l.165), so a background workspace edit while another
+  tab is open costs nothing. Called both from
+  \texttt{selectInspectorPanel('typing')} (\S1) and from the workspace's
+  own change listener (\texttt{app.ts:1109}) on every non-viewport
+  mutation. \\
+\texttt{\seqsplit{initTypingPanel(getWorkspace)}} &
+  \texttt{typingPanel.ts:173--180} --- wires the \texttt{\#typing-method-select}
+  dropdown's \texttt{change} listener and stores the workspace getter;
+  called once from \texttt{app.ts:1416}. \\
+\texttt{\seqsplit{deriveProgram(workspace)}} &
+  \texttt{core/types/typeChecker.ts:495--497} --- the same walk that
+  produces the Problems tab's diagnostics (see \texttt{bottom-panel-sync.tex}),
+  so the two views can never disagree. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section{Outline}
+\label{sec:outline}
+
+The Outline tab renders the block program as a plain indented tree ---
+every top-level block, recursively, down to its structural children ---
+each row click-to-locate to the corresponding block in the workspace. It
+is implemented entirely inside \texttt{app.ts} (no separate module).
+
+\subsection{Rendering}
+\label{sec:outline-render}
+
+\begin{center}
+\begin{longtable}{@{}p{4.2cm}p{10.0cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{scheduleOutlineRender()}} &
+  \texttt{app.ts:368--374} --- rAF-debounced (mirrors
+  \texttt{scheduleTypingRender}'s pattern, though this one does not itself
+  check tab visibility --- the caller at \texttt{selectInspectorPanel}
+  gates on the panel becoming active, and the workspace listener
+  (\texttt{app.ts:1108}) fires it unconditionally on every edit regardless
+  of which tab is showing, since a full outline rebuild is cheap enough
+  not to need the same guard). \\
+\texttt{renderOutline()} &
+  \texttt{app.ts:376--427} --- clears \texttt{\#program-outline}
+  (\texttt{index.html:235}); if the workspace has no top blocks, shows an
+  \texttt{.outline-empty} placeholder (l.382--388); otherwise walks every
+  top block via the local \texttt{addBlock(block, depth)} closure
+  (l.390--424). \\
+\texttt{\seqsplit{addBlock(block, depth)}} &
+  \texttt{app.ts:390--424} (inline closure) --- recursive tree walk using
+  Blockly's own \texttt{block.getChildren(true)} (structural children,
+  l.391) as the recursion source --- \textbf{no separate outline data
+  structure is built or maintained}; the block tree \emph{is} the outline,
+  walked fresh on every render. Each row is a \texttt{button.outline-item}
+  with a CSS custom property \texttt{--outline-depth} driving indentation
+  (l.396), a disclosure glyph (a caret if the block has children, a
+  centered dot otherwise, l.400--403), the block's own \texttt{toString(54,
+  '…')} rendering truncated to 54 characters as the row label
+  (l.407--408), and the block's type with the \texttt{mj\_} prefix and
+  underscores stripped as a small trailing tag (l.410--412). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Click-to-locate}
+
+Each row's click handler (\texttt{app.ts:415--421}) is the same
+three-call idiom used everywhere else in the IDE that links a rendered
+artifact back to its source block (Problems, CESK, A~vs~B --- see the
+companion \texttt{bottom-panel-sync.tex}):
+\texttt{workspace.getBlockById(item.dataset.blockId)}, then
+\texttt{workspace.centerOnBlock(id)}, then
+\texttt{Blockly.common.setSelected(block)} (which, unlike
+\texttt{BlockSvg.select()}, also clears whatever was previously selected).
+The Outline row itself carries no separate "locate" affordance --- the
+\emph{whole row} is the button, since unlike Problems (which also needs
+room for a multi-line diagnostic message) an outline entry has nothing
+else to click.
+
+\subsection{Why Outline needs no staleness guard}
+
+Unlike the CESK/Compare/Rewrite steppers (which snapshot a
+\texttt{MachineState} or a copied block tree that can drift out of sync
+with a live-edited workspace, requiring an explicit \texttt{stale} flag —
+see \texttt{stepperPanel.ts:46} and the companion CESK note), the Outline
+and Typing tabs hold \textbf{no persistent state of their own} between
+renders: each call to \texttt{renderOutline}/\texttt{deriveProgram} reads
+the live workspace fresh. There is nothing to go stale, and hence no
+"Program changed --- press Load to restart" banner in either tab, unlike
+the machine steppers.
+
+% =============================================================================
+\section{Cross-cutting: the provenance idiom}
+
+All three tabs, and every other program-view surface in the IDE, converge
+on the same two- or three-line idiom to link a rendered UI element back to
+the block that produced it:
+
+\begin{center}
+\begin{longtable}{@{}p{3.4cm}p{10.8cm}@{}}
+\toprule
+\textbf{Tab} & \textbf{Locate function} \\
+\midrule
+\endhead
+Editable Code &
+  N/A --- the editor \emph{is} a textual view of the whole program at
+  once; there is no per-line click-to-locate, only the debounced
+  text$\to$blocks import of \S\ref{sec:code}. \\
+Typing &
+  Every judgement button calls \texttt{locate(blockId)}
+  (\texttt{typingPanel.ts:26--30}), which forwards to
+  \texttt{locateBlock} from \texttt{typeDiagnostics.ts} (shared with the
+  Problems tab, \texttt{typeDiagnostics.ts:37--44}). \\
+Outline &
+  Inline in \texttt{addBlock}'s click handler
+  (\texttt{app.ts:415--421}), using \texttt{centerOnBlock} +
+  \texttt{Blockly.common.setSelected} directly. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+The full inventory of this pattern across the \emph{bottom} panel
+(Problems, CESK, A~vs~B, and the two tabs that deliberately \emph{don't}
+sync back to the main workspace) is catalogued in the companion note
+\texttt{bottom-panel-sync.tex}.
+
+% =============================================================================
+\section*{Note on scope}
+\addcontentsline{toc}{section}{Note on scope}
+This note covers the three \emph{inspector column} tabs. The seven
+\emph{bottom panel} (viz-dock) tabs --- Problems, Output, Call-by-Structure,
+Call-by-Value, CESK, A~vs~B, Rewrite --- are covered in
+\texttt{bottom-panel-sync.tex}. The Typing tab's typing-rule content is
+covered in \texttt{typing-and-evaluation-rules.tex}. The overall workbench
+shell (activity bar, perspectives, panel visibility/resizing) that the
+inspector column sits inside is covered in \texttt{ui-design-and-layout.tex}.
+
+\end{document}

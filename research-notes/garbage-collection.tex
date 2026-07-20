@@ -1,0 +1,527 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{xcolor}
+\usepackage[export]{adjustbox}
+\usepackage{microtype}
+\emergencystretch=2.5em
+
+\title{Mark-and-Sweep Garbage Collection in Block-MiniJava\\
+\large Logic, Formalization, and Implementation Mapping}
+\author{Research note --- Block-MiniJava}
+\date{2026-07-20}
+
+\newcommand{\rulename}[1]{\textsc{#1}}
+\newcommand{\irule}[3]{%
+  \adjustbox{max width=.96\linewidth}{$\displaystyle
+    \begin{array}{c}
+      #2 \\[2pt] \hline\hline \\[-9pt] #3
+    \end{array}
+    \;\; \rulename{(#1)}
+  $}%
+}
+\newcommand{\dom}{\mathrm{dom}}
+\newcommand{\reach}{\mathrm{reach}}
+\newcommand{\Loc}{\mathrm{Loc}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Model~A of Block-MiniJava's abstract machine (\S\ref{sec:why}) is a
+faithful, mutable-heap encoding of MiniJava: every \texttt{new} grows a
+store that nothing ever shrinks on its own. \texttt{src/core/semantics/gc.ts}
+and \texttt{src/core/semantics/reachability.ts} add a classical
+\emph{tracing, mark-and-sweep} collector on top of that heap, composed as
+its own machine transition rather than folded into \texttt{step}. This note
+gives the collector's logic precisely --- the root set, the mark closure,
+the sweep, and the soundness argument that makes GC observably a no-op ---
+then maps every piece to the exact file, function, and (for the interactive
+mark-phase animation) UI state machine that implements it.
+\end{abstract}
+
+\tableofcontents
+
+% =============================================================================
+\section{Why a garbage collector is needed at all}
+\label{sec:why}
+
+Block-MiniJava's two value models make fundamentally different storage
+commitments (design note \S2--\S4; the sibling note
+\texttt{typing-and-evaluation-rules.tex}, \S4.2):
+
+\begin{itemize}
+  \item \textbf{Model A} (faithful MiniJava) represents every object and
+        array as a \emph{heap-allocated} cell reached only through a
+        $\mathrm{Ref}(\ell)$ value. This is what makes Java-style aliasing
+        and \texttt{field = e} mutation observable in the first place, and
+        it is exactly what makes the heap a genuine, unboundedly growing
+        resource: \texttt{new} never runs out on its own, and nothing frees
+        a cell when it becomes unreachable.
+  \item \textbf{Model B} (structure-preserving) has \emph{no heap at all}
+        --- objects and arrays are inline values, copied by binding. There
+        is nothing to collect, and this GC module is not exercised, wired,
+        or meaningful under Model B.
+\end{itemize}
+
+So garbage collection in this project is specifically \emph{Model~A's}
+concern: a way to reclaim heap cells the running program can no longer
+reach, without changing what the program computes or prints.
+
+% =============================================================================
+\section{The algorithm: reachability closure, then sweep}
+\label{sec:algorithm}
+
+\subsection{The store and its roots}
+
+Let $H : \Loc \rightharpoonup \mathrm{HeapObj}$ be the heap (\texttt{MachineState.heap},
+\texttt{minijavaMachine.ts:130}) and let a \emph{live configuration} be the
+full machine state $\Sigma = \langle C, \Phi, H\rangle$ (control, frame
+stack, store; \S4.2 of the companion evaluation-rules note). A location
+$\ell \in \dom(H)$ is \textbf{garbage} exactly when it is not reachable from
+anything a future step of the program could still read. Three, and only
+three, places pin a heap location outside $H$ itself:
+
+\begin{enumerate}
+  \item \textbf{Environment roots} --- every value directly bound in a
+        \emph{live} frame's locals $\rho$, plus that frame's $\mathsf{this}$
+        (a $\mathrm{Ref}$ under Model A). \textbf{Every} frame on the call
+        stack is a root source, not just the top one: a MiniJava call stack
+        can hold several active frames (nested method calls), and a parent
+        frame paused mid-call still owns live bindings that must not be
+        collected out from under it.
+  \item \textbf{Kontinuation roots} --- every value already computed and
+        stashed inside a \emph{pending continuation} of a live frame, e.g.\
+        the left operand held by $\mathrm{KBinR}$, the array already looked
+        up by $\mathrm{KLookupIdx}$, or the receiver and already-evaluated
+        arguments held by $\mathrm{KCallArgs}$. These are live exactly as
+        much as a local variable is --- they are simply mid-computation
+        rather than named.
+  \item \textbf{The in-flight control value} --- if $C = \mathrm{Value}(v)$,
+        $v$ itself is a root. This is the subtlest of the three: right
+        after a \rulename{new} transition, the fresh $\mathrm{Ref}$ exists
+        \emph{only} as the machine's in-flight control value for exactly
+        one step, before the pending $\mathrm{KAssign}$ or
+        $\mathrm{KCallArgs}$ continuation consumes it into a binding. A
+        collector that only scanned frames (case 1--2) and happened to run
+        in that one-step window would reclaim an object the very next step
+        needs --- so this case is not optional, and both the library and
+        the UI driver include it explicitly (\S\ref{sec:impl}).
+\end{enumerate}
+
+Formally, the root set is
+\[
+  \mathrm{Roots}(\Sigma) \;=\;
+    \bigcup_{\varphi \in \Phi} \big(\, \mathrm{addrs}(\rho_\varphi) \cup
+      \{\mathrm{Ref}(\mathsf{self}_\varphi)\}\big) \;\cup\;
+    \bigcup_{\varphi \in \Phi} \mathrm{addrs}(\kappa_\varphi) \;\cup\;
+    \begin{cases}
+      \mathrm{addrs}(v) & C = \mathrm{Value}(v) \\
+      \varnothing & \text{otherwise}
+    \end{cases}
+\]
+where $\mathrm{addrs}(v)$ collects every $\mathrm{Ref}$ a value directly or
+transitively contains (a $\mathrm{Ref}$ contributes itself; an inline
+$\mathrm{Obj}/\mathrm{Arr}$ --- which does not occur under Model A's own
+values, but is handled defensively --- contributes its fields/elements
+recursively).
+
+\subsection{Mark: the reachability closure}
+
+Reachability is the least fixed point of the root set closed under
+following object fields and array elements:
+\[
+  \irule{Mark-Root}{\ell \in \mathrm{Roots}(\Sigma)}{\ell \in \reach(\Sigma)}
+\]
+\[
+  \irule{Mark-Field}
+    {\ell \in \reach(\Sigma) \quad H(\ell) = \mathrm{Obj}(C,\overline{f{=}v})
+     \quad \ell' \in \mathrm{addrs}(v_i) \text{ for some } f_i}
+    {\ell' \in \reach(\Sigma)}
+\]
+\[
+  \irule{Mark-Elem}
+    {\ell \in \reach(\Sigma) \quad H(\ell) = \mathrm{Arr}(\overline{v})
+     \quad \ell' \in \mathrm{addrs}(v_i) \text{ for some } v_i}
+    {\ell' \in \reach(\Sigma)}
+\]
+This is a standard \emph{tracing} collector's mark phase: a graph traversal
+of the heap starting from the roots, following every outgoing edge (field
+or element) until no new node is discovered. \textbf{Dangling references}
+($\ell \in \reach(\Sigma)$ but $\ell \notin \dom(H)$) terminate that branch
+of the traversal rather than erroring --- they cannot occur reachably in
+this machine (there is no explicit deallocation before GC runs, so every
+live $\mathrm{Ref}$ points somewhere), but the traversal is defensive about
+it regardless. \textbf{Cycles} terminate because each location is expanded
+into its own outgoing edges \emph{at most once}, however many times it is
+rediscovered --- the standard visited-set guard that makes tracing
+GC total on a possibly-cyclic object graph (an object graph with a field
+cycle, e.g.\ two objects each holding a reference to the other, is
+completely ordinary in Java and must not loop the collector forever).
+
+\subsection{Sweep}
+
+Sweep is a pure filter: keep exactly the store entries whose address
+survived marking, and drop the rest.
+\[
+  \mathrm{sweep}(H, R) \;=\; \{\, \ell \mapsto H(\ell) \mid \ell \in \dom(H) \cap R \,\}
+\]
+Two properties are worth stating explicitly because they are what make
+sweep \emph{safe} to run at arbitrary points in execution rather than only
+between well-chosen safepoints:
+\begin{itemize}
+  \item \textbf{Non-moving.} A surviving object keeps its address $\ell$
+        and is the \emph{same} object (not a copy) --- sweep never
+        relocates anything, so every $\mathrm{Ref}(\ell)$ still held
+        anywhere in the machine (by construction, only in roots or reachable
+        objects, both of which survive) remains valid without any
+        forwarding-pointer or pointer-rewriting pass. This is what a
+        \emph{moving} (e.g.\ copying, compacting) collector would need and
+        this one deliberately avoids, at the cost of not compacting
+        fragmented free space --- an acceptable trade for a
+        pedagogical/visualization machine, not a performance-oriented one.
+  \item \textbf{Monotone addresses.} Sweep only ever \emph{shrinks} the
+        domain of $H$; it never reassigns or recycles a retired address.
+        The machine's separate allocation counter $\mathrm{nextLoc}$ is
+        untouched by GC and keeps incrementing monotonically, so a freshly
+        allocated object can never collide with the address of something
+        GC just swept away, even one step later.
+\end{itemize}
+
+\subsection{The composed transition}
+
+\[
+  \irule{GC}
+    {R = \reach(\Sigma) \quad H' = \mathrm{sweep}(H,R)}
+    {\langle C,\Phi,H\rangle \;\longrightarrow_{\mathrm{GC}}\; \langle C,\Phi,H'\rangle}
+\]
+$\longrightarrow_{\mathrm{GC}}$ is a transition on the \emph{same} kind of
+configuration the evaluator's $\longrightarrow$ relation (the companion
+note's \S4.2) operates on, but it is a genuinely separate relation: it
+never changes $C$ or $\Phi$, is not one of the named evaluation rules
+(\rulename{new}, \rulename{call}, \ldots), and --- critically --- \emph{runs
+to completion in one shot}. There is no partially-marked, partially-swept
+state that a caller (or, under Model~A, the running mutator) can ever
+observe: \S\ref{sec:no-write-barrier} explains why that lets this collector
+skip machinery that a concurrent or incremental collector would need.
+
+% =============================================================================
+\section{Correctness}
+\label{sec:correctness}
+
+\subsection{Soundness: GC never collects a live object}
+
+By construction, $\reach(\Sigma)$ is downward closed under the exact three
+places a running program can ever \emph{read} a $\mathrm{Ref}$ from next: a
+frame's locals/\texttt{this}, a frame's pending continuations, and the
+in-flight control value. Any address the program could dereference on its
+very next step is therefore in $\mathrm{Roots}(\Sigma) \subseteq
+\reach(\Sigma)$, and any address reachable from a root by following live
+fields/elements is in $\reach(\Sigma)$ by the closure rules --- so
+$\mathrm{sweep}(H, \reach(\Sigma))$ can never drop something the next step
+needs. The one case that would silently break this argument (the in-flight
+$\mathrm{Value}(v)$ root, \S\ref{sec:algorithm} case 3) is exactly the case
+both the library's caller contract and the UI driver call out and implement
+--- see \S\ref{sec:impl} and the root-collection code at
+\texttt{stepperPanel.ts:649} / \texttt{test/gc.entry.ts:79}, whose comments
+both point at the identical hazard.
+
+\subsection{Semantic transparency}
+
+The stronger, tested property is that GC is \emph{observably a no-op}: for
+any program $p$ that terminates,
+\[
+  \mathrm{output}(\mathrm{run}(p)) \;=\; \mathrm{output}(\mathrm{run}_{\mathrm{GC}}(p))
+\]
+where $\mathrm{run}$ steps to completion with GC never invoked and
+$\mathrm{run}_{\mathrm{GC}}$ composes a full mark-and-sweep pass after
+\emph{every single step} (the most aggressive schedule possible, and hence
+the strongest test of the property) --- even though the two runs' final
+heaps, and every intermediate heap, generally differ. This is checked, not
+just argued, by \texttt{test/run\_gc.js}'s integration layer
+(\S\ref{sec:tests}): running GC after every step never changes final
+status, output, or step count on programs deliberately built to generate
+garbage mid-run (aliasing plus loop-generated garbage, a field-chain
+rebind, and an array resize that abandons the old backing array).
+
+\subsection{No write barrier, no tri-color invariant}
+\label{sec:no-write-barrier}
+
+A collector that can be \emph{paused} mid-mark while the mutator keeps
+running needs to maintain an invariant relating collector and mutator
+state --- classically Dijkstra et al.'s tri-color invariant, enforced by a
+\emph{write barrier} that intercepts every mutator pointer write so a
+black (already-scanned) object can never come to point at a white
+(not-yet-scanned) one without the collector noticing
+\cite{dijkstra1978line}. Block-MiniJava's collector needs none of this,
+because it is never actually concurrent with the mutator: \texttt{runGC}
+(\texttt{gc.ts:52}) computes the \emph{entire} reachable set before
+sweeping, in one synchronous call, and every caller --- the pure test loop
+in \texttt{test/gc.entry.ts} and the interactive UI driver in
+\texttt{stepperPanel.ts} --- enforces \emph{never interleaved with a
+mutator step} as an invariant (\S\ref{sec:impl}). The mark phase's
+\emph{visual animation} (one heap box highlighted per timer tick,
+\S\ref{sec:ui}) only \emph{looks} incremental to the user; the underlying
+machine state is frozen for its whole duration, so there is no window in
+which a mutator step could invalidate an in-progress mark. This is a
+deliberate simplicity trade documented directly in the source
+(\texttt{gc.ts:10--17}): stop-the-world tracing GC is exactly the right
+amount of collector for a machine whose entire point is single-stepped,
+observed execution, not concurrent throughput.
+
+% =============================================================================
+\section{Implementation mapping}
+\label{sec:impl}
+
+The collector is deliberately split into three layers with three different
+responsibilities, none of which imports \texttt{step} or is imported by it:
+
+\begin{center}
+\begin{tabular}{@{}p{3.6cm}p{5.6cm}p{5.6cm}@{}}
+\toprule
+\textbf{Layer} & \textbf{File} & \textbf{Responsibility} \\
+\midrule
+Reachability (pure, testable in isolation) &
+  \texttt{src/core/semantics/}\linebreak\texttt{reachability.ts} &
+  The mark closure over hand-built \texttt{MachineValue}/heap fixtures ---
+  no dependency on \texttt{MachineState}, \texttt{Frame}, or Blockly. \\
+Collector (pure, composes reachability + sweep) &
+  \texttt{src/core/semantics/gc.ts} &
+  \texttt{sweep} and \texttt{runGC}: the batch, non-animated
+  mark-then-sweep entry point a test or a future non-visual caller uses. \\
+Interactive driver (impure, owns the animation and the UI's GC state) &
+  \texttt{src/core/ui/stepperPanel.ts} &
+  Extracts roots from a real \texttt{MachineState}, drives
+  \texttt{markPhase} one event per animation tick, renders the mark/sweep,
+  and commits the swept heap as a new history entry. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{\texttt{reachability.ts}: the steppable mark phase}
+
+\begin{center}
+\begin{tabular}{@{}p{4.2cm}p{11cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\texttt{Address = Loc} (l.32) & Type alias; a heap address is the same
+  \texttt{Loc} the machine already uses. \\
+\texttt{MarkSource} (l.35--37) & Tags \emph{why} an address was just marked
+  --- a root (\texttt{'env'} or \texttt{'kont'} origin) or reached via
+  another address --- purely for the UI's provenance/animation text, not
+  for correctness. \\
+\texttt{MarkEvent} (l.40--43) & One "object newly marked" record: the
+  address and its \texttt{MarkSource}. \\
+\texttt{markPhase(env, store, kont)} (l.61--96) & The traversal core: a
+  JavaScript \emph{generator}, so a caller can resume it one
+  \texttt{.next()} at a time. Internally an explicit worklist (not the call
+  stack, so it cannot stack-overflow on a deep or cyclic heap), a
+  \texttt{marked} set that both prevents re-expansion and gives the
+  \rulename{Mark-Root}/\rulename{Mark-Field}/\rulename{Mark-Elem} rules
+  their cycle-safety, and \texttt{collectAddresses} (l.114--130) walking one
+  value down to the \texttt{Ref}s it contains. \\
+\texttt{reachableAddresses(env, store, kont)} (l.103--111) & The batch
+  form: drains \texttt{markPhase} into a \texttt{Set}. \textbf{There is
+  exactly one traversal implementation} --- this is not a second algorithm,
+  just a caller that does not care about visitation order. Used by tests
+  and by \texttt{gc.ts}. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{\texttt{gc.ts}: sweep and the batch entry point}
+
+\begin{center}
+\begin{tabular}{@{}p{4.2cm}p{11cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\texttt{sweep(store, reachable)} (l.38--44) & The sweep phase exactly as
+  \S\ref{sec:algorithm}: a fresh \texttt{Map} containing only the reachable
+  entries; surviving values are the \emph{same} \texttt{HeapObj} references
+  (no copying), matching the non-moving property. \\
+\texttt{runGC(env, store, kont)} (l.52--59) & Mark to completion via
+  \texttt{reachableAddresses}, then sweep. This is $\longrightarrow_{\mathrm{GC}}$
+  itself, as a pure function on \texttt{(roots, heap)} rather than on a
+  full \texttt{MachineState} --- deliberately, so it stays independent of
+  which caller (test loop or UI) is responsible for extracting roots from a
+  particular state shape. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{\texttt{stepperPanel.ts}: the interactive driver}
+\label{sec:ui}
+
+This is the "real, running" GC integration --- the \texttt{Run GC}
+button and the auto-trigger on the CESK tab (\texttt{index.html:294--300}).
+
+\begin{center}
+\begin{tabular}{@{}p{4.4cm}p{11.2cm}@{}}
+\toprule
+\textbf{Function / state} & \textbf{Role} \\
+\midrule
+\texttt{kontRoots(kont)} (l.608--632) & Enumerates exactly the \texttt{Kont}
+  tags that pin a \texttt{MachineValue} (\texttt{KArrAssignVal.index},
+  \texttt{KBinR.left}, \texttt{KLookupIdx.arr}, \texttt{KCharAtIdx.str},
+  \texttt{KCallArgs.recv}/\texttt{.done}) --- the concrete realization of
+  the "kontinuation roots" case in \S\ref{sec:algorithm}. Every other
+  \texttt{Kont} tag carries only \texttt{Blockly.Block}/string/null
+  control-flow bookkeeping, nothing rooted. \\
+\texttt{frameRoots(frame)} (l.634--638) & One frame's env roots (its
+  \texttt{locals} plus, under Model~A, \texttt{REF\_V(frame.self)} for
+  \texttt{this}) and kont roots. \\
+\texttt{rootsOf(state)} (l.649--659) & Flattens \emph{every} frame in
+  \texttt{state.stack} (not just the top) via \texttt{frameRoots}, and adds
+  \texttt{state.control.value} when \texttt{control.tag === 'Value'} ---
+  the exact three root sources of \S\ref{sec:algorithm}, spelled out
+  against the real \texttt{MachineState} shape. The in-flight-value comment
+  at l.640--648 is the same hazard \S\ref{sec:correctness} names. \\
+\texttt{startGCAnimation()} (l.703--725) & Entry point for both the manual
+  button and the auto-trigger. Computes \texttt{rootsOf(current)}, opens a
+  \texttt{markPhase} generator, and drains it \emph{one event per
+  \texttt{setInterval} tick} (\texttt{GC\_MARK\_INTERVAL\_MS = 300}ms,
+  l.35) purely for the visualization --- \texttt{stopPlay()} is called
+  first so the mutator's own Play loop cannot interleave. \\
+\texttt{flashMarkedBox(loc)} (l.664--670) & Per-tick visual feedback: the
+  just-marked heap box flashes (\texttt{is-gc-marked}). \\
+\texttt{finishSweep(marked)} (l.676--697) & Once the generator is
+  exhausted: grey out every heap box \emph{not} in \texttt{marked}, wait
+  \texttt{GC\_SWEEP\_FADE\_MS = 450}ms for the fade, then commit --- pushes
+  the pre-GC state onto the same \texttt{history} stack the mutator's
+  \texttt{Back} button uses (so GC is undoable exactly like a step),
+  computes the swept heap via \texttt{sweep} (the same function
+  \texttt{gc.ts} exports), and clears \texttt{lastEffect}/\texttt{lastRule}
+  so a surviving box does not spuriously re-flash as "just written." \\
+\texttt{autoGcEnabled}, \texttt{gcThreshold} (l.53--54) & Persisted
+  (\texttt{localStorage}) settings for the automatic trigger, read/written
+  by \texttt{loadGcSettings}/\texttt{updateAutoGcEnabled}/
+  \texttt{updateGcThreshold} (l.746--765). \\
+\texttt{stepOnce()}'s auto-trigger (l.812--819) & After a mutator step,
+  if auto-GC is on \emph{and} the step's effect was a \texttt{'new'}
+  \emph{and} the heap has grown past \texttt{gcThreshold}, immediately
+  calls \texttt{startGCAnimation()} --- so collection is allocation-triggered,
+  the classic GC scheduling policy, rather than time-triggered. \\
+\texttt{gcAnimation} guard (l.56, checked at l.211,215,704,800,823) &
+  Non-null for the whole duration of a mark-then-sweep pass; every mutator
+  control (\texttt{Step}, \texttt{Back}, \texttt{Play}) is disabled while
+  it is set, enforcing "GC and mutator steps are never interleaved" at the
+  UI layer, on top of \texttt{gc.ts}'s own single-call atomicity. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{\texttt{test/gc.entry.ts}: the property-testing harness}
+
+A fourth, test-only composition (\texttt{collectGarbage}, l.95--99;
+\texttt{runWithGCEveryStep}/\texttt{runWithoutGC}, l.131--155) reproduces
+\texttt{stepperPanel.ts}'s \texttt{rootsOf} logic against a real
+\texttt{MachineState} (not hand-built fixtures) and threads \texttt{runGC}
+directly into the step loop, once per step, to produce the two traces
+\S\ref{sec:correctness}'s semantic-transparency property compares.
+
+% =============================================================================
+\section{Verification}
+\label{sec:tests}
+
+\begin{itemize}
+  \item \textbf{\texttt{test/run\_reachability.js}} (14 cases) --- pure
+        fixtures for \texttt{reachableAddresses}/\texttt{markPhase}:
+        objects reachable only through a field of another object, only
+        through an array element, only through a returned frame
+        (unreachable), only through a pending continuation (reachable);
+        unreachable and reachable A$\leftrightarrow$B reference cycles;
+        that \texttt{reachableAddresses} never mutates the store; empty
+        root sets reaching nothing; and step-by-step assertions on
+        \texttt{markPhase}'s generator protocol itself (first/second/third
+        \texttt{.next()}, a kont-pinned root's reported origin, and that
+        draining the generator matches the batch function).
+  \item \textbf{\texttt{test/run\_gc.js}} (14 cases) --- (a)/(b) pure
+        \texttt{sweep}/\texttt{runGC} unit tests on hand-built stores
+        (reachable objects survive \emph{unchanged}, unreachable ones are
+        gone); (c) the semantic-transparency property
+        (\S\ref{sec:correctness}) on real programs: aliasing plus
+        loop-generated garbage, a field-chain rebind, and an array-resize
+        scenario, each checked three ways --- GC-on vs.\ GC-off give an
+        identical observable result, the specific object/value that
+        should survive does, and the heap actually shrinks under GC (so
+        the test cannot pass vacuously because GC happened to collect
+        nothing).
+  \item \textbf{CESK panel smoke test} (\texttt{test/smoke-csesk.entry.ts},
+        part of \texttt{npm test}'s browser-machine-panel suite) exercises
+        a real mid-run GC through the UI driver end to end: allocation
+        count before/after, the specific soon-to-be-garbage cell present
+        then absent, the heap shrinking by exactly the swept count, the
+        status text reporting a GC summary (not a step count), and the
+        program still finishing --- with the right output --- after a
+        mid-run collection.
+\end{itemize}
+
+Together these three suites test the collector at three levels: the raw
+graph algorithm on synthetic heaps, the composed mark+sweep+transparency
+property on real programs run headlessly, and the full interactive
+mark-then-sweep pass driven exactly as a user would trigger it.
+
+% =============================================================================
+\section{Theoretical sources}
+
+\begin{itemize}
+  \item \textbf{Mark-and-sweep} is McCarthy's original algorithm,
+        introduced for automatic storage reclamation in Lisp
+        \cite{mccarthy1960recursive}: mark every cell reachable from a
+        root set, then reclaim every unmarked cell. This is, unmodified,
+        the two-phase structure of \texttt{runGC}.
+  \item \textbf{Root sets, tracing vs.\ reference counting, and the
+        stop-the-world/incremental/concurrent design space} are given
+        their standard modern treatment in Jones, Hosking, and Moss's
+        \emph{The Garbage Collection Handbook}
+        \cite{jgh2011gchandbook} --- the vocabulary
+        (``roots,'' ``mutator,'' ``non-moving,'' ``stop-the-world'') used
+        throughout this note follows that reference.
+  \item \textbf{The tri-color invariant and write barriers}, which this
+        collector deliberately does \emph{not} need
+        (\S\ref{sec:no-write-barrier}), are Dijkstra, Lamport, Martin,
+        Scholten, and Steffens's on-the-fly garbage collection technique
+        for a collector running \emph{concurrently} with the mutator
+        \cite{dijkstra1978line} --- included here as the contrasting case
+        that explains, by what it avoids, why this simpler
+        stop-the-world collector is sufficient.
+\end{itemize}
+
+% =============================================================================
+\section*{Note on scope}
+\addcontentsline{toc}{section}{Note on scope}
+This collector targets Model~A only; it is meaningless (and not wired up)
+under Model~B, which has no heap. It is also non-generational and
+non-compacting by design --- the project's goal is a legible, animatable
+collection pass over a small, interactively-stepped heap, not throughput on
+a large one.
+
+% =============================================================================
+\begin{thebibliography}{9}
+
+\bibitem{mccarthy1960recursive}
+J.~McCarthy.
+\newblock Recursive functions of symbolic expressions and their computation by machine, Part I.
+\newblock \emph{Communications of the ACM}, 3(4):184--195, 1960.
+
+\bibitem{jgh2011gchandbook}
+R.~Jones, A.~Hosking, and E.~Moss.
+\newblock \emph{The Garbage Collection Handbook: The Art of Automatic Memory Management}.
+\newblock CRC Press, 2011.
+
+\bibitem{dijkstra1978line}
+E.~W. Dijkstra, L.~Lamport, A.~J. Martin, C.~S. Scholten, and E.~F.~M. Steffens.
+\newblock On-the-fly garbage collection: an exercise in cooperation.
+\newblock \emph{Communications of the ACM}, 21(11):966--975, 1978.
+
+\end{thebibliography}
+
+\end{document}

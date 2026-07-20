@@ -1,0 +1,501 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{xcolor}
+\usepackage[export]{adjustbox}
+\usepackage{microtype}
+\usepackage{seqsplit}
+\usepackage{multirow}
+\emergencystretch=2.5em
+
+\title{The Toolbox: Category Rendering, Click-to-Add, and Drag-and-Drop\\
+\large A Custom HTML Toolbox Over Blockly, and How a Block Enters the Workspace}
+\author{Research note --- Block-MiniJava}
+\date{2026-07-20}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Block-MiniJava does not use Blockly's built-in flyout-based toolbox. The
+category list, search box, and every draggable block button in
+\texttt{\#toolbox-column} are hand-rolled HTML
+(\texttt{\seqsplit{src/core/ui/app.ts}}), driven by a small block/category registry
+(\texttt{\seqsplit{src/core/blocks/minijavaBlocks.ts}}) and native HTML5
+drag-and-drop. A block can enter the workspace two ways --- a click, or a
+drag --- and both funnel through the same block-creation function. This
+note documents the registry, the rendering, both entry paths (including
+the exact client-to-workspace coordinate conversion drag-and-drop needs),
+and the "required blocks" mechanism that keeps exactly one \texttt{Goal}
+and one \texttt{MainClass} in the workspace at all times, self-healing
+after any edit, and correspondingly \emph{absent} from the toolbox itself.
+\end{abstract}
+
+\tableofcontents
+
+% =============================================================================
+\section{Why a custom toolbox}
+
+Blockly ships its own toolbox/flyout system (an XML or JSON toolbox
+definition, rendered by Blockly itself as a sidebar flyout you drag out
+of). Block-MiniJava does not use it. Instead, \texttt{\#toolbox-column}
+(\texttt{\seqsplit{index.html:106--163}}) is ordinary HTML that \texttt{app.ts}
+populates and wires by hand: a search input, then one collapsible
+\texttt{<section class="toolbox-category">} per category, each holding a
+\texttt{<button class="toolbox-block-button">} per block. This buys three
+things a stock Blockly flyout does not give for free in this project's
+IDE-shell design: the toolbox can live inside the same activity-bar/sidebar
+system as the Run and Settings views (\texttt{\seqsplit{ui-design-and-layout.tex}}
+\S2--\S3), the search box can filter by block \emph{label} text rather than
+only by category, and every block button can be a real HTML
+\texttt{draggable} element participating in the browser's native
+drag-and-drop rather than Blockly's own (touch-oriented) flyout drag
+gesture.
+
+% =============================================================================
+\section{The block and category registry}
+
+\texttt{\seqsplit{src/core/blocks/minijavaBlocks.ts}} is the single source of truth
+for which block types exist and how the toolbox groups them --- the
+\texttt{renderToolbox} function (\S\ref{sec:render}) never hard-codes a
+block type or category; it only iterates this data.
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{ToolboxBlock} &
+  \texttt{\seqsplit{minijavaBlocks.ts:4--8}} --- \{type, label, icon\}: a block type
+  name, its toolbox display label, and a short glyph/text icon. \\
+\texttt{ToolboxCategory} &
+  \texttt{\seqsplit{minijavaBlocks.ts:10--15}} --- \{id, label, icon, blocks:
+  ToolboxBlock[]\}. \\
+\texttt{\seqsplit{MINI\_JAVA\_REQUIRED\_BLOCK\_TYPES}} &
+  \texttt{\seqsplit{minijavaBlocks.ts:17}} --- the two-element tuple
+  \texttt{['mj\_goal', 'mj\_main\_class']}, destructured in \texttt{app.ts:62}
+  into \texttt{\seqsplit{GOAL\_BLOCK\_TYPE}}/\texttt{\seqsplit{MAIN\_BLOCK\_TYPE}}. \\
+\texttt{\seqsplit{MINI\_JAVA\_BLOCK\_TYPES}} &
+  \texttt{\seqsplit{minijavaBlocks.ts:19--59}} --- the full list of 38 block type
+  names (grammar non-terminals, statements, expressions, literals); the
+  type \texttt{\seqsplit{MiniJavaBlockType}} (l.61) is its element union. \\
+\texttt{\seqsplit{MINI\_JAVA\_CATEGORIES}} &
+  \texttt{\seqsplit{minijavaBlocks.ts:67--144}} --- six \texttt{ToolboxCategory}
+  entries, in display order: \textbf{Program}, \textbf{Declarations},
+  \textbf{Types}, \textbf{Statements}, \textbf{Expressions},
+  \textbf{Values} (\S\ref{sec:categories}). \\
+\texttt{\seqsplit{defineMiniJavaBlocks()}} &
+  \texttt{\seqsplit{minijavaBlocks.ts:155--}}\linebreak(end) --- registers every block's
+  JSON definition with Blockly (\texttt{Blockly.common.}\linebreak\texttt{\seqsplit{defineBlocksWithJsonArray}}),
+  including each input's grammar-aware connection \texttt{check} (\S\ref{sec:connections}) ---
+  called once from \texttt{app.ts} before the workspace is injected. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{The six categories}
+\label{sec:categories}
+
+\begin{center}
+\begin{longtable}{@{}p{2.6cm}p{2.2cm}p{9.4cm}@{}}
+\toprule
+\textbf{Category} & \textbf{id} & \textbf{Blocks} \\
+\midrule
+\endhead
+Program & \texttt{program} & \texttt{\seqsplit{mj\_class\_declaration}}. \\
+Declarations & \texttt{declarations} & \texttt{\seqsplit{mj\_var\_declaration}},
+  \texttt{\seqsplit{mj\_method\_declaration}}, \texttt{\seqsplit{mj\_formal\_parameter}}. \\
+Types & \texttt{types} & \texttt{\seqsplit{mj\_type\_int\_array}},
+  \texttt{\seqsplit{mj\_type\_boolean}}, \texttt{mj\_type\_int}, \texttt{mj\_type\_string},
+  \texttt{\seqsplit{mj\_type\_identifier}}. \\
+Statements & \texttt{statements} & \texttt{\seqsplit{mj\_statement\_block}},
+  \texttt{\seqsplit{mj\_statement\_if}}, \texttt{\seqsplit{mj\_statement\_while}},
+  \texttt{\seqsplit{mj\_statement\_print}}, \texttt{\seqsplit{mj\_statement\_assign}},
+  \texttt{\seqsplit{mj\_statement\_array\_assign}}. \\
+Expressions & \texttt{expressions} & \texttt{mj\_expr\_arith},
+  \texttt{\seqsplit{mj\_expr\_compare}}, \texttt{mj\_expr\_logic},
+  \texttt{\seqsplit{mj\_expr\_array\_lookup}}, \texttt{\seqsplit{mj\_expr\_array\_length}},
+  \texttt{\seqsplit{mj\_expr\_char\_at}}, \texttt{mj\_expr\_concat},
+  \texttt{\seqsplit{mj\_expr\_str\_length}}, \texttt{\seqsplit{mj\_expr\_method\_call}},
+  \texttt{\seqsplit{mj\_argument\_item}}, \texttt{mj\_expr\_not},
+  \texttt{mj\_expr\_parens}. \\
+Values & \texttt{values} & \texttt{\seqsplit{mj\_expr\_integer}},
+  \texttt{mj\_expr\_string}, \texttt{\seqsplit{mj\_expr\_boolean}},
+  \texttt{\seqsplit{mj\_expr\_identifier}}, \texttt{mj\_expr\_this},
+  \texttt{\seqsplit{mj\_expr\_new\_int\_array}}, \texttt{\seqsplit{mj\_expr\_new\_object}}. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Two block types from \texttt{\seqsplit{MINI\_JAVA\_BLOCK\_TYPES}} are conspicuously
+absent from every category: \texttt{mj\_goal} and \texttt{mj\_main\_class}
+--- see \S\ref{sec:required} for why. \texttt{\seqsplit{mj\_value\_object}},
+\texttt{mj\_value\_null}, and \texttt{\seqsplit{mj\_viz\_description}} are also absent:
+the first two are runtime-only value blocks the substitution stepper
+renders into its own private workspace (\texttt{\seqsplit{typing-and-evaluation-
+rules.tex}} \S4.3, \texttt{\seqsplit{bottom-panel-sync.tex}} \S2.4), never
+user-authored; the third is a visualization annotation block, also never
+user-placed directly.
+
+% =============================================================================
+\section{Rendering the toolbox}
+\label{sec:render}
+
+\begin{center}
+\begin{longtable}{@{}p{3.6cm}p{10.6cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{renderToolbox(query)}} &
+  \texttt{app.ts:830--898} --- rebuilds \texttt{\seqsplit{\#toolbox-content}} from
+  scratch on every call (no incremental diffing --- the whole list is
+  cheap enough to throw away and rebuild). With no query, every category
+  and block renders. With a query, a category whose own label/id matches
+  shows \emph{all} its blocks; otherwise each block is individually
+  filtered by whether its label or type contains the (lower-cased) query
+  (l.837--843) --- so searching \texttt{"if"} shows the \texttt{if / else}
+  statement even though its category label ("Statements") does not
+  itself match. A category that ends up with zero visible blocks is
+  omitted entirely (l.844); if \emph{no} block anywhere matches, a
+  \texttt{\seqsplit{.toolbox-search-empty}} message is shown instead
+  (l.891--897). \\
+\texttt{\seqsplit{addBlockToWorkspace(type)}} &
+  \texttt{app.ts:900--902} --- the click handler installed on every
+  toolbox button (l.872); see \S\ref{sec:click}. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+Each category is a collapsible \texttt{<section>}: its
+\texttt{<button class="toolbox-category-header">} toggles a
+\texttt{collapsed} class on click (\texttt{app.ts:855--858}), independent
+per category, with no persisted collapse state --- collapsing is a
+same-session convenience, not a saved preference.
+
+% =============================================================================
+\section{Entry path 1: click to add}
+\label{sec:click}
+
+\begin{center}
+\begin{longtable}{@{}p{4.2cm}p{10.0cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{addBlockToWorkspace(type)}} &
+  \texttt{app.ts:900--902} --- \texttt{\seqsplit{createBlockInWorkspace(type,}}\linebreak\texttt{\seqsplit{activeWorkspaceInsertionPoint())}}. \\
+\texttt{\seqsplit{activeWorkspaceInsertionPoint()}} &
+  \texttt{app.ts:178--185} --- picks a point inset from the visible
+  workspace viewport's top-left corner (18\% of the viewport's
+  width/height, clamped to $[72,\allowbreak 140]$px horizontally and
+  $[72,120]$px vertically, l.180--181), then adds a small
+  \textbf{cascading offset} that increments by 24px (mod 120) on every
+  call (\texttt{clickAddOffset}, l.50, l.182--183) --- so repeatedly
+  clicking the same toolbox button drops a visible \emph{staircase} of
+  blocks rather than stacking them exactly on top of each other. \\
+\texttt{\seqsplit{createBlockInWorkspace(type, position)}} &
+  \texttt{app.ts:187--205} --- if \texttt{type} is the Goal or MainClass
+  type, redirects to \texttt{\seqsplit{ensureRequiredBlocks}} instead of creating a
+  duplicate (a defensive branch: neither type is ever reachable through
+  the toolbox UI at all, \S\ref{sec:required}, so this only guards a
+  hypothetical direct call). Otherwise: opens a
+  \texttt{Blockly.Events} group (l.193, so the create + move the caller
+  performs together undo as one user action), calls
+  \texttt{\seqsplit{workspace.newBlock(type)}}, \texttt{initSvg()}, \texttt{render()},
+  \texttt{moveBy(position.x, position.y)}, and \texttt{select()}, then
+  calls \texttt{updateCode()} and \texttt{saveAutosave()}. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\texttt{\seqsplit{clientPointToWorkspacePoint}} (\S\ref{sec:coords}) is \emph{not}
+used on this path --- a plain click has no client coordinate to convert,
+only "somewhere sensible near the top-left of what's currently visible."
+
+% =============================================================================
+\section{Entry path 2: drag and drop}
+\label{sec:dnd}
+
+Every toolbox block button is a native HTML5 draggable element
+(\texttt{button.draggable = true}, \texttt{app.ts:869}); dropping it onto
+the Blockly canvas creates a block at the exact drop point. This is
+ordinary browser drag-and-drop (the \texttt{DataTransfer} API), not any
+Blockly-provided drag gesture.
+
+\subsection{Starting the drag: the toolbox button}
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Event/Code} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{TOOLBOX\_BLOCK\_MIME}} &
+  \texttt{app.ts:61} --- the custom MIME type
+  \texttt{\seqsplit{"application/x-block-minijava-block"}} used to carry the block
+  \texttt{type} string through the drag. \\
+\texttt{dragstart} &
+  \texttt{app.ts:873--878} --- adds the \texttt{is-dragging} CSS class for
+  visual feedback; calls \texttt{\seqsplit{event.dataTransfer.setData}} \textbf{twice}
+  --- once under \texttt{\seqsplit{TOOLBOX\_BLOCK\_MIME}} (the precise channel) and
+  once under the standard \texttt{'text/plain'} (a fallback, in case
+  something in the drop path only reads the generic type); sets
+  \texttt{effectAllowed = 'copy'} (dragging a toolbox block never removes
+  it from the toolbox --- it is always a copy/instantiate operation, never
+  a move). \\
+\texttt{dragend} &
+  \texttt{app.ts:879--882} --- removes \texttt{is-dragging} and clears the
+  \texttt{\seqsplit{workspace-drop-target}} highlight regardless of whether the drop
+  actually succeeded (a drag cancelled outside any valid target still
+  fires \texttt{dragend}). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Receiving the drag: the workspace area}
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{hasToolboxBlockDrag(event)}} &
+  \texttt{app.ts:908--910} --- true iff the in-flight drag's
+  \texttt{\seqsplit{dataTransfer.types}} includes \texttt{\seqsplit{TOOLBOX\_BLOCK\_MIME}} ---
+  the guard every handler below uses first, so dragging some unrelated
+  thing (a browser tab, a file, page text) over the canvas is silently
+  ignored rather than mishandled. \\
+\texttt{\seqsplit{initToolboxDragAndDrop()}} &
+  \texttt{app.ts:912--941} --- installs four listeners on
+  \texttt{\#blockly-area}: \\
+  & \quad\texttt{dragenter} (l.915--919) --- \texttt{preventDefault()}
+  (required for the element to become a valid drop target at all under
+  the HTML5 DnD spec) and adds \texttt{\seqsplit{workspace-drop-target}} for a
+  visible drop-zone highlight. \\
+  & \quad\texttt{dragover} (l.921--926) --- also \texttt{preventDefault()}
+  (fired continuously while hovering; the spec requires this every time,
+  not just on \texttt{dragenter}), and sets \texttt{dropEffect = 'copy'}
+  so the OS cursor shows a copy (not move) affordance. \\
+  & \quad\texttt{dragleave} (l.928--931) --- removes the highlight only
+  when the pointer has left \texttt{\#blockly-area} entirely (checked via
+  \texttt{\seqsplit{event.relatedTarget}}, so moving between child elements
+  \emph{inside} the drop zone does not flicker the highlight off and back
+  on). \\
+  & \quad\texttt{drop} (l.933--940) --- \texttt{preventDefault()} (stops
+  the browser's default handling, e.g.\ navigating to dropped text as a
+  URL), clears the highlight, reads the block type back out of
+  \texttt{dataTransfer} (custom MIME first, \texttt{'text/plain'} as
+  fallback), and calls \texttt{\seqsplit{addBlockToWorkspaceAtClientPoint(type,}}\linebreak\texttt{event.clientX, event.clientY)}. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Placing the block: client-to-workspace coordinates}
+\label{sec:coords}
+
+A \texttt{drop} event's \texttt{clientX}/\texttt{clientY} are
+\textbf{screen-space pixel} coordinates; a Blockly block needs a position
+in \textbf{workspace-space} coordinates (which account for the canvas's
+current pan offset and zoom level). This conversion is the one genuinely
+non-trivial piece of the whole toolbox implementation.
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{blocklyViewportRect()}} &
+  \texttt{app.ts:159--161} --- \texttt{\#blockly-div}'s
+  \texttt{\seqsplit{getBoundingClientRect()}}: the on-screen rectangle the canvas
+  currently occupies. \\
+\texttt{\seqsplit{clientPointToWorkspacePoint(clientX, clientY)}} &
+  \texttt{app.ts:163--176} --- the conversion, in four steps:
+  (1) read \texttt{\seqsplit{workspace.getMetrics()}} for the current
+  \texttt{viewLeft}/\texttt{viewTop} (how far the canvas is scrolled/panned)
+  and \texttt{currentScale()} for the zoom factor; (2) clamp the client
+  point into the viewport rectangle first (\texttt{Math.max(0, Math.min(...))},
+  l.170--171) so a drop event that lands slightly outside the canvas
+  element (a few pixels of border/padding) still resolves to a point
+  \emph{inside} it, rather than a nonsensical negative or out-of-range
+  workspace coordinate; (3)-(4) convert the clamped local pixel offset to
+  workspace units: $x_{\mathrm{ws}} = \mathrm{viewLeft} +
+  \mathrm{localX}/\mathrm{scale}$, and symmetrically for $y$
+  (l.172--175) --- dividing by scale is what makes a drop land on the
+  \emph{same visual spot} regardless of whether the canvas is zoomed in
+  or out. \\
+\texttt{\seqsplit{addBlockToWorkspaceAtClientPoint(type, clientX, clientY)}} &
+  \texttt{app.ts:904--906} --- \texttt{\seqsplit{createBlockInWorkspace(type,}}\linebreak\texttt{clientPointToWorkspacePoint(clientX, clientY))};
+  the drag-and-drop counterpart of
+  \texttt{\seqsplit{addBlockToWorkspace}} (\S\ref{sec:click}), sharing the same
+  \texttt{\seqsplit{createBlockInWorkspace}} block-creation logic --- the only
+  difference between the click path and the drag path is \emph{which}
+  position function computes where the new block lands. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\texttt{currentScale()} (\texttt{app.ts:150--156}) reads Blockly's own
+\texttt{getScale()} when available, falling back to a raw \texttt{.scale}
+property read for older/differently-typed Blockly builds --- defensive
+compatibility code, not part of the coordinate math itself.
+
+% =============================================================================
+\section{Grammar-aware connections: what happens after the block lands}
+\label{sec:connections}
+
+Neither the click nor the drag path checks \emph{where} the new block is
+allowed to connect --- a freshly created block always lands as an
+unconnected top-level block at the computed position. Whether it can
+subsequently be dragged \emph{into} a connection with an existing block is
+governed entirely by Blockly's own connection-compatibility check against
+the \texttt{check} metadata every block input declares in
+\texttt{\seqsplit{defineMiniJavaBlocks()}} (\texttt{\seqsplit{minijavaBlocks.ts}}, 40
+\texttt{check:} sites plus typed \texttt{output}/\texttt{\seqsplit{previousStatement}}/
+\texttt{nextStatement} declarations) --- named after MiniJava grammar
+non-terminals (\texttt{MainClass}, \texttt{ClassDeclaration},
+\texttt{VarDeclaration}, \texttt{\seqsplit{MethodDeclaration}},
+\texttt{FormalParameter}, \texttt{Type}, \texttt{Statement},
+\texttt{Expression}, \texttt{Identifier}), exactly as the README's Grammar
+section and the project's custom \texttt{BMJ-Thrasos} renderer
+(\texttt{core/renderer/}) describe. This note does not re-derive that
+system --- it is the same static, structural check documented in the
+README's "Grammar-aware renderer" section --- but it is worth stating
+precisely how the toolbox interacts with it: \textbf{the toolbox creates
+blocks; the connection-check system, entirely separate and already built
+into Blockly plus this project's \texttt{check} metadata, decides where
+they may snap.} No toolbox code inspects or enforces grammar.
+
+% =============================================================================
+\section{Required blocks: Goal and MainClass}
+\label{sec:required}
+
+Every MiniJava program has exactly one \texttt{Goal} (the program root)
+wrapping exactly one \texttt{MainClass}. Rather than ask the user to place
+these two blocks correctly (and keep them that way), Block-MiniJava
+enforces their existence and wiring automatically, and --- as already
+noted in \S\ref{sec:categories} --- never offers them in the toolbox at
+all, so there is no user action that could create a \emph{second} Goal or
+a disconnected MainClass in the first place; the enforcement machinery
+below is a safety net against indirect ways a workspace could still end up
+without them (loading an old/hand-edited save file, an incomplete
+text-editor import, an aborted paste).
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{lockRequiredBlock(block)}} &
+  \texttt{app.ts:255--259} --- \texttt{\seqsplit{setDeletable(false)}},
+  \texttt{\seqsplit{setMovable(false)}}, \texttt{\seqsplit{setCollapsed(false)}}: once a Goal or
+  MainClass block exists, the user can edit its contents (attach classes,
+  fill in the class name) but can neither delete it nor drag it away from
+  its required position. \\
+\texttt{\seqsplit{createRequiredBlock(ws, type, x, y)}} &
+  \texttt{app.ts:261--267} --- the same
+  \texttt{newBlock}/\texttt{initSvg}/\texttt{render}/\texttt{moveBy}
+  sequence as \texttt{\seqsplit{createBlockInWorkspace}} (\S\ref{sec:click}), factored
+  out since required blocks are created from a different call site with
+  no click/drag position to reuse. \\
+\texttt{\seqsplit{removeDuplicateRequiredBlock(block)}} &
+  \texttt{app.ts:269--272} --- \texttt{\seqsplit{setDeletable(true)}} then
+  \texttt{dispose(false)}: a \emph{second} Goal or MainClass block (e.g.\
+  from a merge of two saved files) is un-locked just long enough to be
+  disposed of, keeping exactly one of each. \\
+\texttt{\seqsplit{ensureRequiredBlocks(ws)}} &
+  \texttt{app.ts:274--327} --- the sweep, guarded against re-entrancy
+  (\texttt{\seqsplit{enforcingRequiredBlocks}}, l.51, l.275--276, since disposing a
+  block or moving a connection inside this function itself fires more
+  workspace-change events that would otherwise re-trigger it): finds (or
+  creates) the one \texttt{Goal}; disposes every extra \texttt{Goal};
+  finds (or creates) the \texttt{MainClass} \emph{connected to that Goal}
+  in preference to any other stray \texttt{MainClass} on the workspace
+  (l.297--298); disposes every other \texttt{MainClass}; if the Goal and
+  MainClass are not already connected to each other, forcibly disconnects
+  whatever \emph{is} on each connection first and connects them
+  (l.312--319); finally locks both via \texttt{\seqsplit{lockRequiredBlock}}. Returns
+  whether anything actually changed. \\
+\texttt{\seqsplit{scheduleRequiredBlockEnforcement()}} &
+  \texttt{app.ts:329--336} --- debounced (a zero-delay
+  \texttt{setTimeout}, so it runs once after the current synchronous
+  event-handling batch finishes rather than immediately inside a Blockly
+  event callback) call to \texttt{\seqsplit{ensureRequiredBlocks}}; calls
+  \texttt{updateCode()} only if something changed. Invoked from the
+  workspace's change listener on every mutation event
+  (\texttt{app.ts:1112,1121}) and from
+  \texttt{\seqsplit{FINISHED\_LOADING}} (a full workspace load, e.g.\ Open or
+  autosave restore, l.1111--1113). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section{Full inventory}
+
+\begin{center}
+\begin{longtable}{@{}p{4.4cm}p{5.0cm}p{5.4cm}@{}}
+\toprule
+\textbf{Path} & \textbf{Position function} & \textbf{Shared creation call} \\
+\midrule
+\endhead
+Click a toolbox button &
+  \texttt{\seqsplit{activeWorkspaceInsertionPoint()}} &
+  \multirow{2}{5.4cm}{\texttt{\seqsplit{createBlockInWorkspace(type, position)}}} \\
+Drag a toolbox button onto the canvas &
+  \texttt{\seqsplit{clientPointToWorkspacePoint(}\linebreak\texttt{event.clientX, event.clientY)}} & \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section{HTML wiring}
+
+\begin{center}
+\begin{longtable}{@{}p{3.8cm}p{10.4cm}@{}}
+\toprule
+\textbf{Element} & \textbf{Location} \\
+\midrule
+\endhead
+\texttt{\#toolbox-column} &
+  \texttt{\seqsplit{index.html:106--163}} --- the primary sidebar; the
+  \texttt{blocks}/\texttt{search} view (\texttt{\seqsplit{index.html:114--120}})
+  holds \texttt{\#toolbox-search} and \texttt{\seqsplit{\#toolbox-content}}. \\
+\texttt{\#toolbox-search} &
+  \texttt{index.html:116} --- wired at \texttt{app.ts:1219} to call
+  \texttt{\seqsplit{renderToolbox(input.value)}} on every \texttt{input} event. \\
+\texttt{\seqsplit{\#toolbox-content}} &
+  \texttt{index.html:119} --- the render target of \texttt{renderToolbox}
+  (\S\ref{sec:render}); empty until first populated at IDE init. \\
+\texttt{\#blockly-area} &
+  \texttt{\seqsplit{index.html:200--203}} --- the drop target for
+  \texttt{\seqsplit{initToolboxDragAndDrop}} (\S\ref{sec:dnd}); wraps
+  \texttt{\#blockly-div}, the actual Blockly-injected SVG canvas. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section*{Note on scope}
+\addcontentsline{toc}{section}{Note on scope}
+This note covers block \emph{creation} --- the toolbox UI, the click and
+drag entry paths, and the required-block self-healing invariant. It does
+not re-derive the grammar-aware connection-check system that governs where
+a created block may subsequently connect (already documented in the
+project's own README, "Grammar-aware renderer" section) or the static type
+system that separately checks the resulting program
+(\texttt{\seqsplit{typing-and-evaluation-rules.tex}}). The workbench shell the
+toolbox sits inside (activity bar, sidebar resizing, responsive collapse)
+is covered in \texttt{\seqsplit{ui-design-and-layout.tex}}.
+
+\end{document}

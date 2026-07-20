@@ -1,0 +1,1083 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{xcolor}
+\usepackage[export]{adjustbox}
+\usepackage{microtype}
+\emergencystretch=2.5em
+
+\title{Typing Rules and Evaluation Rules in Block-MiniJava\\
+\large A Formal Reconstruction of the Implemented Static and Dynamic Semantics}
+\author{Research note --- Block-MiniJava}
+\date{2026-07-20}
+
+% ---------------------------------------------------------------------------
+% Inference-rule macro (no external proof-tree package required).
+% \irule{RULE-NAME}{premise_1 \quad premise_2 \quad ...}{conclusion}
+% ---------------------------------------------------------------------------
+\newcommand{\rulename}[1]{\textsc{#1}}
+\newcommand{\irule}[3]{%
+  \adjustbox{max width=.96\linewidth}{$\displaystyle
+    \begin{array}{c}
+      #2 \\[2pt] \hline\hline \\[-9pt] #3
+    \end{array}
+    \;\; \rulename{(#1)}
+  $}%
+}
+\newcommand{\emptyrule}[2]{%
+  \adjustbox{max width=.96\linewidth}{$\displaystyle
+    \begin{array}{c}
+      \hline\hline \\[-9pt] #1
+    \end{array}
+    \;\; \rulename{(#2)}
+  $}%
+}
+
+% Judgment shorthands
+\newcommand{\Ty}[3]{#1 \vdash #2 : #3}                 % Gamma |- e : tau
+\newcommand{\Wf}[2]{#1 \vdash #2 \;\mathsf{ok}}         % Gamma |- s ok
+\newcommand{\Sub}[2]{#1 \mathrel{<:} #2}                % tau <: tau'
+\newcommand{\Asg}[2]{#1 \mathrel{\rightsquigarrow} #2}  % assignability
+\newcommand{\Consist}[2]{#1 \sim #2}                    % gradual consistency
+\newcommand{\Step}[1]{\longrightarrow_{\rulename{#1}}}
+\newcommand{\mtype}{\mathrm{mtype}}
+\newcommand{\fields}{\mathrm{fields}}
+\newcommand{\dom}{\mathrm{dom}}
+\newcommand{\Hole}{\mathord{?}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Block-MiniJava's inspector exposes two kinds of formal artifact at runtime: a
+\emph{Typing} tab that renders on-demand natural-deduction derivations for
+every method, and three small-step \emph{steppers} (CESK, A~vs~B, Rewrite)
+that expose the program's operational semantics one transition at a time.
+Both artifacts are produced by the same code that decides whether a program
+type-checks and what it evaluates to --- the visualization cannot drift from
+the implementation because it \emph{is} the implementation, instrumented to
+record its own derivation. This note reconstructs, rule by rule, the static
+type system (\S\ref{sec:types}) and the two operational semantics --- an
+abstract machine and a substitution-based reduction semantics
+(\S\ref{sec:eval}) --- exactly as implemented in
+\texttt{src/core/types/typeChecker.ts}, \texttt{src/core/types/classTable.ts},
+\texttt{src/core/semantics/minijavaMachine.ts}, and
+\texttt{src/core/semantics/minijavaSubstitution.ts}, and traces each rule
+family to the programming-language-theory literature it descends from.
+\end{abstract}
+
+\tableofcontents
+
+% =============================================================================
+\section{Introduction}
+
+Block-MiniJava implements MiniJava (the CSE~401 core, plus a \texttt{String}
+extension; see \texttt{MiniJava-Adjusted-BNF.md}) as a block-based language
+with:
+
+\begin{itemize}
+  \item a three-layer static type system (type grammar, class table with
+        nominal subtyping, and a bidirectional checker) that also produces a
+        typing \emph{derivation} for the Typing tab, and
+  \item two independently implemented, cross-checked operational semantics:
+  \begin{enumerate}
+    \item \textbf{Vehicle~1} --- a small-step \emph{abstract machine},
+          parameterized by a \emph{value model} $\in \{A, B\}$: Model~A is
+          faithful MiniJava (a mutable heap, reference semantics, aliasing);
+          Model~B is structure-preserving (objects/arrays are inline values,
+          field update is functional). Both models share one control-flow
+          skeleton, so they can be run in lockstep on the same program (the
+          ``A vs B'' tab).
+    \item \textbf{Vehicle~2} --- a small-step \emph{substitution} (reduction)
+          semantics over the pure fragment of the language: every state is a
+          literal block tree, and a step is a literal rewrite of a redex (the
+          ``Rewrite'' tab). An \emph{operational correspondence} check
+          replays the same program on the Model~B machine and asserts that
+          the two traces agree on every \emph{salient} rule.
+  \end{enumerate}
+\end{itemize}
+
+Every rule below is named exactly as it appears in the source (the
+\texttt{rule} field of a \texttt{Derivation}, or the \texttt{lastRule} /
+\texttt{rule} field of a machine or substitution step), so this note can be
+read side by side with the Typing, CESK, A-vs-B, and Rewrite tabs.
+
+% =============================================================================
+\section{The Static Type System}
+\label{sec:types}
+
+The type system is implemented in three separable layers, following the
+design document's own layering (\texttt{block-minijava-value-and-visualisation-design.md},
+\S1):
+
+\begin{enumerate}
+  \item \textbf{Type grammar} (\texttt{core/types/ty.ts}) --- the abstract
+        syntax of types.
+  \item \textbf{Class table} (\texttt{core/types/classTable.ts}) --- name
+        resolution, \texttt{extends} chains, nominal subtyping.
+  \item \textbf{Checker} (\texttt{core/types/typeChecker.ts}) --- the typing
+        and statement well-formedness judgments, which also emit a
+        \texttt{Derivation} tree consumed by the Typing tab.
+\end{enumerate}
+
+\subsection{Type grammar}
+
+\[
+  \tau \;::=\; \mathsf{int} \mid \mathsf{boolean} \mid \mathsf{String}
+             \mid \mathsf{int[]} \mid \mathsf{String[]}
+             \mid C
+             \mid (\tau_1,\ldots,\tau_n)\!\to\!\tau
+             \mid \mathsf{Object} \mid \mathsf{Nothing} \mid \Hole
+\]
+
+where $C$ ranges over declared class names. $\mathsf{Object}$
+(\texttt{Top}) and $\mathsf{Nothing}$ (\texttt{Bottom}) bound the nominal
+subtype lattice; the arrow type $(\tau_1,\ldots,\tau_n)\!\to\!\tau$ is
+produced only internally, as the result of the $\mtype$ lookup used by
+\rulename{T-Invk} (\S\ref{sec:t-invk}) --- there is no arrow-typed surface
+syntax. $\Hole$ is a \emph{first-class unfilled-annotation} marker in the
+style of Hazel's typed holes (Omar et al.
+\cite{omar2017hazelnut,omar2019livelits}): an empty socket, or an expression
+whose type could not be determined, types as $\Hole$ and is made consistent
+with every other type (\S\ref{sec:assignability}) so that one incomplete
+block never cascades into unrelated errors.
+
+\subsection{Contexts, the class table, and subtyping}
+
+A typing context $\Gamma$ is a finite map from identifiers to types. Inside a
+method of class $C$, $\Gamma$ is fixed for the whole body:
+\[
+  \Gamma \;=\; \{\, \mathsf{this} : C \,\} \cup
+  \{\, x_i : \tau_i \mid x_i \text{ a parameter} \,\} \cup
+  \{\, y_j : \tau_j \mid y_j \text{ a local variable} \,\}
+\]
+($\mathsf{this}$ is omitted inside \texttt{main}, whose sole binding is
+\texttt{args}$:\mathsf{String[]}$). Field lookup is a \emph{separate},
+class-indexed environment $\fields(C)$, resolved by walking $C$ and its
+ancestors and taking the nearest (most-derived) declaration of a name --- an
+identifier that is not in $\Gamma$ but is in $\fields(C)$ is an
+\emph{implicit} \texttt{this.}\emph{f} reference. Method lookup is the
+analogous $\mtype(m, C)$, giving the $(\tau_1,\ldots,\tau_n)\!\to\!\tau$
+signature found by the same nearest-ancestor walk (overriding, not
+overloading: MiniJava has one method per name per class). Both
+$\fields(\cdot)$ and $\mtype(\cdot,\cdot)$ are named after, and behave
+exactly as, the identically named auxiliary functions in Featherweight Java
+\cite{igarashi2001fj} (\S\ref{sec:fj-source}).
+
+Subtyping $\Sub{\tau}{\tau'}$ is nominal, seeded from \texttt{extends}:
+\[
+  \irule{S-Refl}{}{\Sub{\tau}{\tau}}
+  \qquad
+  \irule{S-Top}{}{\Sub{\tau}{\mathsf{Object}}}
+  \qquad
+  \irule{S-Bottom}{}{\Sub{\mathsf{Nothing}}{\tau}}
+\]
+\[
+  \irule{S-Extends}{\mathtt{class}\;C\;\mathtt{extends}\;D}{\Sub{C}{D}}
+  \qquad
+  \irule{S-Trans}{\Sub{C}{D} \quad \Sub{D}{E}}{\Sub{C}{E}}
+\]
+(the implementation gets \rulename{S-Trans} for free: \texttt{isSubtype}
+walks the whole ancestor chain of $C$ looking for $D$, rather than composing
+single \texttt{extends} steps.) Two classes with no subtype relationship
+except through $\mathsf{Object}$ are otherwise incomparable --- there is no
+structural or union/intersection subtyping.
+
+\subsection{Assignability: subtyping plus hole consistency}
+\label{sec:assignability}
+
+Every place a value flows into a typed slot (assignment, argument passing,
+\texttt{return}) is checked against \emph{assignability}
+$\Asg{\tau}{\tau'}$, not raw subtyping:
+\[
+  \irule{Asg-Sub}{\Sub{\tau}{\tau'}}{\Asg{\tau}{\tau'}}
+  \qquad
+  \irule{Asg-HoleL}{}{\Asg{\Hole}{\tau'}}
+  \qquad
+  \irule{Asg-HoleR}{}{\Asg{\tau}{\Hole}}
+\]
+This is exactly a two-sided \emph{gradual-typing consistency} relation
+$\Consist{\tau}{\tau'}$ in the sense of Siek and Taha
+\cite{siek2006gradual}, restricted so that the only ``unknown'' type is the
+editor's typed hole --- the same design Hazel uses to keep an editable,
+possibly-incomplete program meaningfully typed at every keystroke
+\cite{omar2017hazelnut}.
+
+\subsection{\texorpdfstring{Expression typing rules ($\mathtt{T}\text{-}\ast$)}{Expression typing rules (T-*)}}
+
+Judgment: $\Ty{\Gamma}{e}{\tau}$ --- ``under $\Gamma$, expression $e$ has
+type $\tau$.'' Each rule below is named after the \texttt{rule} string the
+checker attaches to the corresponding \texttt{Derivation} node in
+\texttt{typeChecker.ts}.
+
+\paragraph{Literals and variables.}
+\[
+  \emptyrule{\Ty{\Gamma}{n}{\mathsf{int}}}{T-Int}
+  \qquad
+  \emptyrule{\Ty{\Gamma}{\texttt{"}s\texttt{"}}{\mathsf{String}}}{T-Str}
+  \qquad
+  \emptyrule{\Ty{\Gamma}{b}{\mathsf{boolean}}}{T-Bool}
+  \quad (b \in \{\mathtt{true},\mathtt{false}\})
+\]
+\[
+  \irule{T-Var}{\Gamma(x) = \tau \;\text{ or }\; \fields(C)(x) = \tau}
+        {\Ty{\Gamma}{x}{\tau}}
+  \qquad
+  \irule{T-This}{\text{inside a method of class } C}
+        {\Ty{\Gamma}{\mathtt{this}}{C}}
+\]
+(\rulename{T-Var} is one rule with two side conditions in the code, because
+a bare identifier is either a local/parameter lookup in $\Gamma$ or an
+implicit field read through $\fields(C)$; the Typing tab's note line reports
+which one fired, e.g.\ \texttt{"$\Gamma(v) = \mathsf{int}$"} or
+\texttt{"fields(Cell)(f) = int"}. \rulename{T-This} is undefined --- reported
+as an error, typed $\Hole$ --- inside \texttt{main}, which has no receiver.)
+
+\paragraph{Object and array construction.}
+\[
+  \irule{T-New}{C \text{ is declared}, \; C \neq \text{main class}}
+        {\Ty{\Gamma}{\mathtt{new}\;C()}{C}}
+  \qquad
+  \irule{T-NewArr}{\Ty{\Gamma}{e}{\mathsf{int}}}
+        {\Ty{\Gamma}{\mathtt{new\ int[}e\mathtt{]}}{\mathsf{int[]}}}
+\]
+
+\paragraph{Operators.}
+\[
+  \irule{T-Arith}{\Ty{\Gamma}{e_1}{\mathsf{int}} \quad \Ty{\Gamma}{e_2}{\mathsf{int}}}
+        {\Ty{\Gamma}{e_1 \oplus e_2}{\mathsf{int}}}
+  \quad (\oplus \in \{+,-,*,/\})
+\]
+\[
+  \irule{T-Cmp}{\Ty{\Gamma}{e_1}{\mathsf{int}} \quad \Ty{\Gamma}{e_2}{\mathsf{int}}}
+        {\Ty{\Gamma}{e_1 \bowtie e_2}{\mathsf{boolean}}}
+  \quad (\bowtie \in \{<,\leq,>,\geq\})
+\]
+\[
+  \irule{T-And}{\Ty{\Gamma}{e_1}{\mathsf{boolean}} \quad \Ty{\Gamma}{e_2}{\mathsf{boolean}}}
+        {\Ty{\Gamma}{e_1\,\&\&\,e_2}{\mathsf{boolean}}}
+  \qquad
+  \irule{T-Or}{\Ty{\Gamma}{e_1}{\mathsf{boolean}} \quad \Ty{\Gamma}{e_2}{\mathsf{boolean}}}
+        {\Ty{\Gamma}{e_1\,||\,e_2}{\mathsf{boolean}}}
+\]
+\[
+  \irule{T-Not}{\Ty{\Gamma}{e}{\mathsf{boolean}}}
+        {\Ty{\Gamma}{!e}{\mathsf{boolean}}}
+\]
+(Parenthesization, \texttt{mj\_expr\_parens}, is typing-\emph{transparent}:
+the checker returns the child's own \texttt{Derivation} unchanged, so no
+\rulename{T-Parens} node ever appears in a derivation tree.)
+
+\paragraph{Arrays.}
+\[
+  \irule{T-Lookup}{\Ty{\Gamma}{e_1}{\mathsf{int[]}} \quad \Ty{\Gamma}{e_2}{\mathsf{int}}}
+        {\Ty{\Gamma}{e_1[e_2]}{\mathsf{int}}}
+  \qquad
+  \irule{T-Length}{\Ty{\Gamma}{e}{\mathsf{int[]}}}
+        {\Ty{\Gamma}{e\mathtt{.length}}{\mathsf{int}}}
+\]
+
+\paragraph{Strings (extension over the base BNF).}
+\[
+  \irule{T-CharAt}{\Ty{\Gamma}{e_1}{\mathsf{String}} \quad \Ty{\Gamma}{e_2}{\mathsf{int}}}
+        {\Ty{\Gamma}{e_1\mathtt{.charAt(}e_2\mathtt{)}}{\mathsf{String}}}
+\]
+\[
+  \irule{T-Concat}{\Ty{\Gamma}{e_1}{\mathsf{String}} \quad \Ty{\Gamma}{e_2}{\mathsf{String}}}
+        {\Ty{\Gamma}{e_1\mathtt{.concat(}e_2\mathtt{)}}{\mathsf{String}}}
+  \qquad
+  \irule{T-StrLen}{\Ty{\Gamma}{e}{\mathsf{String}}}
+        {\Ty{\Gamma}{e\mathtt{.length()}}{\mathsf{int}}}
+\]
+(\rulename{T-CharAt} returns a \emph{one-character} $\mathsf{String}$, not a
+$\mathsf{char}$ --- the language has no character type, matching the design
+note's ``strings, no chars'' decision.)
+
+\paragraph{Method invocation.}
+\label{sec:t-invk}
+\[
+  \irule{T-Invk}
+    {\Ty{\Gamma}{e_0}{C} \quad
+     \mtype(m,C) = (\tau_1,\ldots,\tau_n)\!\to\!\tau \quad
+     \Ty{\Gamma}{e_i}{\sigma_i} \quad
+     \Asg{\sigma_i}{\tau_i} \;\; (1 \le i \le n)}
+    {\Ty{\Gamma}{e_0.m(e_1,\ldots,e_n)}{\tau}}
+\]
+This is, rule-for-rule, Featherweight Java's \textsc{T-Invk}
+\cite[Fig.~1]{igarashi2001fj}, adapted from FJ's purely functional core to
+MiniJava's imperative one (arguments are still evaluated for their values,
+not for effects that matter to typing). The Typing tab's note line for this
+rule literally prints the $\mtype$ judgment, e.g.\
+\texttt{"mtype(set, Cell) = (int) -> int"}.
+
+\subsection{\texorpdfstring{Statement well-formedness rules ($\mathtt{WF}\text{-}\ast$)}{Statement well-formedness rules (WF-*)}}
+
+Judgment: $\Wf{\Gamma}{s}$ --- ``under $\Gamma$, statement $s$ is
+well-formed.'' Statements have no type of their own (MiniJava's imperative
+core is outside Featherweight Java's purely functional scope), so their
+judgment concludes $\mathsf{ok}$ rather than a type --- the standard move for
+adding an imperative statement layer on top of an expression type system
+(cf.\ Pierce \cite[Ch.~13]{pierce2002tapl} on typing references and
+commands).
+
+\[
+  \irule{WF-Block}{\Wf{\Gamma}{s_1} \;\cdots\; \Wf{\Gamma}{s_k}}
+        {\Wf{\Gamma}{\{\,s_1;\ldots;s_k\,\}}}
+\]
+\[
+  \irule{WF-If}
+    {\Ty{\Gamma}{e}{\mathsf{boolean}} \quad
+     \Wf{\Gamma}{s_1} \;(\text{then}) \quad
+     \Wf{\Gamma}{s_2} \;(\text{else})}
+    {\Wf{\Gamma}{\mathtt{if}\,(e)\,s_1\,\mathtt{else}\,s_2}}
+\]
+\[
+  \irule{WF-While}
+    {\Ty{\Gamma}{e}{\mathsf{boolean}} \quad \Wf{\Gamma}{s}}
+    {\Wf{\Gamma}{\mathtt{while}\,(e)\,s}}
+\]
+\[
+  \irule{WF-Print}
+    {\Ty{\Gamma}{e}{\mathsf{int}} \;\text{ or }\; \Ty{\Gamma}{e}{\mathsf{String}}}
+    {\Wf{\Gamma}{\mathtt{System.out.println(}e\mathtt{)}}}
+\]
+\[
+  \irule{WF-Assign}
+    {\Gamma(x) = \tau \;\text{or}\; \fields(C)(x) = \tau \quad
+     \Ty{\Gamma}{e}{\sigma} \quad \Asg{\sigma}{\tau}}
+    {\Wf{\Gamma}{x = e}}
+\]
+\[
+  \irule{WF-ArrAssign}
+    {\Gamma(a) = \mathsf{int[]} \;\text{or}\; \fields(C)(a) = \mathsf{int[]} \quad
+     \Ty{\Gamma}{e_1}{\mathsf{int}} \quad \Ty{\Gamma}{e_2}{\mathsf{int}}}
+    {\Wf{\Gamma}{a[e_1] = e_2}}
+\]
+
+An undeclared variable does not abort the derivation: \rulename{WF-Assign}
+and \rulename{T-Var} still produce a node (typed $\Hole$, or with a
+\texttt{"}$x \notin \Gamma$\texttt{"} note) so the rest of the program keeps
+checking --- the same Hazel-style ``hole, don't cascade'' policy as
+\S\ref{sec:assignability}, applied at the statement level.
+
+\subsection{\texorpdfstring{Method well-formedness: $\mathrm{M\text{-}OK}$}{Method well-formedness: M-OK}}
+
+\[
+  \irule{M-OK}
+    {\Gamma = \{\mathsf{this}\!:\!C, x_1\!:\!\tau_1,\ldots\}
+       \quad \Wf{\Gamma}{s_1} \;\cdots\; \Wf{\Gamma}{s_k}
+       \quad \Ty{\Gamma}{e_{\mathrm{ret}}}{\sigma}
+       \quad \Asg{\sigma}{\tau_{\mathrm{ret}}}}
+    {\mathrm{M\text{-}OK} \vdash \mathtt{method}\ C.m\ \mathsf{ok}}
+\]
+is the derivation \emph{root} the Typing tab renders per method (and once
+for \texttt{main}, with no \texttt{return} premise and $\mathsf{this}$
+omitted from $\Gamma$). The name and shape mirror Featherweight Java's
+method judgment $M~\mathsf{OK}~\mathsf{IN}~C$ \cite[Fig.~1]{igarashi2001fj},
+again re-purposed for an imperative statement sequence instead of FJ's
+single return expression.
+
+\subsection{Method overriding}
+
+Outside the per-expression/statement rules, the checker enforces one more
+well-formedness condition on the class table: an overriding method must have
+\emph{identical} parameter types and a \emph{covariant} return type,
+\[
+  \irule{Override}
+    {\Sub{C}{D} \quad \mtype(m,D) = (\tau_1,\ldots,\tau_n)\!\to\!\tau
+     \quad \mtype(m,C) = (\tau_1,\ldots,\tau_n)\!\to\!\tau'
+     \quad \Sub{\tau'}{\tau}}
+    {\text{override of } m \text{ in } C \text{ is well-formed}}
+\]
+which is FJ's override condition \cite[\S2.3]{igarashi2001fj} generalized
+from FJ's invariant-everything rule to Java's actual covariant-return rule
+(JLS \S8.4.8.3, since Java~5) --- MiniJava has no overloading, so ``the''
+overridden signature is unambiguous.
+
+\subsection{Theoretical sources}
+\label{sec:fj-source}
+
+\begin{itemize}
+  \item \textbf{Natural-deduction typing judgments, rule-naming convention,
+        and the $\mathtt{T}\text{-}\ast$ prefix} follow Pierce's \emph{Types
+        and Programming Languages} \cite{pierce2002tapl}, the standard
+        textbook presentation of $\Gamma \vdash e : \tau$ typing rules as
+        premises-over-a-bar proof trees --- exactly the shape the Typing tab
+        renders.
+  \item \textbf{The object layer} --- $\mtype$, $\fields$, \rulename{T-Invk},
+        \rulename{T-New}, nominal subtyping seeded from \texttt{extends},
+        and the $M~\mathsf{OK}$ method judgment --- is Featherweight Java
+        \cite{igarashi2001fj}, the standard minimal core calculus for a
+        Java-like nominally-typed OO language. FJ's auxiliary functions and
+        two of its rule names are used unchanged; MiniJava is close enough
+        to FJ's object model (fields, single inheritance, method
+        invocation, \texttt{this}, \texttt{new}) that no adaptation was
+        needed there.
+  \item \textbf{The imperative statement layer} ($\mathtt{WF}\text{-}\ast$)
+        has no FJ analogue --- FJ is purely functional, with no assignment,
+        loops, or a store. The $\Wf{\Gamma}{s}$ judgment form and its
+        composition with the expression layer follow the generic treatment
+        of imperative extensions to a typed calculus in Pierce
+        \cite[Ch.~13]{pierce2002tapl}.
+  \item \textbf{Typed holes and hole consistency} (\S\ref{sec:assignability})
+        follow Hazel's live, always-typed editor calculus
+        \cite{omar2017hazelnut,omar2019livelits}, itself built on the
+        consistency relation from gradual typing \cite{siek2006gradual}.
+\end{itemize}
+
+% =============================================================================
+\section{Operational Semantics}
+\label{sec:eval}
+
+Block-MiniJava implements two independent evaluators over the same block
+AST, deliberately keeping them structurally different so that agreement
+between them is evidence, not a tautology (design note \S6--\S8;
+\texttt{research-notes/abstract-machine-analysis.md}):
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & \textbf{Vehicle 1 --- abstract machine} & \textbf{Vehicle 2 --- substitution} \\
+\midrule
+file & \texttt{minijavaMachine.ts} & \texttt{minijavaSubstitution.ts} \\
+scope & the full language (Models A and B) & the pure fragment only \\
+state & control + frame stack + heap & one block tree \\
+step & transition rule on a configuration & literal rewrite of a redex \\
+tab & CESK, A vs B & Rewrite \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Vehicle 1: a store-bearing abstract machine, parameterized by value model}
+
+\subsubsection{Configurations}
+
+A machine state is a tuple
+\[
+  \Sigma \;=\; \langle\, C,\; \varphi\!:\!\Phi,\; H \,\rangle
+\]
+where $C$ is the \emph{control} (a statement, an expression, a produced
+\emph{value}, or \emph{done}); $\varphi\!:\!\Phi$ is a non-empty
+\emph{stack of activation frames}, top frame $\varphi$, the rest $\Phi$
+(pushed on method call, popped on return); and $H : \mathrm{Loc} \rightharpoonup
+\mathrm{HeapObj}$ is the \emph{store}. Each frame is itself a small
+CEK-style configuration,
+\[
+  \varphi \;=\; \langle\, \mathsf{self},\; \rho,\; \kappa \,\rangle,
+  \qquad \rho : \mathrm{Var} \rightharpoonup \mathrm{Value}, \quad
+  \kappa : \mathrm{Kont}^{*}
+\]
+with $\rho$ the frame's local environment (parameters and locals, held
+\emph{by copy}) and $\kappa$ its pending-work stack, innermost first. This
+is a \textbf{CESK machine} (Control, Environment, Store, Kontinuation) in
+the sense of Felleisen and Friedman's CEK machine
+\cite{felleisen1986control} extended with an explicit, imperative-language
+store $S$/$H$ as formalized by Might and Van~Horn's abstracting-abstract-machines
+treatment of CESK machines \cite{mightvanhorn2010aam}, further extended with
+an explicit \emph{stack of frames} (rather than one shared continuation) to
+support method call/return --- the \emph{dump} of Landin's original SECD
+machine \cite{landin1964scpp}. The project's own research note classifies
+this precisely as ``a CESK-style machine with an essential mutable store,
+over an explicit call stack of activation frames''
+(\texttt{research-notes/abstract-machine-analysis.md}).
+
+\paragraph{Values diverge by model.}
+\[
+  v ::= n \mid b \mid \mathrm{s} \mid \mathtt{null}
+      \mid \underbrace{\mathrm{Ref}(\ell)}_{\text{Model A only}}
+      \mid \underbrace{\mathrm{Obj}(C,\overline{f{=}v}) \mid \mathrm{Arr}(\overline{v})}_{\text{Model B only}}
+\]
+Under \textbf{Model A}, $\mathrm{Ref}(\ell)$ is the \emph{only} way to reach
+an object or array; $H(\ell)$ holds the actual $\mathrm{Obj}/\mathrm{Arr}$,
+so aliasing is real and field write is a store mutation. Under
+\textbf{Model B}, $H = \varnothing$ always (the ``no-store invariant''):
+objects and arrays \emph{are} values, copied by binding, and field/array
+update rebuilds a fresh value rather than mutating anything. The two models
+share every other part of the machine (control flow, continuations,
+frame-stack discipline), so \texttt{step} is one function parameterized by
+$\mathrm{model} \in \{A,B\}$, and running both models on the same program
+is a genuine lockstep execution, not two separate interpreters that merely
+happen to agree.
+
+\subsubsection{Continuations}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+group & continuation frames ($\kappa$) \\
+\midrule
+statements & $\mathrm{KStmtSeq}, \mathrm{KLoop}, \mathrm{KIf}, \mathrm{KWhile}, \mathrm{KPrint}, \mathrm{KAssign},$ \\
+           & $\mathrm{KArrAssignIdx}, \mathrm{KArrAssignVal}$ \\
+operators  & $\mathrm{KNot}, \mathrm{KAnd}, \mathrm{KOr}, \mathrm{KBinL}\!\to\!\mathrm{KBinR}$ \\
+arrays/strings & $\mathrm{KLookupArr}\!\to\!\mathrm{KLookupIdx}, \mathrm{KLength}, \mathrm{KNewArr},$ \\
+                & $\mathrm{KCharAtStr}\!\to\!\mathrm{KCharAtIdx}, \mathrm{KStrLength}$ \\
+method call & $\mathrm{KCallRecv}\!\to\!\mathrm{KCallArgs}$ (receiver, then arguments left-to-right, then push a frame) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection{Transition rules}
+
+Rules are grouped by category; each is named exactly as \texttt{lastRule}
+records it. A step $\Sigma \Step{r} \Sigma'$ reads ``$\Sigma$ steps to
+$\Sigma'$ by rule $r$.'' Rules marked \emph{salient} correspond 1:1 to a
+rewrite of the substitution semantics (\S\ref{sec:correspondence}); rules
+marked \emph{administrative} are bookkeeping the substitution semantics
+never names (entering a block, dispatching \texttt{if}/\texttt{while},
+pushing an operand continuation, \ldots).
+
+\paragraph{Literals and variables (administrative).}
+\[
+  \irule{lit}{}{\langle \mathrm{Expr}(\ell), \varphi, \Phi, H\rangle \Step{lit} \langle \mathrm{Value}(v(\ell)), \varphi,\Phi,H\rangle}
+\]
+\[
+  \irule{var}{x \in \dom(\rho)}
+        {\langle \mathrm{Expr}(x), \langle \mathsf{self},\rho,\kappa\rangle,\Phi,H\rangle \Step{var}
+         \langle \mathrm{Value}(\rho(x)), \langle \mathsf{self},\rho,\kappa\rangle,\Phi,H\rangle}
+\]
+\[
+  \irule{field-read}{x \notin \dom(\rho) \quad H(\mathsf{self}).\mathrm{fields}(x) = v \;\text{(A), or}\; \mathsf{self}.\mathrm{fields}(x)=v \;\text{(B)}}
+        {\langle \mathrm{Expr}(x), \varphi,\Phi,H\rangle \Step{field\text{-}read} \langle \mathrm{Value}(v),\varphi,\Phi,H\rangle}
+\]
+\[
+  \irule{this}{}
+        {\langle \mathrm{Expr}(\mathtt{this}), \langle \mathsf{self},\rho,\kappa\rangle,\Phi,H\rangle \Step{this}
+         \langle \mathrm{Value}(\underbrace{\mathrm{Ref}(\mathsf{self})}_{A} \;\text{or}\; \underbrace{\mathsf{self}}_{B}), \varphi,\Phi,H\rangle}
+\]
+
+\paragraph{Control flow (administrative except where noted).}
+\[
+  \irule{seq / seq\text{-}end}{}
+    {\langle \mathrm{Done}, \langle\ldots,\mathrm{KStmtSeq}(s_{\mathrm{next}})\!:\!\kappa\rangle\!:\!\Phi,H\rangle
+     \Step{seq}
+     \begin{cases}
+       \langle \mathrm{Stmt}(s_{\mathrm{next}}), \langle\ldots,\mathrm{KStmtSeq}(s_{\mathrm{next}}')\!:\!\kappa\rangle\!:\!\Phi,H\rangle & s_{\mathrm{next}} \neq \bot \\
+       \langle \mathrm{Done},\langle\ldots,\kappa\rangle\!:\!\Phi,H\rangle \;(\rulename{seq\text{-}end}) & s_{\mathrm{next}} = \bot
+     \end{cases}}
+\]
+\[
+  \irule{if\text{-}true / if\text{-}false}{b \in \{\mathtt{true},\mathtt{false}\}}
+    {\langle \mathrm{Value}(b), \langle\ldots,\mathrm{KIf}(s_{\mathtt{then}},s_{\mathtt{else}})\!:\!\kappa\rangle\!:\!\Phi,H\rangle \Step{if\text{-}true/false}
+     \langle \mathrm{enter}(b \,?\, s_{\mathtt{then}} : s_{\mathtt{else}}), \ldots\rangle}
+\]
+\[
+  \irule{while\text{-}enter / while\text{-}exit / loop}{}
+    {\langle \mathrm{Value}(b),\langle\ldots,\mathrm{KWhile}(e,s)\!:\!\kappa\rangle\!:\!\Phi,H\rangle \Step{while\text{-}enter/exit}
+     \begin{cases}
+       \mathrm{enter}(s) \text{ with } \mathrm{KLoop}(e,s)\!:\!\kappa & b=\mathtt{true} \\
+       \mathrm{Done} \text{ with } \kappa & b=\mathtt{false}
+     \end{cases}}
+\]
+(\rulename{loop} re-focuses the \texttt{while} statement once its body's
+$\mathrm{KLoop}$ continuation is reached, restarting the condition.)
+\[
+  \irule{assign}{}
+    {\langle \mathrm{Value}(v), \langle\ldots,\mathrm{KAssign}(x)\!:\!\kappa\rangle\!:\!\Phi,H\rangle \Step{assign}
+     \langle \mathrm{Done}, \langle\ldots,\rho[x\!\mapsto\!v],\kappa\rangle\!:\!\Phi,H\rangle}
+\]
+\[
+  \irule{field\text{-}write}{}
+    {\langle \mathrm{Value}(v), \langle \mathsf{self}\!=\!\ell,\ldots,\mathrm{KAssign}(f)\!:\!\kappa\rangle\!:\!\Phi,H\rangle \Step{field\text{-}write}
+     \langle \mathrm{Done}, \varphi,\Phi,H[\ell.f\!\mapsto\!v]\rangle}
+\]
+\emph{(Model A: the store mutates.)}
+\[
+  \irule{field\text{-}update}{}
+    {\langle \mathrm{Value}(v), \langle \mathsf{self}\!=\!o,\ldots,\mathrm{KAssign}(f)\!:\!\kappa\rangle\!:\!\Phi,H\rangle \Step{field\text{-}update}
+     \langle \mathrm{Done}, \langle o[f\!\mapsto\!v],\ldots\rangle,\Phi,H\rangle}
+\]
+\emph{(Model B: a fresh object replaces $o$.)}
+The pair \rulename{field-write}/\rulename{field-update} is where Models A
+and B provably diverge: the built-in \emph{Aliasing Contrast} example
+prints \texttt{4141} under A (a shared heap cell observes both writes) and
+\texttt{41} under B (each alias holds an independent copy) after the same
+51 steps on both machines --- the machine-level demonstration of the
+design note's core distinction (\S2--\S4).
+\[
+  \irule{println}{}
+    {\langle \mathrm{Value}(v),\langle\ldots,\mathrm{KPrint}\!:\!\kappa\rangle\!:\!\Phi,H\rangle \Step{println}
+     \langle \mathrm{Done},\varphi,\Phi,H\rangle, \; \mathrm{output} \mathrel{+}= \mathrm{show}(v)}
+\]
+\[
+  \irule{array\text{-}write \,/\, array\text{-}update}{}
+    {\langle \mathrm{Value}(v), \langle\ldots,\mathrm{KArrAssignVal}(a,i)\!:\!\kappa\rangle\!:\!\Phi,H\rangle \Step{arr\text{-}write/arr\text{-}update}
+     \cdots}
+\]
+(again bifurcating exactly as field write: Model A mutates $H(\ell)$ in
+place \rulename{(array-write)}; Model B rebinds $a$ to a new array value
+with index $i$ replaced \rulename{(array-update)}.)
+
+\paragraph{Operators (mixed).}
+Left-to-right, call-by-value evaluation is enforced by the
+$\mathrm{KBinL}\!\to\!\mathrm{KBinR}$ continuation pair (administrative:
+\rulename{binop}, \rulename{binop-right}); the salient fold rules are
+\[
+  \rulename{add}, \rulename{sub}, \rulename{mul}, \rulename{div},
+  \rulename{less}, \rulename{leq}, \rulename{gt}, \rulename{geq},
+  \rulename{concat}
+\]
+e.g.
+\[
+  \irule{add}{}
+    {\langle \mathrm{Value}(n_2), \langle\ldots,\mathrm{KBinR}(\mathrm{add},n_1)\!:\!\kappa\rangle\!:\!\Phi,H\rangle
+     \Step{add} \langle \mathrm{Value}(n_1{+}n_2),\varphi,\Phi,H\rangle}
+\]
+\[
+  \irule{div}{n_2 \neq 0}
+    {\langle \mathrm{Value}(n_2), \langle\ldots,\mathrm{KBinR}(\mathrm{div},n_1)\!:\!\kappa\rangle\!:\!\Phi,H\rangle
+     \Step{div} \langle \mathrm{Value}(\mathrm{trunc}(n_1/n_2)),\varphi,\Phi,H\rangle}
+\]
+(division truncates toward zero and gets \emph{stuck} on $n_2=0$, matching
+Java's \texttt{ArithmeticException} rather than silently producing a value).
+Boolean connectives short-circuit via dedicated continuations:
+\[
+  \irule{and\text{-}short\text{-}circuit}{}
+    {\langle \mathrm{Value}(\mathtt{false}), \langle\ldots,\mathrm{KAnd}(e_2)\!:\!\kappa\rangle\!:\!\Phi,H\rangle \Step{and\text{-}sc}
+     \langle \mathrm{Value}(\mathtt{false}),\varphi,\Phi,H\rangle}
+\]
+\[
+  \irule{or\text{-}short\text{-}circuit}{}
+    {\langle \mathrm{Value}(\mathtt{true}), \langle\ldots,\mathrm{KOr}(e_2)\!:\!\kappa\rangle\!:\!\Phi,H\rangle \Step{or\text{-}sc}
+     \langle \mathrm{Value}(\mathtt{true}),\varphi,\Phi,H\rangle}
+\]
+with \rulename{and}/\rulename{or} firing once the (necessarily evaluated)
+right operand comes back, and \rulename{not} negating a boolean directly.
+
+\paragraph{Strings.}
+\[
+  \irule{char\text{-}at}{0 \le i < |s|}
+    {\langle \mathrm{Value}(i), \langle\ldots,\mathrm{KCharAtIdx}(s)\!:\!\kappa\rangle\!:\!\Phi,H\rangle
+     \Step{char\text{-}at} \langle \mathrm{Value}(s[i]),\varphi,\Phi,H\rangle}
+\]
+\[
+  \irule{str\text{-}length}{}
+    {\cdots \Step{str\text{-}length} \langle \mathrm{Value}(|s|),\ldots\rangle}
+\]
+($i$ out of $[0,|s|)$ is \emph{stuck}: a string index out of bounds, Java's
+\texttt{StringIndexOutOfBoundsException}.)
+
+\paragraph{Arrays.}
+\[
+  \irule{new\text{-}array}{n \ge 0}
+    {\langle \mathrm{Value}(n), \langle\ldots,\mathrm{KNewArr}\!:\!\kappa\rangle\!:\!\Phi,H\rangle
+     \Step{new\text{-}array}
+     \begin{cases}
+       \langle \mathrm{Value}(\mathrm{Ref}(\ell)),\varphi,\Phi,H[\ell\!\mapsto\!\overline{0}^n]\rangle & \text{Model A}\\
+       \langle \mathrm{Value}(\mathrm{Arr}(\overline{0}^n)),\varphi,\Phi,H\rangle & \text{Model B}
+     \end{cases}}
+\]
+\[
+  \irule{array\text{-}read}{0 \le i < |arr|}
+    {\cdots \Step{array\text{-}read} \langle \mathrm{Value}(arr[i]),\ldots\rangle}
+  \qquad
+  \irule{array\text{-}length}{}
+    {\cdots \Step{array\text{-}length} \langle \mathrm{Value}(|arr|),\ldots\rangle}
+\]
+
+\paragraph{Objects and method call/return.}
+\[
+  \irule{new}{C \text{ is declared}, \; C \neq \text{main class}}
+    {\langle \mathrm{Expr}(\mathtt{new}\;C()), \varphi,\Phi,H\rangle \Step{new}
+     \begin{cases}
+       \langle \mathrm{Value}(\mathrm{Ref}(\ell)),\varphi,\Phi,H[\ell\!\mapsto\!\mathrm{Obj}(C,\overline{f{=}0})]\rangle & \text{A} \\
+       \langle \mathrm{Value}(\mathrm{Obj}(C,\overline{f{=}0})),\varphi,\Phi,H\rangle & \text{B}
+     \end{cases}}
+\]
+\[
+  \irule{call}{
+    v_0 \text{ resolves to an object of dynamic class } C \quad
+    \mtype(m,C) = (\tau_1,\ldots,\tau_n)\!\to\!\tau \quad |args|=n}
+    {\langle \mathrm{Value}(v_n), \langle\ldots,\mathrm{KCallArgs}(v_0,\overline{v})\!:\!\kappa\rangle\!:\!\Phi,H\rangle
+     \Step{call}
+     \langle \mathrm{Stmt}(\mathrm{body}(m,C)), \varphi_{\mathrm{new}}\!:\!\varphi\!:\!\Phi,H\rangle}
+\]
+where $\varphi_{\mathrm{new}} = \langle \mathsf{self}\!=\!v_0,\;
+[x_i\!\mapsto\!v_i]_{i=1}^{n},\; [\,]\rangle$ is a fresh frame --- dynamic
+dispatch: the method looked up by $\mtype$ is resolved from $v_0$'s
+\emph{dynamic} class, exactly as in FJ/Java, not from the receiver
+expression's static type.
+\[
+  \irule{return\text{-}focus}{\kappa = [\,], \; \text{frame has a return expression not yet focused}}
+    {\langle \mathrm{Done}, \varphi,\Phi,H\rangle \Step{return\text{-}focus}
+     \langle \mathrm{Expr}(e_{\mathrm{ret}}),\varphi,\Phi,H\rangle}
+\]
+\[
+  \irule{return}{}
+    {\langle \mathrm{Value}(v), \varphi\!:\!\Phi,H\rangle \Step{return}
+     \langle \mathrm{Value}(v), \Phi, H\rangle}
+  \qquad
+  \irule{halt}{|\Phi|=0, \; C=\mathrm{Done}}
+    {\Sigma \Step{halt} \mathrm{status} := \mathsf{done}}
+\]
+
+\subsection{Vehicle 2: substitution-based reduction semantics (pure fragment)}
+
+The Rewrite tab implements a classical \emph{small-step reduction
+semantics}: every state is a literal syntax tree, and a step contracts one
+\emph{redex} in place, following Plotkin's structural operational semantics
+\cite{plotkin1981sos} as refined into the \emph{reduction-semantics-with-evaluation-contexts}
+style of Felleisen and Hieb \cite{felleisenhieb1992}, the style taught and
+tooled in \emph{Semantics Engineering with PLT Redex}
+\cite{felleisenfindlerflatt2009redex} --- the design note's own vocabulary
+(``redex,'' ``salient reduction,'' congruence-by-recursive-descent) matches
+that tradition directly.
+
+\subsubsection{Scope: the pure fragment}
+
+Vehicle~2 covers only programs whose every method body is a straight-line
+sequence of simple assignments followed by a \texttt{return}
+(\texttt{analyzeMethod} in \texttt{minijavaSubstitution.ts}); \texttt{if},
+\texttt{while}, \texttt{println}, and array writes make a method
+\emph{impure}, and the stepper reports \emph{why} rather than silently
+changing semantics. \texttt{main} itself is restricted to exactly one
+\texttt{System.out.println(\ldots)}. This mirrors the classic move of
+carving out a substitution-only calculus (the $\lambda$-calculus core, or
+FJ's purely functional method bodies) from a full imperative language, so
+that pure substitution --- no environment, no store --- is even meaningful.
+
+\subsubsection{Values and evaluation contexts}
+
+\[
+  v \;::=\; n \mid b \mid \mathrm{s} \mid C\{f_1{=}v_1,\ldots,f_k{=}v_k\}
+\]
+Congruence (``where does the next redex live'') is implemented as
+left-to-right, outermost-in recursive descent that stops at the first
+non-value child --- an \emph{implicit} evaluation-context grammar
+\[
+  E \;::=\; [\,] \mid E \oplus e \mid v \oplus E \mid \ldots \mid E.m(\overline{e}) \mid v.m(\overline{v},E,\overline{e})
+\]
+(one production per operator/constructor, all call-by-value, left
+argument first) that \texttt{stepNode}'s recursive structure encodes
+directly rather than naming as data --- the standard \emph{reduction-free}
+implementation strategy for evaluation contexts \cite{felleisenhieb1992}.
+
+\subsubsection{Reduction rules}
+
+Fold rules (identical arithmetic/relational/string semantics to Vehicle~1,
+by construction --- both call the same truncating-division and
+1-character-\texttt{charAt} conventions):
+\[
+  \irule{add/sub/mul/div}{}{n_1 \oplus n_2 \longrightarrow n_1 \oplus_{\mathbb{Z}} n_2}
+  \qquad
+  \irule{less/leq/gt/geq}{}{n_1 \bowtie n_2 \longrightarrow n_1 \bowtie_{\mathbb{Z}} n_2}
+\]
+\[
+  \irule{and\text{-}short\text{-}circuit}{}{\mathtt{false}\;\&\&\;e_2 \longrightarrow \mathtt{false}}
+  \qquad
+  \irule{and}{}{\mathtt{true}\;\&\&\;b \longrightarrow b}
+\]
+\[
+  \irule{or\text{-}short\text{-}circuit}{}{\mathtt{true}\;||\;e_2 \longrightarrow \mathtt{true}}
+  \qquad
+  \irule{or}{}{\mathtt{false}\;||\;b \longrightarrow b}
+\]
+\[
+  \irule{not}{}{!b \longrightarrow \lnot b}
+  \qquad
+  \irule{parens}{}{(v) \longrightarrow v}
+  \qquad
+  \irule{concat}{}{\texttt{"}s_1\texttt{"}.\mathtt{concat(}\texttt{"}s_2\texttt{"}\mathtt{)} \longrightarrow \texttt{"}s_1s_2\texttt{"}}
+\]
+\[
+  \irule{char\text{-}at}{0\le i<|s|}{\texttt{"}s\texttt{"}.\mathtt{charAt(}i\mathtt{)} \longrightarrow \texttt{"}s[i]\texttt{"}}
+  \qquad
+  \irule{str\text{-}length}{}{\texttt{"}s\texttt{"}.\mathtt{length()} \longrightarrow |s|}
+\]
+\[
+  \irule{new}{C \text{ declared}, \; C \neq \text{main class}}
+    {\mathtt{new}\;C() \longrightarrow C\{f_1{=}\mathrm{default}(\tau_1),\ldots,f_k{=}\mathrm{default}(\tau_k)\}}
+\]
+
+\subsubsection{The $\beta$ rule: method call}
+
+Method call is this semantics' one true $\beta$-rule, and its side
+conditions are the most intricate part of the implementation:
+\[
+  \irule{call}{
+    \begin{array}{l}
+      v_0 = C\{\overline{f{=}u}\}, \quad \mathrm{mdef}(m,C) = (x_1,\ldots,x_n)\{\,y_1{:=}e_1;\ldots;y_k{:=}e_k;\ \mathtt{return}\ e_{\mathrm{ret}}\,\} \\
+      \mathrm{mdef}(m,C) \text{ pure (assignments only)}, \quad n = |v_1,\ldots,v_n| \\
+      \rho_0 = [x_i \mapsto v_i]_{i=1}^n, \quad \phi_0 = [\overline{f \mapsto u}] \\
+      \forall j\!\in\!1..k:\; w_j = \sigma(e_j; \rho_{j-1}, \phi_{j-1}) \text{ is itself a value}, \quad
+        (\rho_j,\phi_j) = \mathrm{update}(\rho_{j-1},\phi_{j-1}, y_j\!\mapsto\!w_j)
+    \end{array}
+  }
+  {v_0.m(v_1,\ldots,v_n) \longrightarrow \sigma(e_{\mathrm{ret}}; \rho_k, \phi_k)}
+\]
+where $\sigma(e;\rho,\phi)$ substitutes each free identifier $x$ by
+$\mathrm{copyFresh}(\rho(x))$ (or $\phi(x)$ if $x$ is a field, i.e.\ an
+implicit \texttt{this.}$x$) and each occurrence of \texttt{this} by the
+\emph{freshly rebuilt} object $C\{\overline{f \mapsto \phi(f)}\}$ --- so
+\texttt{this} inside assignment $j{+}1$ already reflects assignment $j$'s
+functional update, matching Model~B's semantics exactly. \textbf{Every
+substituted occurrence gets a fresh id}
+(\texttt{copyFresh}); this is the \emph{structure-preservation invariant} ---
+no two parents ever share a child node, i.e.\ substitution here is the
+classical \emph{capture-avoiding, sharing-free} substitution
+$e[v/x]$ of the $\lambda$-calculus, not the graph-sharing substitution that
+would secretly reintroduce Model~A's aliasing.
+
+The requirement that each $w_j$ \emph{already be a value} after
+substitution (checked by \texttt{isValueNode}, else the method is reported
+outside the pure fragment) is a deliberate restriction to
+\emph{non-duplicating}, call-by-value $\beta$: because $\sigma$ copies
+$\rho(x)$ verbatim into every occurrence of $x$, allowing $w_j$ to be an
+unevaluated redex would risk re-doing the same computation at every
+occurrence --- the classical call-by-name/call-by-value duplication hazard
+that $\beta_v$-reduction (call-by-value $\beta$, e.g.\ Plotkin
+\cite{plotkin1975callccv}) exists to avoid.
+
+\subsection{Operational correspondence between the two vehicles}
+\label{sec:correspondence}
+
+The Rewrite tab's companion check (implemented in \texttt{test/run\_subst.js}
+and surfaced live in the UI) replays the same program on the Model~B
+machine and asserts that the two traces agree on every \emph{salient} rule
+and on the final value, where salient is exactly the set
+\begin{center}
+\adjustbox{max width=\linewidth}{$\displaystyle
+  \{\rulename{add},\rulename{sub},\rulename{mul},\rulename{div},
+    \rulename{less},\rulename{leq},\rulename{gt},\rulename{geq},
+    \rulename{not},\rulename{and},\rulename{and\text{-}short\text{-}circuit},
+    \rulename{or},\rulename{or\text{-}short\text{-}circuit},
+    \rulename{new},\rulename{call},\rulename{concat},
+    \rulename{char\text{-}at},\rulename{str\text{-}length}\}
+$}
+\end{center}
+Every other machine rule (\texttt{seq}, \texttt{if-*}, \texttt{while-*},
+\texttt{var}, \texttt{field-read}, \texttt{push/pop-frame}, the
+\texttt{K*} continuation dispatches, \ldots) is \emph{administrative}: it
+exists because the machine represents control and environment explicitly,
+where the substitution semantics simply rewrites the tree and looks nothing
+up. The claim being tested --- that ``environment lookup on the machine is
+lazy substitution'' (README, \emph{Semantics \& steppers}) --- is precisely
+the informal statement proved formally, for general reduction
+semantics/abstract-machine pairs, by Danvy's \emph{syntactic
+correspondence} technique (deriving an abstract machine from a reduction
+semantics by refocusing, and vice versa)
+\cite{danvy2004rational,ageefsen2003refocusing}, and is the operational
+half of the progress/preservation methodology that soundness proofs use to
+relate a reduction relation to a machine
+\cite{wrightfelleisen1994syntactic}. Here the correspondence is checked
+\emph{empirically}, by exhaustive comparison of salient-rule traces on a
+fixed program suite (\texttt{test/run\_subst.js}, 35 programs at the time of
+writing) plus a 400-program differential fuzz suite that additionally
+cross-checks both machine models, the substitution stepper, and a legacy
+evaluator against each other (\texttt{test/run\_fuzz.js}) --- it is not
+machine-checked in a proof assistant, unlike the sibling Live-Types project's
+Coq-mechanized metatheory.
+
+\subsection{An auxiliary evaluation rule system: mark-and-sweep garbage collection}
+
+Model~A's heap accumulates unreachable objects as a normal side effect of
+`new`/field-write; \texttt{src/core/semantics/gc.ts} implements a classical
+two-phase \emph{tracing} collector over that heap:
+
+\begin{enumerate}
+  \item \textbf{Mark} --- compute $\mathrm{reachable}(H) \subseteq \dom(H)$
+        as the least fixed point of a root set (every $\mathrm{Ref}$
+        reachable from a live frame's $\rho$, $\mathsf{self}$, or $\kappa$)
+        closed under following object fields and array elements.
+  \item \textbf{Sweep} --- restrict $H$ to $\mathrm{reachable}(H)$, dropping
+        every other binding.
+\end{enumerate}
+This is the original mark-and-sweep algorithm as introduced for Lisp by
+McCarthy \cite{mccarthy1960recursive} and given its modern, general
+treatment (root sets, tracing vs.\ reference counting, generational
+variants) in Jones, Hosking, and Moss's \emph{The Garbage Collection
+Handbook} \cite{jgh2011gchandbook}. It is deliberately \emph{not} part of
+the machine's core transition relation $\Step{}$: GC is triggered
+externally (a UI action or an explicit test call to \texttt{runGC}),
+observably shrinks $H$, and is proved --- by the GC test suite
+(\texttt{test/run\_gc.js}, 14 cases) --- to never change a program's
+observable output, i.e.\ it is a \emph{sound} store transformation:
+$\forall \Sigma.\ \mathrm{run}(\Sigma) = \mathrm{run}(\mathrm{gc}(\Sigma))$
+on output, even though the two runs' heaps differ.
+
+\subsection{Theoretical sources}
+
+\begin{itemize}
+  \item \textbf{The CESK abstract machine} follows Felleisen and Friedman's
+        CEK machine \cite{felleisen1986control}, extended with an explicit
+        store as formalized in Might and Van~Horn's CESK presentation
+        \cite{mightvanhorn2010aam}; the explicit call-stack-of-frames
+        (rather than one shared continuation) traces back to the
+        \emph{dump} component of Landin's SECD machine
+        \cite{landin1964scpp}, the historical origin of explicit
+        function-call/return machinery in an abstract machine.
+  \item \textbf{The substitution/reduction semantics} follows Plotkin's
+        structural operational semantics \cite{plotkin1981sos} in the
+        evaluation-contexts style of Felleisen and Hieb
+        \cite{felleisenhieb1992}, as taught and tooled by \emph{PLT Redex}
+        \cite{felleisenfindlerflatt2009redex}; call-by-value $\beta$-reduction
+        specifically follows Plotkin's call-by-value $\lambda$-calculus
+        \cite{plotkin1975callccv}.
+  \item \textbf{The operational-correspondence check} between the two
+        vehicles instantiates, empirically rather than by proof, the
+        syntactic-correspondence methodology relating reduction semantics
+        to abstract machines \cite{danvy2004rational,ageefsen2003refocusing},
+        which is also the technique underlying Wright and Felleisen's
+        syntactic type-soundness proofs \cite{wrightfelleisen1994syntactic}.
+  \item \textbf{Mark-and-sweep garbage collection} follows McCarthy's
+        original algorithm \cite{mccarthy1960recursive}, per the modern
+        treatment in \cite{jgh2011gchandbook}.
+\end{itemize}
+
+% =============================================================================
+\section{Summary: rule families and their theoretical lineage}
+
+\begin{longtable}{@{}p{2.6cm}p{5.4cm}p{6.7cm}@{}}
+\toprule
+\textbf{Rule family} & \textbf{Where} & \textbf{Theoretical source} \\
+\midrule
+\endhead
+$\Gamma \vdash e:\tau$, $\mathtt{T}\text{-}\ast$ &
+  \texttt{typeChecker.ts}, expression rules &
+  Pierce, \emph{TAPL} \cite{pierce2002tapl} (judgment form and rule-naming
+  convention) \\
+\rulename{T-Invk}, \rulename{T-New}, $\mtype$, $\fields$, \rulename{M-OK},
+  \rulename{Override} &
+  \texttt{typeChecker.ts}/\texttt{classTable.ts} &
+  Featherweight Java \cite{igarashi2001fj} (names, auxiliary functions, and
+  rule shapes reused directly) \\
+$\mathtt{WF}\text{-}\ast$, $\Gamma \vdash s\ \mathsf{ok}$ &
+  \texttt{typeChecker.ts}, statement rules &
+  Imperative-extension treatment of a typed calculus \cite[Ch.~13]{pierce2002tapl};
+  no FJ analogue (FJ has no statements) \\
+$\Hole$, $\Asg{}{}$ (hole consistency) &
+  \texttt{ty.ts}, \texttt{classTable.ts} &
+  Hazel's typed holes \cite{omar2017hazelnut,omar2019livelits}, built on
+  gradual-typing consistency \cite{siek2006gradual} \\
+CESK machine, $\Sigma \longrightarrow \Sigma'$ &
+  \texttt{minijavaMachine.ts} &
+  Felleisen--Friedman CEK \cite{felleisen1986control}; CESK per
+  Might--Van~Horn \cite{mightvanhorn2010aam}; frame stack per Landin's SECD
+  dump \cite{landin1964scpp} \\
+Substitution rewrite, $e \longrightarrow e'$ &
+  \texttt{minijavaSubstitution.ts} &
+  Plotkin's SOS \cite{plotkin1981sos}; Felleisen--Hieb evaluation contexts
+  \cite{felleisenhieb1992}; PLT Redex style \cite{felleisenfindlerflatt2009redex} \\
+\rulename{call} ($\beta$-reduction for method invocation) &
+  \texttt{minijavaSubstitution.ts}, \texttt{beta()} &
+  Call-by-value $\beta_v$ \cite{plotkin1975callccv} \\
+Operational correspondence (salient-rule agreement) &
+  \texttt{test/run\_subst.js} &
+  Syntactic correspondence between reduction semantics and abstract
+  machines \cite{danvy2004rational,ageefsen2003refocusing};
+  Wright--Felleisen soundness methodology \cite{wrightfelleisen1994syntactic} \\
+Mark-and-sweep GC &
+  \texttt{gc.ts} &
+  McCarthy \cite{mccarthy1960recursive}; modern treatment in
+  \cite{jgh2011gchandbook} \\
+\bottomrule
+\end{longtable}
+
+% =============================================================================
+\section*{Note on scope}
+\addcontentsline{toc}{section}{Note on scope}
+
+This note reconstructs the rules \emph{as implemented}; it does not attempt
+a soundness proof (progress/preservation) relating \S\ref{sec:types} to
+\S\ref{sec:eval}, and the operational-correspondence claim of
+\S\ref{sec:correspondence} is currently checked by exhaustive testing, not
+mechanized. Both are natural next artifacts if this project follows the
+sibling Live-Types work toward a machine-checked metatheory.
+
+% =============================================================================
+\begin{thebibliography}{99}
+
+\bibitem{pierce2002tapl}
+B.~C. Pierce.
+\newblock \emph{Types and Programming Languages}.
+\newblock MIT Press, 2002.
+
+\bibitem{igarashi2001fj}
+A.~Igarashi, B.~C. Pierce, and P.~Wadler.
+\newblock Featherweight Java: a minimal core calculus for Java and GJ.
+\newblock \emph{ACM Transactions on Programming Languages and Systems (TOPLAS)}, 23(3):396--450, 2001.
+\newblock (Originally OOPSLA 1999.)
+
+\bibitem{omar2017hazelnut}
+C.~Omar, I.~Voysey, M.~Hilton, J.~Aldrich, and M.~A. Hammer.
+\newblock Hazelnut: a bidirectionally typed structure editor calculus.
+\newblock In \emph{POPL}, 2017.
+
+\bibitem{omar2019livelits}
+C.~Omar, D.~Moon, A.~Blinn, I.~Voysey, N.~Collins, and R.~Chugh.
+\newblock Live functional programming with typed holes.
+\newblock In \emph{POPL}, 2019.
+
+\bibitem{siek2006gradual}
+J.~G. Siek and W.~Taha.
+\newblock Gradual typing for functional languages.
+\newblock In \emph{Scheme and Functional Programming Workshop}, 2006.
+
+\bibitem{felleisen1986control}
+M.~Felleisen and D.~P. Friedman.
+\newblock Control operators, the SECD machine, and the $\lambda$-calculus.
+\newblock In \emph{Formal Description of Programming Concepts III}, 1986.
+
+\bibitem{mightvanhorn2010aam}
+M.~Might and D.~Van~Horn.
+\newblock Abstracting abstract machines.
+\newblock In \emph{ICFP}, 2010.
+
+\bibitem{landin1964scpp}
+P.~J. Landin.
+\newblock The mechanical evaluation of expressions.
+\newblock \emph{The Computer Journal}, 6(4):308--320, 1964.
+
+\bibitem{plotkin1981sos}
+G.~D. Plotkin.
+\newblock A structural approach to operational semantics.
+\newblock Technical Report DAIMI FN-19, Aarhus University, 1981.
+
+\bibitem{felleisenhieb1992}
+M.~Felleisen and R.~Hieb.
+\newblock The revised report on the syntactic theories of sequential control and state.
+\newblock \emph{Theoretical Computer Science}, 103(2):235--271, 1992.
+
+\bibitem{felleisenfindlerflatt2009redex}
+M.~Felleisen, R.~B. Findler, and M.~Flatt.
+\newblock \emph{Semantics Engineering with PLT Redex}.
+\newblock MIT Press, 2009.
+
+\bibitem{plotkin1975callccv}
+G.~D. Plotkin.
+\newblock Call-by-name, call-by-value and the $\lambda$-calculus.
+\newblock \emph{Theoretical Computer Science}, 1(2):125--159, 1975.
+
+\bibitem{danvy2004rational}
+O.~Danvy.
+\newblock A rational deconstruction of Landin's SECD machine.
+\newblock In \emph{IFL}, 2004.
+
+\bibitem{ageefsen2003refocusing}
+M.~S. Ager, D.~Biernacki, O.~Danvy, and J.~Midtgaard.
+\newblock A functional correspondence between evaluators and abstract machines.
+\newblock In \emph{PPDP}, 2003.
+
+\bibitem{wrightfelleisen1994syntactic}
+A.~K. Wright and M.~Felleisen.
+\newblock A syntactic approach to type soundness.
+\newblock \emph{Information and Computation}, 115(1):38--94, 1994.
+
+\bibitem{mccarthy1960recursive}
+J.~McCarthy.
+\newblock Recursive functions of symbolic expressions and their computation by machine, Part I.
+\newblock \emph{Communications of the ACM}, 3(4):184--195, 1960.
+
+\bibitem{jgh2011gchandbook}
+R.~Jones, A.~Hosking, and E.~Moss.
+\newblock \emph{The Garbage Collection Handbook: The Art of Automatic Memory Management}.
+\newblock CRC Press, 2011.
+
+\end{thebibliography}
+
+\end{document}

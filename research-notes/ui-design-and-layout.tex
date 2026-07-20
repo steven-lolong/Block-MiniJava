@@ -1,0 +1,502 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{xcolor}
+\usepackage[export]{adjustbox}
+\usepackage{microtype}
+\usepackage{seqsplit}
+\emergencystretch=2.5em
+
+\title{The Block-MiniJava Workbench: UI Design and Layout\\
+\large Shell Architecture, Perspectives, Panel Sizing, and Responsive Behavior}
+\author{Research note --- Block-MiniJava}
+\date{2026-07-20}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Block-MiniJava presents itself as a small IDE, not a single Blockly canvas
+with a toolbar bolted on. Its shell --- header, activity bar, primary
+sidebar (toolbox), workspace column, inspector column, bottom dock, and
+status bar --- is a genuine \emph{workbench}, in the sense the README uses
+the word: named \emph{regions} (\texttt{data-ide-region} attributes),
+\emph{perspectives} that reconfigure several regions atomically, a
+keyboard-first \emph{command palette}, and layout state that persists
+across reloads. This note documents that shell's structure and every
+mechanism behind it --- panel visibility and sizing, the perspective
+system, responsive breakpoints, and persisted state --- tracing each to its
+file and line. The three content panels the shell hosts (inspector-column
+tabs, bottom-panel tabs, and the toolbox) are documented separately in
+\texttt{\seqsplit{typing-code-outline-tabs.tex}}, \texttt{\seqsplit{bottom-panel-sync.tex}}, and
+\texttt{\seqsplit{toolbox-drag-and-drop.tex}}.
+\end{abstract}
+
+\tableofcontents
+
+% =============================================================================
+\section{Layout regions}
+
+\texttt{src/index.html} tags every major structural element with a
+\texttt{data-ide-region} attribute --- not read by any script (there is no
+region-dispatch logic keyed off it), but a deliberate naming convention
+that keeps the DOM self-documenting and gives CSS a stable, semantic hook
+independent of element ids.
+
+\begin{center}
+\begin{longtable}{@{}p{3.4cm}p{3.0cm}p{7.4cm}@{}}
+\toprule
+\textbf{Region} & \textbf{Element} & \textbf{Purpose} \\
+\midrule
+\endhead
+\texttt{shell} & \texttt{\seqsplit{\#app}} (l.11) & The whole application root. \\
+\texttt{\seqsplit{application-header}} & \texttt{\seqsplit{header.app-header}} (l.12) & Brand, command palette
+  trigger, perspective picker, main menu (New/Open/Save/Export/Visualize/
+  Autosave/Examples/About/theme toggle). \\
+\texttt{workbench} & \texttt{\seqsplit{.ide-workbench}} (l.85) & Everything below the
+  header: activity bar + the editor area. \\
+\texttt{activity-bar} & \texttt{\seqsplit{\#activity-bar}} (l.86) & The narrow icon
+  strip selecting which sidebar view is showing (\S\ref{sec:activity}). \\
+\texttt{editor-area} & \texttt{\seqsplit{main.ide-layout}} (l.105) & Primary
+  sidebar + workspace column + inspector column, side by side. \\
+\texttt{\seqsplit{primary-sidebar}} & \texttt{\seqsplit{\#toolbox-column}} (l.106) & The toolbox
+  (documented in \texttt{\seqsplit{toolbox-drag-and-drop.tex}}) and the other
+  activity-bar-selected views (Run/Settings). \\
+\texttt{workspace} & \texttt{\seqsplit{.workspace-column}} (l.168) & The Blockly
+  canvas and its title-bar toolbar (undo/redo, zoom, run, toggle bottom
+  tools, toggle inspector). \\
+\texttt{inspector} & \texttt{\seqsplit{\#code-column}} (l.210) & Editable Code /
+  Typing / Outline (\texttt{\seqsplit{typing-code-outline-tabs.tex}}). \\
+\texttt{bottom-tools} & \texttt{\seqsplit{\#viz-dock}} (l.243) & The seven-tab dock
+  (\texttt{\seqsplit{bottom-panel-sync.tex}}). \\
+\texttt{status-bar} & \texttt{\seqsplit{footer.ide-status-bar}} (l.381) & Perspective
+  button, block count, problems count, autosave status
+  (\S\ref{sec:status}). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section{Activity bar and primary sidebar}
+\label{sec:activity}
+
+The activity bar is a four-icon vertical strip (\texttt{\seqsplit{index.html:86--103}})
+that selects which \emph{view} the primary sidebar shows --- the same
+"activity bar + views" idea as a typical IDE's left rail, implemented from
+scratch (no framework).
+
+\begin{center}
+\begin{longtable}{@{}p{3.2cm}p{10.6cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{ActivityKind} &
+  \texttt{app.ts:71} --- \texttt{'blocks' | 'search' | 'run' | 'settings'}. \\
+\texttt{\seqsplit{ACTIVITY\_META}} &
+  \texttt{app.ts:76--81} --- per-activity \{title, icon\} shown in the
+  sidebar header when that activity is active. \\
+\texttt{\seqsplit{setActiveActivity(activity, ensureVisible, focusSearch)}} &
+  \texttt{app.ts:439--456} --- persists the choice
+  (\texttt{\seqsplit{ACTIVE\_ACTIVITY\_KEY}}), updates the sidebar title/icon, toggles
+  \texttt{is-active} on every \texttt{\seqsplit{.sidebar-view[data-activity-view]}}
+  whose \texttt{\seqsplit{data-activity-view}} list includes the new activity (one
+  view, \texttt{\seqsplit{sidebar-blocks-view}}, is shared between \texttt{'blocks'}
+  \emph{and} \texttt{'search'} --- \texttt{index.html:114}, since Search
+  Blocks is really the same toolbox view with the search box pre-focused,
+  not a separate panel), reveals the sidebar if it was hidden, and
+  auto-focuses \texttt{\#toolbox-search} for the \texttt{'search'}
+  activity. \\
+\texttt{\seqsplit{updateActivityButtons()}} &
+  \texttt{app.ts:429--437} --- toggles \texttt{is-active}/\texttt{aria-pressed}
+  on the four \texttt{.activity-item} buttons; \texttt{aria-pressed} also
+  factors in whether the sidebar is actually visible on narrow screens
+  (\S\ref{sec:responsive}), not just which activity is logically selected. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+The three non-\texttt{'blocks'} sidebar views are: \textbf{Run and
+Analysis} (\texttt{\seqsplit{index.html:122--135}} --- a \textbf{Run Program} button
+plus five shortcuts straight into specific bottom-panel tabs), and
+\textbf{Settings and Layout} (\texttt{\seqsplit{index.html:137--161}} --- the
+perspective picker's button form, layout toggles, and the autosave
+interval slider). The toolbox view itself
+(\texttt{\seqsplit{index.html:114--120}}) is documented in
+\texttt{\seqsplit{toolbox-drag-and-drop.tex}}.
+
+% =============================================================================
+\section{Perspectives}
+
+A \emph{perspective} is a named, one-click preset over several independent
+layout toggles at once --- sidebar visibility, inspector visibility/tab,
+bottom-dock visibility/tab, and code-maximize state --- so a user does not
+have to manually reconstruct "the debugging layout" every time.
+
+\begin{center}
+\begin{longtable}{@{}p{2.4cm}p{13.4cm}@{}}
+\toprule
+\textbf{Perspective} & \textbf{What \texttt{applyPerspective} (\texttt{app.ts:485--521}) sets} \\
+\midrule
+\endhead
+\texttt{edit} &
+  Activity \texttt{'blocks'}; sidebar shown; inspector shown, not
+  maximized, \textbf{Editable Code} tab; bottom dock \textbf{closed}. The
+  default, block-authoring-focused layout. \\
+\texttt{debug} &
+  Activity \texttt{'run'}; sidebar shown; inspector shown, \textbf{Outline}
+  tab; bottom dock open on \textbf{CESK}. \\
+\texttt{types} &
+  Activity \texttt{'blocks'}; sidebar shown; inspector shown,
+  \textbf{Outline} tab; bottom dock open on \textbf{Problems}, and
+  \texttt{\seqsplit{refreshTypeDiagnostics}} is called immediately so the Problems
+  list is not stale on arrival. \\
+\texttt{presentation} &
+  Code column and sidebar both \textbf{hidden}, code not maximized, viz
+  dock closed --- a maximized, distraction-free block workspace for
+  demoing or screenshotting. \\
+\texttt{custom} &
+  Not a preset --- see below. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{setPerspective-Identity(perspective, persist)}} &
+  \texttt{app.ts:458--474} --- the \emph{identity} update only: sets
+  \texttt{\seqsplit{document.body.dataset.perspective}}, toggles the
+  \texttt{\seqsplit{presentation-mode}} body class, syncs the
+  \texttt{\seqsplit{\#perspective-select}} dropdown and the perspective-option
+  buttons' \texttt{is-active} state, and updates the status bar's
+  perspective label (\S\ref{sec:status}). Does \emph{not} touch any
+  panel visibility --- that is \texttt{applyPerspective}'s job. \\
+\texttt{\seqsplit{applyPerspective(perspective)}} &
+  \texttt{app.ts:485--521} --- sets \texttt{applyingPerspective = true}
+  (a re-entrancy guard, \S\ref{sec:custom-detect}) for its whole body,
+  calls \texttt{\seqsplit{setPerspectiveIdentity}}, then the table above's panel
+  toggles. \\
+\texttt{\seqsplit{markPerspectiveCustom()}} &
+  \texttt{app.ts:476--478} --- called by every manual panel-visibility
+  toggle (sidebar hide/show, code hide/show/maximize, viz-dock
+  open/close); if \texttt{\seqsplit{applyingPerspective}} is \texttt{false} (i.e.\
+  the change came from the user directly, not from
+  \texttt{applyPerspective} itself reconfiguring things) and the current
+  perspective is not already \texttt{'custom'}, switches identity to
+  \texttt{'custom'}. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Why perspectives need a re-entrancy guard}
+\label{sec:custom-detect}
+
+Every one of the four preset perspectives is implemented by calling the
+\emph{same} panel-visibility setters (\texttt{setToolboxHidden},
+\texttt{setCodeHidden}, \texttt{openBottomTool}, \ldots) that a user's
+manual click also calls. Those setters cannot tell, by themselves, whether
+they were invoked because the user just clicked \textbf{Hide inspector} or
+because \texttt{\seqsplit{applyPerspective('debug')}} is reconfiguring five things at
+once as an atomic preset. \texttt{\seqsplit{applyingPerspective}} is exactly that
+missing context: \texttt{applyPerspective} sets it before making any
+change and clears it in a \texttt{finally} block (\texttt{app.ts:517--521})
+so an exception mid-preset cannot leave the flag stuck; every setter's
+trailing call to \texttt{\seqsplit{markPerspectiveCustom}} then correctly no-ops
+during a preset application and correctly demotes the identity to
+\texttt{'custom'} on any \emph{later}, genuinely manual adjustment ---
+matching the design note's own description: "Adjusting panels by hand
+switches to \texttt{Custom} rather than misreporting a preset."
+
+% =============================================================================
+\section{Panel visibility and sizing}
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{setToolboxHidden(next)}} &
+  \texttt{app.ts:644--664} --- toggles the \texttt{toolbox-hidden} body
+  class; on narrow screens toggles \texttt{\seqsplit{mobile-sidebar-open}} instead
+  (\S\ref{sec:responsive}); persists to \texttt{\seqsplit{SIDEBAR\_VISIBLE\_KEY}};
+  updates the show/hide button labels and \texttt{\seqsplit{updateActivityButtons()}};
+  calls \texttt{\seqsplit{requestLayoutResize()}} (\S\ref{sec:resize-coordinator}). \\
+\texttt{\seqsplit{setCodeHidden(next)}} &
+  \texttt{app.ts:620--641} --- the inspector-column analogue; also
+  un-maximizes the code column if it was maximized (a hidden panel cannot
+  be maximized). \\
+\texttt{\seqsplit{setCodeMaximized(next)}} &
+  \texttt{app.ts:607--618} --- toggles the \texttt{code-maximized} body
+  class (CSS grows the inspector column to fill the editor area); reveals
+  the inspector first if it was hidden (l.609); swaps the maximize
+  button's glyph between a hollow-square and an offset-square icon. \\
+\texttt{\seqsplit{setVizOpen(open)}} &
+  documented in \texttt{\seqsplit{bottom-panel-sync.tex}} \S1 ---
+  \texttt{\seqsplit{visualizationPanel.ts:157--173}}. \\
+\texttt{\seqsplit{setSidebarWidth(width)}} &
+  \texttt{app.ts:944--950} --- clamps to $[220\text{px}, \min(420,
+  45\%\,\text{viewport})]$, writes the CSS custom property
+  \texttt{\seqsplit{--ide-primary-sidebar-width}}, persists to
+  \texttt{\seqsplit{SIDEBAR\_WIDTH\_KEY}}. \\
+\texttt{\seqsplit{initSidebarResizer()}} &
+  \texttt{\seqsplit{app.ts:952--(follows)}} --- pointer-drag on
+  \texttt{\seqsplit{\#sidebar-resizer}}, mirroring the code-column and viz-dock
+  resizers' pointer-capture pattern. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+All three resizable regions --- primary sidebar, inspector column, bottom
+dock --- follow the identical resizer pattern: a thin
+\texttt{role="separator"} element with \texttt{pointerdown} starting a
+\texttt{pointermove}/\texttt{pointerup} drag (removed on release), plus
+\texttt{ArrowUp}/\texttt{ArrowDown} or \texttt{ArrowLeft}/\texttt{ArrowRight}
+keyboard resizing for accessibility, each clamped to a sane range and
+persisted independently.
+
+% =============================================================================
+\section{The layout-resize coordinator}
+\label{sec:resize-coordinator}
+
+Blockly's own SVG canvas, the code editor's line-number/highlight overlay,
+and every visualization tab's own Blockly instance all need to be told
+explicitly when their container changes size --- none of this is automatic
+in the browser. \texttt{app.ts} centralizes that into one coordinator
+rather than letting each panel poll or guess.
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Function} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{syncLayoutSize()}} &
+  \texttt{app.ts:89--95} --- the actual work: \texttt{\seqsplit{Blockly.svgResize(workspace)}},
+  \texttt{\seqsplit{codeEditor?.resize()}}, \texttt{\seqsplit{resizeVisualizationPanel()}}. \\
+\texttt{\seqsplit{requestLayoutResize(settle)}} &
+  \texttt{app.ts:101--114} --- the coordinator every panel-visibility
+  setter calls. One \texttt{\seqsplit{requestAnimationFrame}} handles the immediate
+  case (covers pointer-driven resizing, which fires continuously); when
+  \texttt{settle} is true (the default), \emph{two more} calls are
+  scheduled at 60ms and 180ms via \texttt{setTimeout} to catch CSS grid
+  \emph{transition} end-states a single animation frame would miss (a
+  CSS-animated width change keeps changing after the triggering JS call
+  returns). \\
+\texttt{\seqsplit{initLayoutResizeCoordinator()}} &
+  \texttt{app.ts:116--125} --- additionally installs a
+  \texttt{ResizeObserver} on four regions (\texttt{blockly-area},
+  \texttt{toolbox-column}, \texttt{code-column}, \texttt{viz-dock}) so
+  \emph{any} size change to those elements --- including ones with no
+  corresponding JS call at all, e.g.\ the browser window itself resizing
+  --- triggers the same \texttt{\seqsplit{requestLayoutResize(false)}} path. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section{Command palette}
+
+\texttt{\seqsplit{src/core/ui/commandPalette.ts}} (158 lines) is a small,
+self-contained keyboard-first command surface, deliberately decoupled from
+knowing what any command actually \emph{does} --- it is handed a flat
+\texttt{IdeCommand[]} array by \texttt{app.ts} and only ever calls
+\texttt{command.run()}.
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{IdeCommand} &
+  \texttt{\seqsplit{commandPalette.ts:1--8}} --- \{id, label, category, run,
+  keywords?, shortcut?\}. \\
+\texttt{\seqsplit{matches(command, query)}} &
+  \texttt{\seqsplit{commandPalette.ts:21--27}} --- \textbf{every} space-separated
+  query token must appear \emph{somewhere} in the command's label $\cup$
+  category $\cup$ keywords (all lower-cased) --- an AND-of-substrings
+  match, not a fuzzy/scored one. \\
+\texttt{\seqsplit{installCommandPalette(commands)}} &
+  \texttt{\seqsplit{commandPalette.ts:30--158}} --- wires the trigger button, live
+  filtering on input, \texttt{ArrowUp}/\texttt{ArrowDown} selection,
+  \texttt{Enter} to run, \texttt{Escape} to close, click-outside-to-close,
+  and the global shortcut (\texttt{Ctrl/Cmd+Shift+P} \emph{or}
+  \texttt{F1}, l.146--154) that opens it from anywhere in the app,
+  restoring focus to whatever was focused before on close (l.105,
+  l.117--118). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+The command list itself is assembled in \texttt{app.ts} (around
+\texttt{\seqsplit{installCommandPalette(commands)}} at l.1199) grouping File
+(new/open/save/export/autosave), Run (CESK/compare/rewrite), and View
+commands --- README's own description of the palette's contents.
+
+% =============================================================================
+\section{Status bar}
+\label{sec:status}
+
+\texttt{\seqsplit{footer.ide-status-bar}} (\texttt{\seqsplit{index.html:381--392}}) is a
+two-group bar: perspective + block count + problems button on the left,
+autosave status + technical labels ("MiniJava", "BMJ-Thrasos") on the
+right.
+
+\begin{center}
+\begin{longtable}{@{}p{3.8cm}p{4.0cm}p{6.4cm}@{}}
+\toprule
+\textbf{Element} & \textbf{Updated by} & \textbf{Trigger} \\
+\midrule
+\endhead
+\texttt{\seqsplit{\#status-perspective-label}} &
+  \texttt{\seqsplit{setPerspectiveIdentity}} & Any perspective change. \\
+\texttt{\seqsplit{\#status-block-count}} &
+  \texttt{app.ts:221} (inside \texttt{updateCode}) &
+  Every workspace mutation --- counts via
+  \texttt{\seqsplit{workspace.getAllBlocks(false)}}. \\
+\texttt{\seqsplit{\#status-problems-count}} &
+  \texttt{\seqsplit{renderProblemsPanel}} (\texttt{\seqsplit{typeDiagnostics.ts:86--90}},
+  documented in \texttt{\seqsplit{bottom-panel-sync.tex}}) &
+  Every type-check pass. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\texttt{\seqsplit{\#status-perspective}} and \texttt{\seqsplit{\#status-problems-button}} are
+themselves clickable: the former opens the perspective picker, the latter
+calls \texttt{showProblems()} (\texttt{app.ts:480--483}), which opens the
+bottom dock directly on the Problems tab --- the status bar doubles as a
+secondary set of shortcuts into the same actions the sidebar/command
+palette expose.
+
+% =============================================================================
+\section{Responsive breakpoints}
+\label{sec:responsive}
+
+The shell has three width-based behavioral thresholds, all read live via
+\texttt{\seqsplit{window.matchMedia}} at the point of use rather than cached once
+(so a browser window resize takes effect immediately without a separate
+resize listener re-deriving a "is mobile" flag):
+
+\begin{center}
+\begin{longtable}{@{}p{2.6cm}p{4.0cm}p{7.6cm}@{}}
+\toprule
+\textbf{Breakpoint} & \textbf{Where checked} & \textbf{Effect} \\
+\midrule
+\endhead
+\texttt{\seqsplit{max-width:1100px}} &
+  Throughout \texttt{app.ts} (activity buttons, \texttt{setToolboxHidden},
+  \texttt{setCodeHidden}, drag-resize guards, initial layout at l.1354,
+  l.1358) &
+  The primary "compact" breakpoint: sidebar and inspector become
+  \emph{overlay} panels (\texttt{\seqsplit{mobile-sidebar-open}} /
+  \texttt{mobile-code-open} body classes) instead of persistent columns,
+  and are forced closed by default when this width is first detected
+  (l.1354). \\
+\texttt{\seqsplit{max-width:700px}} &
+  \texttt{app.ts:1129} &
+  A narrower phone-sized threshold for additional layout collapse (per
+  the README's "the shell collapses to tablet and phone layouts"). \\
+\texttt{\seqsplit{min-width:901px}} &
+  \texttt{app.ts:1364} &
+  A recovery threshold on resize \emph{back up}: past this width, mobile
+  overlay state is cleared. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\texttt{\seqsplit{compactPanelLayout}} (\texttt{app.ts:56}) caches the 1100px query's
+initial value only as a starting default for code that runs before the
+first layout pass; every subsequent visibility decision re-queries
+\texttt{matchMedia} live, so there is no stale "was compact" state to
+desync from the real viewport.
+
+% =============================================================================
+\section{Theming}
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{\seqsplit{\#theme-toggle}} &
+  \texttt{\seqsplit{index.html:70--75}} --- a checkbox styled as a sun/moon switch;
+  checked = dark (the app's default, \texttt{index.html:10}'s
+  \texttt{\seqsplit{data-theme="dark"}}). \\
+\texttt{\seqsplit{createBlocklyTheme(theme)}} &
+  \texttt{\seqsplit{core/renderer/theme.ts}} --- builds the Blockly \texttt{Theme}
+  object (block-style colors) for \texttt{'dark' | 'light'}; called both
+  for the main workspace (on toggle, \texttt{app.ts:602}) and for every
+  visualization tab's own injected workspace
+  (\texttt{\seqsplit{visualizationPanel.ts:81}}), so a theme switch is consistent
+  across all Blockly instances in the app, not just the main one. \\
+\texttt{\seqsplit{disposeVizWorkspaces()}} &
+  \texttt{\seqsplit{visualizationPanel.ts:199--214}}, called from the theme-toggle
+  handler (\texttt{app.ts:603}) --- Blockly workspaces do not support a
+  live in-place theme swap reliably, so the visualization tabs' private
+  workspaces are disposed and (if one was open on a rendered subtree)
+  immediately re-rendered under the new theme, rather than patched. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section{Persisted state}
+
+Every piece of layout state that should survive a reload is written to
+\texttt{localStorage} under a namespaced \texttt{block-minijava.*} key,
+read back once at startup. This is the complete inventory, gathered from
+every \texttt{\_KEY} constant across the shell:
+
+\begin{center}
+\begin{longtable}{@{}p{5.6cm}p{8.6cm}@{}}
+\toprule
+\textbf{Key} & \textbf{Governs} \\
+\midrule
+\endhead
+\texttt{\seqsplit{block-minijava.autosave.v2}} & The autosaved workspace blob itself. \\
+\texttt{\seqsplit{block-minijava.theme}} & Dark/light theme. \\
+\texttt{\seqsplit{block-minijava.autosave.interval}} & The autosave interval slider's value. \\
+\texttt{\seqsplit{block-minijava.code.width}} & Legacy/alternate code-width key (superseded by the layout keys below in current layouts). \\
+\texttt{\seqsplit{block-minijava.layout.code.visible}} & Inspector column shown/hidden. \\
+\texttt{\seqsplit{block-minijava.layout.sidebar.width}} & Primary sidebar width. \\
+\texttt{\seqsplit{block-minijava.layout.sidebar.visible}} & Primary sidebar shown/hidden. \\
+\texttt{\seqsplit{block-minijava.layout.activity}} & Which activity-bar view is selected. \\
+\texttt{\seqsplit{block-minijava.layout.perspective}} & The current perspective identity. \\
+\texttt{\seqsplit{block-minijava.layout.bottom.open}} & Bottom dock open/closed
+  (\texttt{\seqsplit{visualizationPanel.ts}}). \\
+\texttt{\seqsplit{block-minijava.layout.bottom.height}} & Bottom dock height. \\
+\texttt{\seqsplit{block-minijava.layout.bottom.tab}} & Which of the seven bottom-dock tabs was last active. \\
+\texttt{\seqsplit{block-minijava.gc.autoEnabled}} & CESK tab's auto-GC checkbox (\texttt{\seqsplit{garbage-collection.tex}} \S4.3). \\
+\texttt{\seqsplit{block-minijava.gc.threshold}} & CESK tab's auto-GC allocation threshold. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section*{Note on scope}
+\addcontentsline{toc}{section}{Note on scope}
+This note covers the workbench \emph{shell}: regions, activity bar,
+perspectives, panel sizing, the resize coordinator, command palette,
+status bar, responsive breakpoints, theming, and persisted layout state.
+The \emph{content} each region hosts is documented separately: the toolbox
+in \texttt{\seqsplit{toolbox-drag-and-drop.tex}}, the inspector-column tabs in
+\texttt{\seqsplit{typing-code-outline-tabs.tex}}, and the bottom-dock tabs in
+\texttt{\seqsplit{bottom-panel-sync.tex}}. The CESK/A-vs-B machine internals and the
+garbage collector are covered in \texttt{\seqsplit{cesk-machine-and-stepper.tex}} and
+\texttt{\seqsplit{garbage-collection.tex}}; the type system and both operational
+semantics are covered in \texttt{\seqsplit{typing-and-evaluation-rules.tex}}.
+
+\end{document}

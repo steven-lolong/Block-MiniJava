@@ -1,0 +1,600 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{xcolor}
+\usepackage[export]{adjustbox}
+\usepackage{microtype}
+\emergencystretch=2.5em
+
+\title{The CESK Machine and Its Stepper in Block-MiniJava\\
+\large Machine Semantics, UI Architecture, and Source Mapping}
+\author{Research note --- Block-MiniJava}
+\date{2026-07-20}
+
+\newcommand{\rulename}[1]{\textsc{#1}}
+\newcommand{\irule}[3]{%
+  \adjustbox{max width=.96\linewidth}{$\displaystyle
+    \begin{array}{c}
+      #2 \\[2pt] \hline\hline \\[-9pt] #3
+    \end{array}
+    \;\; \rulename{(#1)}
+  $}%
+}
+\newcommand{\Step}[1]{\longrightarrow_{\rulename{#1}}}
+\newcommand{\dom}{\mathrm{dom}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Block-MiniJava's "CESK" viz-dock tab steps a real, faithful MiniJava
+program one machine transition at a time and renders its configuration as
+four coordinated panels --- Control, Stack+Environment, Store,
+Kontinuation --- with SVG arrows tracing every reference into the heap box
+it points at. This note explains how that machine and its stepper actually
+work, at two levels: the \emph{semantics} (what a CESK machine is, and
+which configuration this project's machine realizes), and the
+\emph{implementation} (exactly which TypeScript type, function, and line
+implements which theoretical component, and how the interactive stepper in
+\texttt{stepperPanel.ts} turns a pure transition function into a
+time-travelling, provenance-linked visualization). A companion tab, "A~vs~B"
+(\texttt{comparePanel.ts}), reuses the identical machine to run two value
+models in lockstep, and is covered briefly in \S\ref{sec:compare} as a
+one-page consequence of the same design.
+\end{abstract}
+
+\tableofcontents
+
+% =============================================================================
+\section{What ``the CESK machine'' means here}
+
+Block-MiniJava's Model~A evaluator (\texttt{src/core/semantics/minijavaMachine.ts})
+is a \textbf{CESK machine} --- Control, Environment, Store, Kontinuation ---
+in the sense of Felleisen and Friedman's CEK machine
+\cite{felleisen1986control} extended with an explicit, imperative-language
+store as formalized by Might and Van~Horn \cite{mightvanhorn2010aam},
+further extended with an explicit \emph{stack of activation frames} (rather
+than one shared continuation) to support method call/return, tracing back
+to the \emph{dump} of Landin's SECD machine \cite{landin1964scpp}. This is
+the same machine formalized in the companion note
+\texttt{typing-and-evaluation-rules.tex} (\S4.2); \emph{this} note's job is
+different: go deep on \emph{how the machine and its UI are actually built},
+with every theoretical component pinned to a file, a type, and a function.
+
+Three things distinguish the CESK tab from the language's other two
+steppers, and are worth having side by side before diving in:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+ & \textbf{CESK (this note)} & \textbf{A vs B / Rewrite} \\
+\midrule
+value model & Model A only (heap, \texttt{Ref}) & A\&B lockstep / B only \\
+state shape & one \texttt{MachineState} & a pair, or a substitution tree \\
+UI file & \texttt{stepperPanel.ts} & \texttt{comparePanel.ts} / (Rewrite panel) \\
+unique feature & heap boxes + SVG arrows + GC & side-by-side divergence / redex highlight \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =============================================================================
+\section{The machine, formally}
+\label{sec:machine-formal}
+
+\subsection{Configuration}
+
+A machine state is
+\[
+  \Sigma \;=\; \langle\, C,\; \varphi\!:\!\Phi,\; H \,\rangle,
+  \qquad
+  \varphi \;=\; \langle\, \mathsf{self},\; \rho,\; \kappa \,\rangle
+\]
+with $C$ the \emph{control} (a statement, an expression, a produced value,
+or done), $\varphi\!:\!\Phi$ a non-empty stack of activation frames (top
+frame $\varphi$, the rest $\Phi$), and $H$ the heap. Each frame is itself a
+CEK-style triple: $\mathsf{self}$ (the frame's \texttt{this}, a heap
+location under Model~A), $\rho$ (its local environment: parameters and
+locals, held \emph{by copy}), and $\kappa$ (its own pending-work stack,
+innermost first). \textbf{Every frame owns its own $\kappa$} --- this is
+what makes the design a \emph{stack of CEK configurations} rather than one
+flat CESK machine with a single global continuation: a paused caller frame
+keeps exactly the pending work it had when it made the call, and control
+returns to precisely that point when the callee's frame pops.
+
+\subsection{The transition function}
+
+Execution is a (partial) function $\mathrm{step} : \Sigma \to \Sigma$,
+total on every $\Sigma$ with $\mathrm{status} = \mathrm{running}$, and it
+dispatches on the shape of $C$:
+\[
+  \mathrm{step}(\Sigma) \;=\;
+  \begin{cases}
+    \mathrm{beginStatement}(\Sigma, s) & C = \mathrm{Stmt}(s) \\
+    \mathrm{beginExpression}(\Sigma, e) & C = \mathrm{Expr}(e) \\
+    \mathrm{applyKont}(\Sigma, v) & C = \mathrm{Value}(v) \\
+    \mathrm{applyKont}(\Sigma, \bot) & C = \mathrm{Done}
+  \end{cases}
+\]
+$\mathrm{beginStatement}$/$\mathrm{beginExpression}$ \emph{decompose} a
+statement or expression --- pushing whatever continuation records "what to
+do with the result" and refocusing $C$ onto the first subterm that needs
+evaluating (or, for a value-producing leaf like a literal, going straight
+to $\mathrm{Value}(v)$). $\mathrm{applyKont}$ is the dual: given a value
+(or $\bot$, meaning "this statement finished with no value"), it pops one
+continuation frame off $\kappa$ and does whatever that frame was waiting to
+do --- fold an operator, write a binding, dispatch an \texttt{if}, push or
+pop a call frame, and so on. This decompose/recompose discipline is exactly
+how a CEK machine implements evaluation-context congruence \emph{without}
+representing the context as data: the continuation stack \emph{is} the
+context, built up one push at a time as the machine walks down into a term
+and unwound one pop at a time as it walks back up with a value.
+
+\subsection{Purity, and why it matters for the UI}
+
+$\mathrm{step}$ is a \emph{pure} function: given $\Sigma$, it returns a
+\emph{fresh} $\Sigma'$ that shares no mutable substructure with $\Sigma$
+(frames, locals maps, kont stacks, and the heap are all shallow-copied at
+the top of every step). This single property is what makes the stepper's
+\textbf{Back} button exact time travel rather than an undo log that has to
+know how to reverse each rule: the UI simply keeps every previously visited
+$\Sigma$ on a plain array and pops the last one to go back
+(\S\ref{sec:controls}). No rule in \S\ref{sec:rule-summary} needs an
+inverse.
+
+\subsection{Rule summary}
+\label{sec:rule-summary}
+
+The full inference-rule presentation of every named transition
+(\rulename{lit}, \rulename{var}, \rulename{field-write} vs.\
+\rulename{field-update}, \rulename{call}, \rulename{return}, and every
+operator/array/string rule) is in the companion note
+\texttt{typing-and-evaluation-rules.tex}, \S4.2.3 --- this note does not
+repeat it, and instead spends its space on \S\ref{sec:impl} and
+\S\ref{sec:ui}, which that note does not cover.
+
+% =============================================================================
+\section{Theory-to-implementation mapping}
+\label{sec:impl}
+
+Every symbol in \S\ref{sec:machine-formal} corresponds to one, and only
+one, place in \texttt{src/core/semantics/minijavaMachine.ts}:
+
+\begin{center}
+\begin{longtable}{@{}p{2.6cm}p{4.6cm}p{7.0cm}@{}}
+\toprule
+\textbf{Theory} & \textbf{TypeScript} & \textbf{Notes} \\
+\midrule
+\endhead
+$\Sigma$ (state) &
+  \texttt{MachineState} (l.125--142) &
+  \texttt{\{model, control, stack, heap, output, nextLoc, status, error,
+  table, stepCount, lastRule, lastEffect, focusBlockId\}} --- the last
+  three fields exist purely for the visualization (\S\ref{sec:ui}), not for
+  the semantics. \\
+$C$ (control) &
+  \texttt{Control} (l.108--112) &
+  A tagged union: \texttt{\{tag:'Stmt',block\}}, \texttt{\{tag:'Expr',block\}},
+  \texttt{\{tag:'Value',value\}}, \texttt{\{tag:'Done'\}}. \texttt{block} is
+  a live \texttt{Blockly.Block} reference --- the machine's "syntax" is the
+  program's own block tree, read but never copied. \\
+$\Phi$ (frame stack) &
+  \texttt{MachineState.stack: Frame[]} (l.128) &
+  Pushed by \texttt{pushFrame} (l.298--358) on a method call, popped inside
+  \texttt{applyKont}'s empty-continuation case (l.688--693) on return. \\
+$\varphi$ (one frame) &
+  \texttt{Frame} (l.88--106) &
+  \texttt{\{method, self, selfObj, locals, kont, blockId, callBlockId,
+  returnBlock, returningNow\}}. \texttt{self} is Model~A's \texttt{this}
+  (a \texttt{Loc} or \texttt{null} in \texttt{main}); \texttt{selfObj} is
+  Model~B's (always \texttt{null} here). \\
+$\rho$ (environment) &
+  \texttt{Frame.locals: Map<string,MachineValue>} (l.96) &
+  Parameters and locals, by copy --- binding a \texttt{Ref} copies the
+  arrow (four bytes, conceptually), not the heap object it points to. \\
+$\kappa$ (kontinuation) &
+  \texttt{Frame.kont: Kont[]} (l.97), \texttt{Kont} union (l.64--86) &
+  Nineteen tags across three groups (statement, operator, method-call
+  continuations) --- \S\ref{sec:kont-table}. \\
+$H$ (store) &
+  \texttt{MachineState.heap: Map<Loc,HeapObj>} (l.130) &
+  \texttt{HeapObj} (l.57--59) is \texttt{\{tag:'Obj',className,fields,blockId\}}
+  or \texttt{\{tag:'Arr',elems,blockId\}} --- every heap object also carries
+  the \texttt{new}/\texttt{new int[]} block that allocated it, purely for
+  provenance (\S\ref{sec:ui}). \\
+$v$ (values) &
+  \texttt{MachineValue} (l.46--53) &
+  \texttt{Int|Bool|Str|Null|Ref(loc)} (Model A) plus \texttt{Obj|Arr}
+  (Model B only, unused on this tab). \\
+$\mathrm{step}$ &
+  \texttt{step(previous)} (l.936--951) &
+  \texttt{cloneState} (l.182--200) first (the purity in
+  \S\ref{sec:machine-formal}), then dispatches on \texttt{state.control.tag}
+  to one of the four handlers below. \\
+$\mathrm{beginStatement}$ &
+  \texttt{beginStatement(state, block)} (l.393--433) &
+  One case per statement block type (\texttt{mj\_statement\_block/if/while/
+  print/assign/array\_assign}); pushes the matching \texttt{Kont} and
+  refocuses \texttt{C} on the first subexpression, or recurses into a
+  nested statement chain via \texttt{enterChain} (l.237--244). \\
+$\mathrm{beginExpression}$ &
+  \texttt{beginExpression(state, block)} (l.435--571) &
+  One case per expression block type; literals go straight to
+  \texttt{produce} (l.228--230, sets \texttt{Value}); everything else
+  pushes a \texttt{Kont} and refocuses on a child. \\
+$\mathrm{applyKont}$ &
+  \texttt{applyKont(state, value)} (l.667--933) &
+  Pops one \texttt{Kont}, or --- if $\kappa$ is empty --- handles frame
+  exhaustion: focus the method's \texttt{return} expression
+  (\rulename{return-focus}), deliver a value back to the caller and pop the
+  frame (\rulename{return}), or halt (\rulename{halt}) once the outermost
+  (\texttt{main}) frame is done. \\
+initial $\Sigma$ &
+  \texttt{injectMachine(workspace, model)} (l.954--1003) &
+  Builds the one-frame \texttt{main} stack from the workspace's
+  \texttt{mj\_goal}/\texttt{mj\_main\_class} blocks; returns
+  \texttt{\{injectError: string\}} instead when the program is structurally
+  incomplete (no goal/main-class block) rather than throwing. \\
+run-to-completion &
+  \texttt{run(initial, maxSteps)} (l.1006--1013) &
+  Iterates \texttt{step} under a step-count bound; used by the
+  non-interactive test suites, \emph{not} by the interactive stepper (which
+  calls \texttt{step} once per user action instead, \S\ref{sec:controls}). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{The kontinuation vocabulary}
+\label{sec:kont-table}
+
+\begin{center}
+\begin{longtable}{@{}p{3.6cm}p{3.4cm}p{7.2cm}@{}}
+\toprule
+\textbf{Group} & \textbf{Tags} & \textbf{Meaning (what fires when the hole is filled)} \\
+\midrule
+\endhead
+statements &
+  \texttt{KStmtSeq, KLoop, KIf, KWhile, KPrint, KAssign, KArrAssignIdx,
+  KArrAssignVal} &
+  Sequencing (advance to the next statement, or finish the block),
+  loop re-entry, branch dispatch, output, and the two-stage
+  index-then-value continuation for \texttt{a[i]=e}. \\
+operators &
+  \texttt{KNot, KAnd, KOr, KBinL, KBinR} &
+  \texttt{KAnd}/\texttt{KOr} implement short-circuit directly (the
+  right operand's block is only ever focused if the left value does not
+  already decide the result); \texttt{KBinL}$\to$\texttt{KBinR} sequences
+  left-then-right for every strict binary operator (arith, compare,
+  \texttt{concat}). \\
+arrays/strings &
+  \texttt{KLookupArr}$\to$\linebreak\texttt{KLookupIdx}, \texttt{KLength},
+  \texttt{KNewArr}, \texttt{KCharAtStr}$\to$\linebreak\texttt{KCharAtIdx},
+  \texttt{KStrLength} &
+  Each two-stage pair evaluates its receiver/array first, then the index,
+  mirroring the left-to-right evaluation order of the surface syntax. \\
+method call &
+  \texttt{KCallRecv}$\to$\linebreak\texttt{KCallArgs} &
+  Receiver first, then arguments strictly left-to-right
+  (\texttt{KCallArgs.done} accumulates already-evaluated arguments,
+  \texttt{.remaining} the still-unevaluated ones); once the last argument
+  lands, \texttt{pushFrame} (l.298) fires --- dynamic dispatch resolved
+  from the receiver's \emph{runtime} class, not its static type. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Effects: the visualization hook}
+
+\texttt{MachineState.lastRule}/\texttt{lastEffect} are not read by
+\texttt{step} itself --- no rule branches on them --- they exist solely so
+the stepper can explain, in the UI, \emph{what just happened}.
+\texttt{Effect} (l.115--123) is a small closed set --- \texttt{new,
+field-write, arr-write, local-write, self-write, push-frame, pop-frame,
+output} --- and it is this tag, not the rule name, that
+\texttt{stepperPanel.ts}'s rendering keys off to decide which heap box or
+locals row to flash (\S\ref{sec:ui}).
+
+% =============================================================================
+\section{The stepper: from a pure function to an interactive, provenance-linked UI}
+\label{sec:ui}
+
+\texttt{src/core/ui/stepperPanel.ts} (876 lines) is everything between "a
+pure \texttt{step} function exists" and "a user can press \emph{Step}, see
+four coordinated panels update, and click any value to jump to the block
+that produced it." Its job splits into five concerns.
+
+\subsection{Module state and the control loop}
+\label{sec:controls}
+
+\begin{center}
+\begin{longtable}{@{}p{3.6cm}p{11.6cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{current: MachineState|null} (l.44) &
+  The machine state currently on screen. \texttt{null} before the first
+  \texttt{Load}. \\
+\texttt{history: MachineState[]} (l.45) &
+  Every previously visited state, oldest first, capped at
+  \texttt{MAX\_HISTORY = 5000} (l.31). \textbf{Back} is exactly
+  \texttt{current = history.pop()} (\texttt{stepBack}, l.822--828) ---
+  possible \emph{only} because \texttt{step} is pure
+  (\S\ref{sec:machine-formal}); nothing is ever un-mutated. \\
+\texttt{stale: boolean} (l.46) &
+  Set the instant the workspace changes while a machine is loaded
+  (\texttt{markStale}, l.143--150, driven by a Blockly
+  \texttt{addChangeListener} in \texttt{attachWorkspaceListener},
+  l.152--173) --- the stepper never silently keeps stepping a program that
+  no longer matches what is on screen; every control disables until the
+  user presses \textbf{Load} again. \\
+\texttt{loadMachine()} (l.775--797) &
+  \textbf{Load}: calls \texttt{injectMachine}, resets \texttt{history} and
+  \texttt{stale}, and (re)installs the workspace-change listener. \\
+\texttt{stepOnce()} (l.799--820) &
+  \textbf{Step}: pushes \texttt{current} onto \texttt{history}, then
+  \texttt{current = step(current)}; also checks the GC auto-trigger
+  (companion note \texttt{garbage-collection.tex}, \S4.3) after every
+  mutator step. \\
+\texttt{togglePlay()} (l.830--839) &
+  \textbf{Play}/\textbf{Pause}: a \texttt{setInterval} calling
+  \texttt{stepOnce} every \texttt{PLAY\_INTERVAL\_MS = 550}ms (l.30) ---
+  auto-stops on \texttt{status} leaving \texttt{'running'}, on
+  \texttt{stale}, or while a GC animation owns the machine. \\
+\texttt{initStepperPanel(}\linebreak\texttt{getWorkspace)} (l.857--876) &
+  The module's one exported wiring entry point --- called once from
+  \texttt{app.ts:1413} with a closure returning the live
+  \texttt{Blockly.WorkspaceSvg}. Attaches every button/checkbox listener,
+  a scroll listener per panel body and a \texttt{ResizeObserver} (both
+  just to keep the SVG arrows aligned, \S\ref{sec:arrows}), and does the
+  first \texttt{renderAll()}. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Rendering: one function per CESK column}
+
+\texttt{renderAll()} (l.480--490) is the single entry point every state
+change routes through (\texttt{loadMachine}, \texttt{stepOnce},
+\texttt{stepBack}, and the GC driver all end by calling it, directly or via
+\texttt{finishSweep}). It calls, in order, \texttt{renderStatus},
+\texttt{renderButtons}, then one function per visual column:
+
+\begin{center}
+\begin{longtable}{@{}p{2.6cm}p{2.6cm}p{9.9cm}@{}}
+\toprule
+\textbf{Column} & \textbf{Function} & \textbf{What it shows} \\
+\midrule
+\endhead
+\textbf{C}ontrol &
+  \texttt{renderControl} (l.225--271) &
+  A "kind" chip (statement/expression/value/done), the focused block's text
+  (click-to-locate via \texttt{locateProvenance}, l.90--100) or the
+  produced value as a chip, and the \texttt{lastRule} name --- the one
+  place in the UI the rule names from \S\ref{sec:rule-summary} are printed
+  verbatim. \\
+\textbf{S}$\cdot$\textbf{E} &
+  \texttt{renderFrames} (l.367--411) &
+  The call stack, top frame first, each as a card: the method name
+  (click-to-locate the call site), \texttt{this}$\to$ a \texttt{Ref} chip
+  when applicable, and a table of \texttt{locals} --- a row flashes
+  \texttt{is-changed} exactly when \texttt{lastEffect.kind==='local-write'}
+  named that local, on the top frame only. \\
+\textbf{S}tore &
+  \texttt{renderHeap} (l.413--462) &
+  One box per live heap object/array, sorted by address; a box flashes
+  \texttt{is-changed} on a fresh \texttt{'new'} at that location, or
+  \texttt{is-write-target} on a \texttt{'field-write'}/\texttt{'arr-write'}
+  there; the changed field/element row inside gets \texttt{is-changed}
+  too. Every box's title is click-to-locate to the \texttt{new} block that
+  allocated it (\texttt{HeapObj.blockId}). \\
+\textbf{K}ontinuation &
+  \texttt{renderKont} (l.315--365) &
+  Every live frame's own $\kappa$, innermost entry first, rendered via
+  \texttt{kontEntry} (l.284--313) --- a per-tag mapping from a \texttt{Kont}
+  value to a human-readable "hole" sentence, e.g.\ \texttt{KAssign} $\to$
+  \texttt{"x = $\square$"}, \texttt{KBinR} $\to$ \texttt{"$\langle$left-chip$\rangle$ + $\square$"}. The
+  next entry to fire on the top frame is marked \texttt{is-next}. \\
+Output &
+  \texttt{renderOutput} (l.464--478) &
+  The accumulated \texttt{println} log, flashing on
+  \texttt{lastEffect.kind==='output'}, mirrored into the shared bottom
+  \emph{Output} tab via \texttt{mirrorProgramOutput} so \textbf{Run} and
+  the CESK stepper share one console view. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Provenance: everything links back to a block}
+\label{sec:provenance}
+
+Every rendered artifact --- the focused control, a frame's name, a heap
+box's title, a kontinuation entry with a waiting block --- is a clickable
+\texttt{.stepper-provenance} element wired to \texttt{locateProvenance(blockId)}
+(l.90--100), which selects and centers that block in the \emph{main
+workspace} (not a separate mini-view): the CESK panel never draws its own
+copy of the program, it always points back at the one live program surface.
+\texttt{setHighlight} (l.119--133) additionally keeps the machine's current
+\texttt{focusBlockId} highlighted continuously, so the program surface
+itself shows where execution currently is even without a click.
+
+\subsection{Value chips and the heap-arrow visualization}
+\label{sec:arrows}
+
+Every \texttt{MachineValue} is rendered by \texttt{valueChip} (l.72--86):
+scalars/null print their value directly; a \texttt{Ref(loc)} becomes a
+chip colored by \texttt{locHue(loc) = (loc*67) mod 360} (l.68--70) --- "the
+poor man's arrow: two chips with one color are two arrows to one box"
+(module docstring, l.9--10). The literal arrows are drawn separately, on
+demand, by \texttt{drawArrows} (l.524--\textasciitilde 600) directly into
+an overlay \texttt{<svg id="stepper-arrows">} sized to the whole panel
+group: every element in the DOM carrying a \texttt{data-ref-loc} attribute
+(a chip anywhere in Control, Frames, Heap, or Kont) gets a cubic-Bézier
+path drawn from its position to its target heap box, using the same
+\texttt{--loc-hue} custom property for stroke color as the chip itself, so
+a color match \emph{is} the visual proof of aliasing. On a
+\texttt{field-write}/\texttt{arr-write} step the written box's incoming
+arrow additionally gets an animated dot (an SVG \texttt{<animateMotion>})
+travelling from the writing frame's chip into the box --- the "money
+animation" the design note calls out (\texttt{block-minijava-value-and-
+visualisation-design.md}, \S6): the value's motion is drawn along the
+\emph{same} arrow that was already there, never a new one, which is the
+visual argument that a field write mutates a shared cell rather than
+creating a new one. Redraws are batched to one per animation frame
+(\texttt{scheduleArrowRedraw}, l.503--512) and re-triggered on panel
+scroll/resize so the arrows never desync from element positions the user
+just moved by scrolling.
+
+\subsection{HTML wiring}
+
+\begin{center}
+\begin{longtable}{@{}p{4.0cm}p{10.2cm}@{}}
+\toprule
+\textbf{Element} & \textbf{Location} \\
+\midrule
+\endhead
+\texttt{<button class="viz-tab" data-kind="machine">} &
+  \texttt{src/index.html:260--262} --- the "CESK" tab button in the
+  viz-dock's tab strip; its title attribute is the one-sentence description
+  ("Control $\cdot$ Environment $\cdot$ Store $\cdot$ Kontinuation, over an
+  activation-frame stack") shown as a tooltip. \\
+\texttt{<div data-kind="machine">} &
+  \texttt{index.html:287--327} --- the panel body: the control strip
+  (\texttt{stepper-load/back/step/play/gc} buttons, the GC threshold
+  inputs, and \texttt{stepper-status}) above the four-column
+  \texttt{.stepper-panels-csesk} grid (\texttt{stepper-control},
+  \texttt{stepper-frames}, \texttt{stepper-heap}, \texttt{stepper-kont},
+  plus an \texttt{Output} card) and the \texttt{<svg id="stepper-arrows">}
+  overlay. \\
+\texttt{initStepperPanel(() => workspace)} &
+  \texttt{app.ts:1413} --- the one call site that wires this whole module
+  to the live IDE workspace; \texttt{app.ts:364} additionally calls
+  \texttt{scheduleTypingRender}-style visibility hooks so \texttt{Play}
+  stops when the tab is hidden (\texttt{setStepperTabVisible}, l.847--855). \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+% =============================================================================
+\section{The sibling stepper: A vs B lockstep}
+\label{sec:compare}
+
+\texttt{src/core/ui/comparePanel.ts} is a second, much smaller UI
+(reusing \texttt{valueChip}/\texttt{locHue}/\texttt{step} against the
+\emph{same} \texttt{minijavaMachine.ts}) that demonstrates the design
+note's \S8 artifact directly: one program, two machines.
+
+\begin{center}
+\begin{longtable}{@{}p{3.2cm}p{12.0cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Role} \\
+\midrule
+\endhead
+\texttt{stateA, stateB} &
+  Two independent \texttt{MachineState}s, both built by
+  \texttt{loadBoth()} (l.290--312) calling
+  \texttt{injectMachine(workspace,'A')} and
+  \texttt{injectMachine(workspace,'B')} on the \emph{same} workspace ---
+  the only difference between them is the \texttt{model} tag threaded
+  through every subsequent \texttt{step} call. \\
+\texttt{stepBoth()} (l.314--326) &
+  Advances \emph{both} machines by exactly one transition each,
+  \texttt{stateA = step(stateA); stateB = step(stateB)} --- because both
+  share the same control-flow skeleton (\S\ref{sec:machine-formal}), their
+  \texttt{stepCount}s stay equal by construction; they diverge only in
+  \emph{values} (a shared cell in A, an independent copy in B), which is
+  exactly the pedagogical point. \\
+\texttt{history:}\linebreak\texttt{Array<[}\linebreak\texttt{MachineState,}\linebreak\texttt{MachineState]>} &
+  A history of \emph{pairs}, so \textbf{Back} undoes one lockstep step on
+  both machines at once --- the same purity-enables-time-travel argument
+  as \S\ref{sec:controls}, applied twice. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+No new machine semantics are introduced here --- \texttt{comparePanel.ts}
+is UI-only evidence that parameterizing \texttt{step} by \texttt{model}
+(rather than writing two separate interpreters) was the right
+factorization: running Model~A and Model~B "in lockstep" is not a special
+mode, it is simply calling the same function twice with a different tag.
+
+% =============================================================================
+\section{Verification}
+
+\texttt{test/run\_machine.js} (part of \texttt{npm test}'s five headless
+suites) runs each of many MiniJava programs through
+text~$\to$~blocks~$\to$~\texttt{injectMachine}~$\to$~\texttt{step}$^{*}$
+and asserts on the full run report: printed output, final
+\texttt{status}, error-message fragments for stuck programs, which rules
+were exercised, maximum call-stack depth, and final heap size --- so every
+transition rule in \S\ref{sec:rule-summary} is exercised by name, not just
+indirectly through a final-value check. The CESK panel is additionally
+smoke-tested end to end (headless Chrome/CDP) in
+\texttt{test/smoke-csesk.entry.ts}: that a real \texttt{println}/store/kont
+column renders correctly for a concrete run, that the "machine finished"
+status appears, and (as detailed in the companion GC note) that a real
+mid-run garbage collection renders and completes correctly through this
+exact UI path.
+
+% =============================================================================
+\section{Theoretical sources}
+
+\begin{itemize}
+  \item \textbf{The CESK machine itself} --- Control/Environment/Store/
+        Kontinuation as one configuration, and the decompose
+        (\texttt{beginStatement}/\texttt{beginExpression}) /
+        recompose (\texttt{applyKont}) discipline that realizes evaluation
+        contexts without reifying them as data --- follows Felleisen and
+        Friedman's CEK machine \cite{felleisen1986control}, extended with
+        an explicit store as in Might and Van~Horn's CESK presentation
+        \cite{mightvanhorn2010aam}.
+  \item \textbf{The explicit call-stack-of-frames} (rather than one shared
+        continuation) is, historically, the \emph{dump} component of
+        Landin's SECD machine \cite{landin1964scpp} --- the original
+        abstract machine with explicit function call/return, predating CEK
+        by two decades.
+  \item \textbf{Purity enabling exact time-travel} (\S\ref{sec:controls})
+        is not a citation so much as a direct consequence of formalizing
+        \texttt{step} as a mathematical function $\Sigma \to \Sigma$ rather
+        than an in-place state mutator --- the standard reason functional
+        interpreters are easy to checkpoint, exploited here for the
+        \textbf{Back} button rather than for, say, backtracking search.
+\end{itemize}
+
+% =============================================================================
+\section*{Note on scope}
+\addcontentsline{toc}{section}{Note on scope}
+This note covers the \emph{CESK} tab (\texttt{stepperPanel.ts}) and its
+lockstep sibling (\texttt{comparePanel.ts}) in implementation depth. The
+substitution/reduction semantics behind the \emph{Rewrite} tab
+(\texttt{minijavaSubstitution.ts}) is a different machine entirely (no
+store, no frame stack, no continuations) and is covered, both semantically
+and operationally, in \texttt{typing-and-evaluation-rules.tex} \S4.3. The
+mark-and-sweep collector reachable from this same panel's \textbf{Run GC}
+button is covered in full in \texttt{garbage-collection.tex}.
+
+\begin{thebibliography}{9}
+
+\bibitem{felleisen1986control}
+M.~Felleisen and D.~P. Friedman.
+\newblock Control operators, the SECD machine, and the $\lambda$-calculus.
+\newblock In \emph{Formal Description of Programming Concepts III}, 1986.
+
+\bibitem{mightvanhorn2010aam}
+M.~Might and D.~Van~Horn.
+\newblock Abstracting abstract machines.
+\newblock In \emph{ICFP}, 2010.
+
+\bibitem{landin1964scpp}
+P.~J. Landin.
+\newblock The mechanical evaluation of expressions.
+\newblock \emph{The Computer Journal}, 6(4):308--320, 1964.
+
+\end{thebibliography}
+
+\end{document}

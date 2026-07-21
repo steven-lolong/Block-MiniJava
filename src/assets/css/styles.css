@@ -1422,20 +1422,10 @@ body.code-hidden .code-column {
     display: none !important;
   }
 
-  /* NOT display:none/visibility:hidden/opacity:0 here: hiding this element
-     by any means, in the same print pass as hiding .workspace-column (the
-     Blockly SVG canvas — itself heavy with <filter> defs for glow/shadow),
-     reproducibly renders the ENTIRE printed page blank in Chromium's print
-     pipeline (confirmed in both real print preview and headless
-     Page.printToPDF — a genuine engine bug, not a layout mistake here: the
-     footer keeps rendering fine on its own, and .workspace-column keeps
-     hiding fine on its own, only the *combination* blanks the page). Restyle
-     it for print instead of removing it.  */
-  body.printing-typing .workspace-footer {
-    background: #fff !important;
-    color: #000 !important;
-    border-top-color: rgba(0, 0, 0, 0.2) !important;
-  }
+  /* .workspace-footer isn't listed here: it's removed from the DOM outright
+     for the print pass instead (see `printTyping()` in typingPanel.ts) —
+     CSS-hiding it alongside .workspace-column reproducibly blanks the
+     entire printed page in Chromium's print pipeline. */
 }
 
 .code-view,

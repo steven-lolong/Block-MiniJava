@@ -268,6 +268,21 @@ export function printTyping(): void {
 
   const scale = naturalWidth > PRINT_SAFE_WIDTH_PX ? PRINT_SAFE_WIDTH_PX / naturalWidth : 1;
 
+  // The status-bar footer can't simply be CSS-hidden for print: doing so
+  // (display:none, visibility:hidden, opacity:0, or a zero-size +
+  // overflow:hidden) in the same pass as hiding .workspace-column (the
+  // Blockly SVG canvas — heavy with <filter> defs for glow/shadow)
+  // reproducibly blanks the ENTIRE printed page in Chromium's print
+  // pipeline, confirmed in both real print preview and headless
+  // Page.printToPDF — a genuine engine bug, not a layout mistake, and every
+  // CSS-based hiding technique tried hit it. Detaching the element from the
+  // DOM outright for the print pass sidesteps whatever compositing path
+  // triggers that bug; it's reinserted at its original position afterward.
+  const footer = document.querySelector<HTMLElement>('.workspace-footer');
+  const footerParent = footer?.parentElement ?? null;
+  const footerNextSibling = footer?.nextSibling ?? null;
+  footer?.remove();
+
   let cleaned = false;
   const cleanup = (): void => {
     if (cleaned) return;
@@ -278,6 +293,7 @@ export function printTyping(): void {
     tree.style.removeProperty('transform');
     tree.style.removeProperty('transform-origin');
     document.title = previousTitle;
+    if (footer && footerParent) footerParent.insertBefore(footer, footerNextSibling);
   };
   if (scale < 1) {
     tree.style.transform = `scale(${scale})`;

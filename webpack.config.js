@@ -7,7 +7,9 @@ module.exports = {
   output: {
     filename: 'block_minijava.js',
     path: path.resolve(__dirname, 'docs'),
-    clean: true,
+    // `docs/` is also the tracked GitHub Pages root. Preserve hand-authored
+    // refactor documentation while replacing generated application artifacts.
+    clean: { keep: /ui-refactor\// },
     publicPath: ''
   },
   resolve: {

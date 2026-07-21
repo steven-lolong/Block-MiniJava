@@ -19,12 +19,16 @@
     "test:fuzz": "npm run test:build && node test/run_fuzz.js",
     "test:reachability": "npm run test:build && node test/run_reachability.js",
     "test:gc": "npm run test:build && node test/run_gc.js",
-    "test:smoke": "npm run test:build && node test/dist/smoke.bundle.js"
+    "test:smoke": "npm run test:build && node test/dist/smoke.bundle.js",
+    "test:ui": "playwright test test/ui/workbench.spec.ts --project=chromium",
+    "test:ui:visual": "playwright test test/ui/visual.spec.ts --project=chromium",
+    "test:ui:update": "playwright test test/ui/visual.spec.ts --project=chromium --update-snapshots"
   },
   "dependencies": {
     "blockly": "^12.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "copy-webpack-plugin": "^13.0.1",
     "css-loader": "^7.1.2",
     "html-webpack-plugin": "^5.6.3",

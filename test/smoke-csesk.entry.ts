@@ -115,7 +115,7 @@ check('C · control card rendered', seen.control);
 check('S·E · nested call frame rendered', seen.frames);
 check('S · store box rendered', seen.heap);
 check('K · kontinuation entries rendered', seen.kont);
-check('machine finished: status shows ✓', document.getElementById('stepper-status')!.textContent!.includes('✓'));
+check('machine finished: status shows completion', document.getElementById('stepper-status')!.textContent!.includes('Finished'));
 check('output rendered 42', document.getElementById('stepper-output')!.textContent!.trim() === '42');
 check('bottom Output tool mirrors 42', document.getElementById('bottom-program-output')!.textContent!.includes('42'));
 
@@ -186,15 +186,15 @@ async function runGCScenario(): Promise<void> {
     'GC scenario: the swept cell is gone from the heap panel',
     !(document.getElementById('stepper-heap')!.textContent ?? '').includes('999')
   );
-  check('GC scenario: status reports the GC summary, not a step count', statusText().startsWith('☠ GC complete'));
+  check('GC scenario: status reports the GC summary, not a step count', statusText().startsWith('GC complete'));
 
   // `keep` (read by the pending return) and `self` (the GCDriver receiving
   // `.get()`) must both have survived the sweep, or the program would get
   // stuck on the next step instead of finishing normally.
-  for (let i = 0; i < 500 && !statusText().includes('✓') && !statusText().includes('⨯'); i++) {
+  for (let i = 0; i < 500 && !statusText().includes('Finished') && !statusText().includes('Stuck'); i++) {
     stepBtn.dispatchEvent(new (globalThis as any).Event('click'));
   }
-  check('GC scenario: program still finishes (not stuck) after a mid-run GC', statusText().includes('✓'));
+  check('GC scenario: program still finishes (not stuck) after a mid-run GC', statusText().includes('Finished'));
   check(
     'GC scenario: program still finishes with the right output after a mid-run GC',
     document.getElementById('stepper-output')!.textContent!.trim() === '7'

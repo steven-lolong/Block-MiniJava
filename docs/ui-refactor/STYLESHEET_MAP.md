@@ -90,7 +90,7 @@ No legacy stylesheet remains in the import chain, and `workbench.css` no longer 
 | Grammar/toolbox | Six category-family tokens from `--grammar-program` through `--grammar-value`; Blockly renderer color mappings are unchanged |
 | Typography | `--font-family-ui`, `--font-family-code`, six font sizes, four allowed font weights, and compact/default/relaxed/code line heights |
 | Spacing | `--space-0` through `--space-12` for the recurring 0–24 px scale |
-| Controls/icons | Compact/default/comfortable control heights and small/medium/large icon sizes |
+| Controls/icons | Compact/default/comfortable control heights, shared control padding, and small/medium/large icon sizes |
 | Shape/elevation | Radius, shadow, and motion tokens |
 | Panels | Semantic header/activity/sidebar/inspector/bottom/status/toolbar/tab dimensions plus resizer size |
 | Layers | Base, workspace, content, interaction, visualization, header, scrim, drawer, menu, bottom-panel, and modal layers |
@@ -171,12 +171,27 @@ These values should not be globally replaced with a spacing token merely because
 
 - UI family: `--font-family-ui` (Inter, then platform sans-serif fallbacks).
 - Code family: `--font-family-code` (JetBrains Mono, then platform monospace fallbacks).
-- Base shell: 13 px with the default 1.4 line height.
-- Editable code/output: 12 px on an exact 20 px line height shared by every overlay layer.
+- Base shell: 14 px with the default 1.45 line height.
+- Editable code/output: 13 px on an exact 21 px line height shared by every overlay layer.
 - Permitted weights: 400, 500, 600, and 700 through semantic weight tokens.
 - Print typography remains locally sized for paper readability.
 
 There are no numeric font-weight declarations outside the four token definitions.
+
+## Icon and control system
+
+`src/index.html` contains the small inline `icon-sprite` used by the shell and
+dynamic UI. Each symbol has a `16 × 16` view box and is rendered through the
+shared `.app-icon` rule with `currentColor` stroke semantics. This replaces
+the former character-based `.icon-*::before` rules without adding a runtime
+dependency. The existing `.icon`, `icon-menu`, and `icon-close` classes remain
+on the compact-menu SVG because `app.ts` still synchronizes those state classes.
+
+Controls use the `Primary`, `Secondary`, `Quiet`, and `Destructive` hierarchy:
+the existing primary run/stepper actions map to the primary treatment, regular
+stepper actions map to secondary, and familiar icon controls remain quiet.
+All icon-only controls keep their `aria-label` and `title`; semantic stepper
+actions use visible text labels.
 
 ## Responsive breakpoints
 
@@ -201,7 +216,8 @@ The retired 980 and 580 px legacy shell queries no longer exist.
 2. Split `workbench.css` into shell submodules only if import order remains explicit and selector ownership stays non-overlapping; line count alone is not a reason to split it.
 3. Add a browser print regression before simplifying `printing-typing` rules further.
 4. Tokenize remaining component geometry selectively when a later visual change actually needs it.
-5. Replace character-based legacy icons with the planned single SVG system during the visual/IA phase, without changing command reachability or ARIA names.
+5. Extend the local SVG sprite only when a new familiar action needs an icon;
+   do not add a large icon dependency or reintroduce character-glyph icons.
 6. Keep editor metrics together; any font, line-height, gutter, wrapping, or padding change needs editable-code overlay tests and visual comparison.
 
 ## Consolidation verification

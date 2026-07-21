@@ -74,11 +74,28 @@ type Perspective = 'edit' | 'debug' | 'types' | 'presentation' | 'custom';
 const ACTIVITY_KINDS: ActivityKind[] = ['blocks', 'search', 'run', 'settings'];
 const PERSPECTIVES: Perspective[] = ['edit', 'debug', 'types', 'presentation', 'custom'];
 const ACTIVITY_META: Record<ActivityKind, { title: string; icon: string }> = {
-  blocks: { title: 'Blocks', icon: 'icon-blocks' },
-  search: { title: 'Search Blocks', icon: 'icon-search' },
-  run: { title: 'Run and Analysis', icon: 'icon-run' },
-  settings: { title: 'Settings and Layout', icon: 'icon-settings' }
+  blocks: { title: 'Blocks', icon: 'blocks' },
+  search: { title: 'Search Blocks', icon: 'search' },
+  run: { title: 'Run and Analysis', icon: 'run' },
+  settings: { title: 'Settings and Layout', icon: 'settings' }
 };
+
+const CATEGORY_ICON: Record<string, string> = {
+  program: 'blocks',
+  declarations: 'structure',
+  types: 'code',
+  statements: 'structure',
+  expressions: 'rewrite',
+  values: 'value'
+};
+
+function iconMarkup(icon: string, className = ''): string {
+  return `<svg class="app-icon ${className}" aria-hidden="true"><use href="#icon-${icon}"></use></svg>`;
+}
+
+function setIconUse(icon: Element, name: string): void {
+  icon.querySelector('use')?.setAttribute('href', `#icon-${name}`);
+}
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -400,7 +417,7 @@ function renderOutline(): void {
 
     const disclosure = document.createElement('span');
     disclosure.className = 'outline-disclosure';
-    disclosure.textContent = children.length > 0 ? '⌄' : '·';
+    if (children.length > 0) disclosure.innerHTML = iconMarkup('chevron-down');
     disclosure.setAttribute('aria-hidden', 'true');
 
     const label = document.createElement('span');
@@ -445,7 +462,9 @@ function setActiveActivity(activity: ActivityKind, ensureVisible = true, focusSe
 
   const meta = ACTIVITY_META[activity];
   byId<HTMLSpanElement>('sidebar-title').textContent = meta.title;
-  byId<HTMLSpanElement>('sidebar-title-icon').className = `icon ${meta.icon}`;
+  const titleIcon = byId<HTMLElement>('sidebar-title-icon');
+  titleIcon.setAttribute('class', `app-icon icon icon-${meta.icon}`);
+  setIconUse(titleIcon, meta.icon);
   for (const view of Array.from(document.querySelectorAll<HTMLElement>('.sidebar-view[data-activity-view]'))) {
     const visible = (view.dataset.activityView ?? '').split(/\s+/).includes(activity);
     view.classList.toggle('is-active', visible);
@@ -613,8 +632,8 @@ function setCodeMaximized(next: boolean): void {
   button.setAttribute('aria-pressed', String(next));
   button.setAttribute('aria-label', next ? 'Restore inspector' : 'Maximize inspector');
   button.title = next ? 'Restore inspector' : 'Maximize inspector';
-  const glyph = button.querySelector<HTMLElement>('.toolbar-glyph');
-  if (glyph) glyph.textContent = next ? '◱' : '□';
+  const glyph = button.querySelector<SVGElement>('.toolbar-glyph');
+  if (glyph) setIconUse(glyph, next ? 'collapse' : 'expand');
   requestLayoutResize();
 }
 
@@ -852,7 +871,7 @@ function renderToolbox(query = ''): void {
     header.type = 'button';
     header.className = 'toolbox-category-header';
     header.setAttribute('aria-expanded', 'true');
-    header.innerHTML = `<span class="category-left"><span class="category-icon" aria-hidden="true">${category.icon}</span><span>${category.label}</span></span><span class="category-caret" aria-hidden="true">⌄</span>`;
+    header.innerHTML = `<span class="category-left">${iconMarkup(CATEGORY_ICON[category.id] ?? 'blocks', 'category-icon')}<span>${category.label}</span></span>${iconMarkup('chevron-down', 'category-caret')}`;
     header.addEventListener('click', () => {
       const collapsed = group.classList.toggle('collapsed');
       header.setAttribute('aria-expanded', String(!collapsed));
@@ -869,7 +888,7 @@ function renderToolbox(query = ''): void {
       button.title = `Add ${block.label}`;
       button.draggable = true;
       button.dataset.blockType = block.type;
-      button.innerHTML = `<span class="block-icon" aria-hidden="true">${block.icon}</span><span class="block-label">${block.label}</span>`;
+      button.innerHTML = `${iconMarkup('blocks', 'block-icon')}<span class="block-label">${block.label}</span>`;
       button.addEventListener('click', () => addBlockToWorkspace(block.type));
       button.addEventListener('dragstart', (event) => {
         button.classList.add('is-dragging');
@@ -1163,6 +1182,7 @@ function updateMenuToggle(open: boolean): void {
   if (icon) {
     icon.classList.toggle('icon-close', open);
     icon.classList.toggle('icon-menu', !open);
+    setIconUse(icon, open ? 'close' : 'menu');
   }
   if (label) label.textContent = open ? 'Close' : 'Menu';
   button.title = open ? 'Close menu' : 'Menu';

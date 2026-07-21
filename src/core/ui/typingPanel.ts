@@ -72,12 +72,17 @@ function renderRow(derivation: Derivation, index: number): HTMLElement {
   toggle.type = 'button';
   toggle.className = 'typ-row-toggle';
   toggle.title = 'Show this judgement’s full derivation';
+  toggle.setAttribute('aria-label', 'Show this judgement’s full derivation');
   toggle.setAttribute('aria-expanded', String(openRows.has(index)));
+  toggle.innerHTML = '<svg class="app-icon" aria-hidden="true"><use href="#icon-chevron-right"></use></svg>';
   toggle.addEventListener('click', () => {
     if (openRows.has(index)) openRows.delete(index);
     else openRows.add(index);
     row.classList.toggle('is-open');
-    toggle.setAttribute('aria-expanded', String(row.classList.contains('is-open')));
+    const open = row.classList.contains('is-open');
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.title = open ? 'Hide this judgement’s full derivation' : 'Show this judgement’s full derivation';
+    toggle.setAttribute('aria-label', toggle.title);
   });
 
   const rule = document.createElement('span');

@@ -5,6 +5,9 @@ type WorkspaceGetter = () => Blockly.WorkspaceSvg | null;
 
 type LoadChoice = 'replace' | 'merge' | 'cancel';
 
+const iconMarkup = (icon: string, className: string): string =>
+  `<svg class="app-icon ${className}" aria-hidden="true"><use href="#icon-${icon}"></use></svg>`;
+
 function askLoadChoice(exampleLabel: string): Promise<LoadChoice> {
   const modal = document.getElementById('example-load-modal') as HTMLDialogElement | null;
   if (!modal || typeof modal.showModal !== 'function') return Promise.resolve('replace');
@@ -55,7 +58,7 @@ export function initExamplesMenu(getWorkspace: WorkspaceGetter, onLoaded: (examp
   panel.innerHTML = '';
   const heading = document.createElement('div');
   heading.className = 'examples-group-heading';
-  heading.innerHTML = '<span class="examples-group-icon" aria-hidden="true">EX</span><span>Examples</span>';
+  heading.innerHTML = `${iconMarkup('examples', 'examples-group-icon')}<span>Examples</span>`;
   panel.appendChild(heading);
 
   for (const example of MINI_JAVA_EXAMPLES) {
@@ -64,7 +67,7 @@ export function initExamplesMenu(getWorkspace: WorkspaceGetter, onLoaded: (examp
     item.className = 'examples-item';
     item.setAttribute('role', 'menuitem');
     item.title = example.description;
-    item.innerHTML = '<span class="examples-item-icon" aria-hidden="true">◇</span><span class="examples-item-label"></span>';
+    item.innerHTML = `${iconMarkup('examples', 'examples-item-icon')}<span class="examples-item-label"></span>`;
     item.querySelector('.examples-item-label')!.textContent = example.label;
     item.addEventListener('click', () => {
       panel.classList.remove('examples-open');

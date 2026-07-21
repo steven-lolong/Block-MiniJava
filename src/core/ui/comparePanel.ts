@@ -87,7 +87,7 @@ function stopPlay(): void {
     window.clearInterval(playTimer);
     playTimer = null;
   }
-  byId<HTMLButtonElement>('compare-play').textContent = '⏵ Play';
+  byId<HTMLButtonElement>('compare-play').textContent = 'Play';
 }
 
 function markStale(): void {
@@ -122,8 +122,8 @@ function attachWorkspaceListener(): void {
 }
 
 function modelStatusText(state: MachineState): { text: string; state?: string } {
-  if (state.status === 'error') return { text: `⨯ stuck: ${state.error}`, state: 'error' };
-  if (state.status === 'done') return { text: `✓ finished in ${state.stepCount} step(s)`, state: 'done' };
+  if (state.status === 'error') return { text: `Stuck: ${state.error}`, state: 'error' };
+  if (state.status === 'done') return { text: `Finished in ${state.stepCount} step(s)`, state: 'done' };
   return { text: `step ${state.stepCount}${state.lastRule ? ` · ${state.lastRule}` : ''}` };
 }
 
@@ -143,7 +143,7 @@ function renderFrames(hostId: string, state: MachineState | null): void {
   const host = byId<HTMLDivElement>(hostId);
   host.innerHTML = '';
   if (!state) {
-    host.appendChild(hint('Press ⟲ Load to build both machines.'));
+    host.appendChild(hint('Press Load to build both machines.'));
     return;
   }
   const effect = state.lastEffect;
@@ -233,17 +233,17 @@ function renderStatus(): void {
   const status = byId<HTMLSpanElement>('compare-status');
   status.removeAttribute('data-state');
   if (!stateA || !stateB) {
-    status.textContent = 'Press ⟲ Load to run the program under both value models.';
+    status.textContent = 'Press Load to run the program under both value models.';
     return;
   }
   if (stale) {
-    status.textContent = 'Program changed — press ⟲ Load to restart.';
+    status.textContent = 'Program changed — press Load to restart.';
     status.dataset.state = 'stale';
     return;
   }
   if (stateA.status !== 'running' && stateB.status !== 'running') {
     const agree = stateA.output.join('\n') === stateB.output.join('\n');
-    status.textContent = agree ? '✓ both finished — same output' : '⇄ both finished — DIFFERENT output';
+    status.textContent = agree ? 'Both finished — same output' : 'Both finished — different output';
     status.dataset.state = agree ? 'done' : 'stale';
     return;
   }
@@ -339,7 +339,7 @@ function togglePlay(): void {
     return;
   }
   if (!stateA || !stateB || stale) return;
-  byId<HTMLButtonElement>('compare-play').textContent = '⏸ Pause';
+  byId<HTMLButtonElement>('compare-play').textContent = 'Pause';
   playTimer = window.setInterval(stepBoth, PLAY_INTERVAL_MS);
 }
 

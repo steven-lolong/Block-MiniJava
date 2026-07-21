@@ -1,222 +1,212 @@
 # Block-MiniJava stylesheet map
 
-## Scope
-
-This map covers every application stylesheet imported by the primary browser entry point. It records current cascade ownership and conflicts so the UI can be refactored without accidentally changing layout, Blockly sizing, responsive drawers, printing, editor behavior, semantic visualizations, or state visibility. It does not prescribe a redesign.
+Status: current after stylesheet consolidation. This document describes the production cascade loaded by `src/assets/js/block_minijava.ts` and the boundaries that later visual work must respect.
 
 ## Effective import order
 
-`src/assets/js/block_minijava.ts` imports CSS in this exact order:
+There are no application stylesheet `<link>` elements in `src/index.html`. Webpack injects these imports in source order:
 
-| Cascade order | File | Approximate size | Current role |
+| Order | File | Approximate size | Authoritative responsibility |
 |---:|---|---:|---|
-| 1 | `src/assets/css/styles.css` | 2,501 lines | Legacy/global stylesheet; base reset and tokens, original application shell, toolbox/workspace/inspector, dialogs, icons, typing/print, generated-code highlighting, bottom visualizations, CESK/compare/rewrite semantics, and older responsive layout. |
-| 2 | `src/assets/css/codeEditor.css` | 97 lines | Editable-code overlay mechanics: highlight layer, textarea, line numbers, status, focus, and token alignment. |
-| 3 | `src/assets/css/workbench.css` | 1,982 lines | Later domain-workbench override: revised tokens/themes, shell/header/activity/sidebar/workspace/inspector/status/palette, code-editor visual overrides, bottom-panel chrome, and the current responsive drawer model. |
+| 1 | `src/assets/css/tokens.css` | 272 lines | Design tokens, dark/light theme values, runtime dimension contracts, and temporary compatibility aliases. |
+| 2 | `src/assets/css/workbench.css` | 2,420 lines | Global reset/utilities, application shell, header, activity/sidebar, workspace, inspector shell, dialogs, bottom-panel shell, status bar, command palette, and responsive behavior. |
+| 3 | `src/assets/css/domain.css` | 923 lines | Typing derivations and print layout, CESK/runtime views, comparison and rewrite views, and domain-state animation. |
+| 4 | `src/assets/css/codeEditor.css` | 163 lines | Generated/editable MiniJava text, output text, textarea/highlight alignment, line numbers, editor status, and syntax tokens. |
 
-Webpack injects the imported styles in module order. Therefore equal-specificity declarations in `workbench.css` override `codeEditor.css` and `styles.css`; this order is part of current behavior.
+The order follows dependency rather than override intent: tokens first, shell structure next, specialized domain content next, and exact editor-layer metrics last. No stylesheet is a generic “skin” over another stylesheet.
 
-There is no independent `<link>` stylesheet in `src/index.html`. Moving imports, extracting files, or changing bundler insertion order is a cascade change even if declarations are unchanged.
+## Architecture by file
 
-## Ownership by file
+### `tokens.css`: the single token authority
 
-### `styles.css`: legacy plus still-authoritative domain styles
+Only this file defines application theme colors and global scales. `:root` owns theme-independent geometry, typography, spacing, motion, elevation, z-index, panel-size references, and breakpoint references. `body[data-theme="dark"]` and `body[data-theme="light"]` own theme values.
 
-The file is “legacy” only for shell presentation. It remains authoritative for several functional/domain areas:
+The file also preserves three runtime-written variables as compatibility contracts:
 
-- `:root` font stacks, compatibility dimensions, legacy theme tokens, code token colors, radii, shadows, and transitions.
-- Base reset and original shell/header/menu/panel rules that still provide fallbacks where the override is incomplete.
-- Toolbox category and block-list details, grammar/token highlighting, modal/form and examples details.
-- Typing derivation layout and the complete print workflow.
-- Semantic visualization workspaces, CESK stepper, heap/reference arrows, compare, rewrite, transition/GC states, and output animation.
-- Older responsive rules at 1260, 980, and 580 px, plus semantic-layout breakpoints at 1180 and 920 px.
+- `--ide-primary-sidebar-width`
+- `--ide-code-panel-width`
+- `--ide-bottom-panel-height`
 
-It cannot be deleted after visually replacing the old shell; doing so would remove typing, print, code tokens, semantic/runtime, dialog, and fallback behavior.
+TypeScript writes those properties during resizing and restores their persisted values. Semantic aliases such as `--panel-sidebar-width`, `--panel-inspector-width`, and `--panel-bottom-height` reference them; the direction must not be reversed.
 
-### `codeEditor.css`: editor mechanics
+`--ide-activity-bar-width`, `--ide-status-bar-height`, and `--header-height` also remain available because current layout and responsive rules depend on their established identities.
 
-This small file owns the layered editor structure:
+### `workbench.css`: shell and responsive owner
 
-- `.code-editor-pane`, `.code-editor-scroll`, `.code-editor-highlight`, `.code-editor-input`.
-- Synchronized monospace metrics, transparent textarea foreground/caret, line numbers, focus state, and `.code-editor-status`.
-- Token/highlight positioning needed for text/block round-tripping.
+This file contains all structural and visual rules for the application shell. The former legacy structural declarations were merged into the matching current rules, and declarations already superseded by the workbench were removed. It owns:
 
-`workbench.css` later overrides some editor colors, spacing, `white-space`, line-number/status appearance, and selection feedback. The mechanics should remain isolated until editor regression tests cover scroll synchronization, Tab insertion, source import, and resize.
+- base sizing, focus, hidden-content, and visually-hidden utilities;
+- header, command center, menus, theme control, and dialogs;
+- activity bar, toolbox/sidebar, workspace chrome, inspector chrome, and resizers;
+- Problems and Outline shell presentation;
+- bottom-panel tabs/chrome and status bar;
+- command palette and overlays;
+- all screen-responsive application layout.
 
-### `workbench.css`: current shell override
+Behavior-related selectors remain unchanged, including visibility/maximization classes, `data-open`, `data-active`, drawer classes, resize state, and `[hidden]` handling.
 
-This is the visual authority for:
+### `domain.css`: language and runtime presentation
 
-- Neutral dark/light shell tokens and compatibility aliases back to legacy variable names.
-- Header/project identity/command center/menu, activity bar, primary sidebar, workspace toolbar, right inspector, bottom dock chrome, status bar, command palette, and current Problems/Output presentation.
-- State selectors for hidden/maximized panels and perspectives.
-- The 1100 px fixed drawer implementation and scrims, 900 px compact header menu, and 700/480 px phone layout.
-- Reduced-motion behavior.
+This file owns MiniJava-specific semantic views rather than general application chrome:
 
-It is not a complete replacement for `styles.css`; it deliberately relies on legacy domain styles and compatibility variables.
+- Typing toolbar, gamma context, proof trees, expandable judgements, and print-only derivation layout;
+- CESK control, stack/environment, store, continuation, heap references, provenance, GC, and execution transitions;
+- Call-by-structure/value, Model A/B comparison, and rewrite/substitution views;
+- runtime layouts at 1180 and 920 px.
 
-## Design tokens already present
+Print rules load after the shell and are scoped by `printing-typing`; they no longer require `!important` to beat later responsive shell declarations.
 
-| Token family | Defined in | Notes |
-|---|---|---|
-| Fonts | `styles.css`: `--font-ui`, `--font-code` | UI uses Inter with system fallbacks; code uses JetBrains Mono/SFMono/Consolas/Liberation Mono/Menlo. No webfont is imported here. |
-| Shell dimensions | Both: `--ide-activity-bar-width`, `--ide-primary-sidebar-width`, `--ide-code-panel-width`, `--ide-bottom-panel-height`, `--ide-status-bar-height`; header variables | `workbench.css` values win. TypeScript mutates sidebar/code/bottom variables at runtime. |
-| Compatibility dimensions | `styles.css`: `--toolbox-width`, `--code-width`, `--viz-height` | Aliases to the `--ide-*` dimensions; retain while legacy rules remain. |
-| Neutral semantic shell | `workbench.css`: `--ide-shell-bg`, `--ide-activity-bg`, `--ide-sidebar-bg`, `--ide-panel-bg`, `--ide-surface-raised`, `--ide-workspace-bg`, `--ide-toolbar-bg`, `--ide-header-bg`, borders, text/muted/disabled | Separate dark and `body[data-theme="light"]` values. |
-| Product/status colors | `workbench.css`: `--ide-accent`, `--ide-accent-hover`, `--ide-success`, `--ide-warning`, `--ide-error`, `--ide-info` | Intended primary accent and semantic status families. |
-| Legacy palette aliases | Both: `--bg`, `--bg-strong`, `--panel`, `--panel-soft`, `--panel-elevated`, `--border`, `--border-strong`, `--text`, `--muted`, `--aquamarine`, `--aquamarine-strong`, `--gold`, `--danger` | `workbench.css` maps these to new semantic variables so old domain selectors inherit the new theme. |
-| Code syntax | Both: `--token-keyword`, `--token-type`, `--token-number`, `--token-identifier`, `--token-operator`, `--token-comment`, `--token-builtin`, `--token-method`, `--token-punctuation`; `styles.css` also defines `--token-string` | Important gap: `workbench.css` does not redefine `--token-string`; the legacy dark/light value continues to win by inheritance. |
-| Geometry/effects | Both: radius and shadow variables, transition duration/easing; workspace grid variables in the override | Current use is mixed with many hard-coded values. |
-| Runtime-generated | TypeScript: `--outline-depth`, `--loc-hue` | Used for outline indentation and heap/reference color identity. These are behavioral style inputs. |
+### `codeEditor.css`: editor and text-view owner
 
-Token redefinition at the start of `workbench.css` is intentional cascade compatibility. Removing legacy tokens before every consumer is migrated will create undefined values or theme drift.
+The previous split between editor mechanics and later workbench editor overrides has been removed. One file now owns both mechanics and presentation. The textarea, highlighted preformatted layer, and line numbers share fixed padding, font, and line-height tokens. Changing one layer without the others will desynchronize caret/selection and syntax text.
 
-## Duplicate selectors
+This file also owns Output text presentation and the `is-console-changed` animation because Code and Output intentionally share the same monospace text system.
 
-A selector-level scan finds approximately **139 selector strings present in more than one stylesheet**. There are also repeated selectors within individual files—approximately 53 in `styles.css`, 2 in `codeEditor.css`, and 60 in `workbench.css`—primarily because base declarations are revisited inside media queries or state sections. Counts include comma-split selectors and are an inventory signal, not a semantic duplicate-removal count.
+## Retired legacy stylesheet
 
-### Cross-file duplicate families
+`src/assets/css/styles.css` was removed. Its contents were handled by responsibility:
 
-| Selector/family | Files | Conflict/ownership |
-|---|---|---|
-| `:root`, `body`, `body[data-theme="light"]` | `styles.css`, `workbench.css` | Workbench dimensions and theme tokens win; legacy-only variables still inherit. |
-| `.app-shell`, `.app-header`, `.brand-banner`, `.brand-banner img`, `.main-menu`, `.menu-button`, `.theme-switch`, `.project-status`, `.loaded-file-label` | Legacy and workbench | Workbench owns current shell; unoverridden legacy decoration can leak through. |
-| `.ide-workbench`, `.ide-layout`, `.activity-bar`, `.toolbox-column`, `.workspace-column`, `.code-column` | Legacy and workbench | Workbench grid/flex rules win; these are layout-critical, not safe mechanical duplicates. |
-| `body.code-hidden .ide-layout`, `body.toolbox-hidden .ide-layout`, their combined state, and hidden-column/resizer selectors | Legacy and workbench | Later grid templates are authoritative; both embody behavior. |
-| `.column-header`, `.column-title`, `.workspace-header`, `.workspace-title-row`, `.workspace-tools`, `.workspace-footer` | Legacy and workbench | Workbench current chrome; typing print still queries `.workspace-footer`. |
-| `.icon-button`, `.visibility-toggle`, `.workspace-reveal-button`, `.run-button`, `.zoom-pill` | Legacy and workbench | Equal/higher specificity rules combine; state visibility must be tested before consolidation. |
-| `.inspector-tabs`, `.inspector-tab`, `.inspector-tab.is-active`, `.inspector-panel`, `.inspector-panel.is-active` | Legacy and workbench | Workbench owns appearance; active display semantics are shared and functional. |
-| `.viz-dock`, `.viz-dock[data-open="true"]`, `.viz-resizer`, `.viz-dock-header`, `.viz-tabs`, `.viz-tab`, `.viz-host`, `.viz-dock-tools` | Legacy and workbench | Workbench owns panel chrome, legacy owns much domain content. Open/active selectors must survive. |
-| `.console-view`, Problems list/count/item families | Legacy and workbench | Workbench presentation wins while legacy provides some base/animation behavior. |
-| `.examples-panel`, `.examples-panel.examples-open`, example item families | Legacy and workbench | Visibility and placement combine with later responsive header rules. |
-| `.about-modal`, `.about-card`, `.about-header/body/actions`, save-name controls | Legacy and workbench | Workbench restyles but relies on native `<dialog>` and legacy structure. |
-| `.code-view`, `.grammar-highlight`, token classes | Legacy, editor, and/or workbench | The editor install expects the legacy host; token colors/weights remain split. |
-| `.code-editor-pane`, `.code-editor-input`, `.code-editor-input:focus`, `.code-editor-status` | `codeEditor.css`, `workbench.css` (with some legacy code-view rules) | Mechanics start in editor file; workbench later changes display metrics and colors. Consolidate only with editor tests. |
-| `.panel-scrim`, sidebar/code scrims and resizers | Legacy/workbench responsive sections | Workbench 1100 px drawer implementation wins. Explicitly frozen pending regression tests. |
+| Former content | Result |
+|---|---|
+| Duplicate root/theme tokens | Replaced by `tokens.css`. |
+| Base shell and behavior-coupled structure | Merged into `workbench.css`. |
+| Rules contradicted by the later workbench skin | Removed after their effective declarations were incorporated. |
+| Editable-code and generated-code styles | Consolidated into `codeEditor.css`. |
+| Typing, print, CESK, comparison, and rewrite styles | Moved to `domain.css`. |
+| Legacy 1260/980/580 shell breakpoints | Removed; they were superseded by the tested current responsive system. |
 
-### Important within-file repeats
+No legacy stylesheet remains in the import chain, and `workbench.css` no longer redefines theme tokens at its beginning.
 
-- Shell and panel selectors in `styles.css` are declared once for desktop and again at 1260/980/580 px. They describe the superseded stacked layout but still leak properties not reset by `workbench.css`.
-- Workbench layout/state selectors repeat at 1260, 1100, 900, 700, and 480 px. These are responsive overrides rather than deletable duplicates.
-- Bottom panel selectors repeat in base and 700 px fixed/mobile layouts.
-- Code editor focus/status selectors repeat between base editor mechanics and workbench visual rules.
+## Design-token structure
 
-A future consolidation must compare complete computed declarations at each breakpoint; selector-name equality alone is insufficient.
+| Group | Canonical tokens |
+|---|---|
+| Surfaces | `--surface-app`, `--surface-raised`, `--surface-recessed`, `--surface-workspace`, `--surface-activity`, `--surface-sidebar`, `--surface-control`, `--surface-hover`, `--surface-code`, overlay/scrim tokens |
+| Borders | `--border-default`, `--border-strong` |
+| Text | `--text-primary`, `--text-secondary`, `--text-muted`, `--text-emphasis`, `--text-on-state` |
+| Product/focus | `--accent-primary`, `--accent-hover`, `--selection`, `--focus-ring`, `--focus-outline`, `--focus-offset` |
+| State | `--state-success`, `--state-warning`, `--state-error`, `--state-info`, `--state-execution`, `--state-execution-strong` |
+| Syntax | `--syntax-keyword`, `--syntax-type`, `--syntax-number`, `--syntax-string`, `--syntax-identifier`, `--syntax-operator`, `--syntax-comment`, `--syntax-builtin`, `--syntax-method`, `--syntax-punctuation` |
+| Grammar/toolbox | Six category-family tokens from `--grammar-program` through `--grammar-value`; Blockly renderer color mappings are unchanged |
+| Typography | `--font-family-ui`, `--font-family-code`, six font sizes, four allowed font weights, and compact/default/relaxed/code line heights |
+| Spacing | `--space-0` through `--space-12` for the recurring 0–24 px scale |
+| Controls/icons | Compact/default/comfortable control heights and small/medium/large icon sizes |
+| Shape/elevation | Radius, shadow, and motion tokens |
+| Panels | Semantic header/activity/sidebar/inspector/bottom/status/toolbar/tab dimensions plus resizer size |
+| Layers | Base, workspace, content, interaction, visualization, header, scrim, drawer, menu, bottom-panel, and modal layers |
+| Breakpoint references | Header compact, panel compact, drawer, menu, mobile, phone, and runtime compact/stack references |
 
-## Specificity and cascade conflicts
+CSS custom properties cannot be used in media-query conditions, so media queries retain literal breakpoint values. The reference tokens document the contract; the literals and coupled TypeScript queries must be changed together.
 
-| Conflict | Current winner | Risk |
-|---|---|---|
-| Equal-specificity shell rules in legacy and workbench | Later `workbench.css` | Reordering imports restores decorated legacy shell. |
-| Legacy `@media (max-width: 980px)` stacked layout vs workbench `@media (max-width: 1100px)` fixed drawers | Workbench where it redeclares a property; legacy elsewhere | Very high: partial deletion can create a hybrid stacked/drawer layout. |
-| Legacy and workbench 1260 px grid widths | Workbench | High: min/max constraints differ and state grids have separate selectors. |
-| Legacy 580 px rules vs workbench 700/480 px rules | Later workbench only for properties it covers | High: old mobile spacing/sizing can survive unexpectedly. |
-| `codeEditor.css` layered text metrics vs workbench editor declarations | Workbench | Critical: a small line-height/white-space/padding difference desynchronizes text and highlight layers. |
-| Legacy syntax token colors vs workbench theme tokens | Workbench for redefined variables; legacy for `--token-string` | Medium/high: removing legacy theme block loses string color. |
-| Native `[hidden]` behavior vs class selectors with display declarations | Depends on specificity/order | High: workbench explicitly restores `display:none !important` for selected hidden controls; `.activity-bar, .activity-bar[hidden] { display:flex; }` would override native hiding if `hidden` were used there. |
-| Print stylesheet in legacy vs later workbench compact/mobile layout | Legacy print rules use `!important` | Critical: without those declarations the typing derivation can disappear in print. |
-| Runtime state class selectors vs general card/table styles | State selectors or later rules depending on combination | High: transitions/writes/GC become invisible if specificity is reduced. |
+### Compatibility aliases
+
+`tokens.css` still maps established names such as `--ide-*` colors, `--bg`, `--panel`, `--aquamarine`, and `--token-*` to canonical tokens. These aliases protect external/Blockly integrations and any overlooked dynamic consumer. Production shell, domain, and editor declarations now use canonical semantic tokens; aliases may be removed only after a repository-wide and browser-runtime usage audit.
+
+## Duplicate selectors and removed conflicts
+
+A selector-string scan now finds no exact functional selector shared by two ownership files. The only cross-file scanner results are:
+
+- `:root`, because `tokens.css` has the root scale while `workbench.css` changes only the activity width inside the 700 px media query;
+- `from` and `to`, which are keyframe nodes rather than DOM selectors.
+
+Within-file repeated selector strings remain where a state or media query intentionally revisits a base selector. Current approximate counts are 55 in `workbench.css`, 6 in `domain.css`, and 3 in `codeEditor.css` when comma-separated selectors and media contexts are counted without context. These are not legacy-versus-override duplicates.
+
+The consolidation removed these conflict families:
+
+- duplicate dark/light token blocks;
+- legacy/current shell declarations for the same components;
+- legacy 980/580 stacked layouts competing with the 1100 px drawer system;
+- editor declarations split between three files;
+- bottom-panel shell declarations split between legacy and workbench files;
+- nonstandard font weights such as 520, 560, 620, 720, 780, 820, 860, 900, and 920.
+
+## Specificity and state coupling
+
+Specificity is now used for state, not stylesheet ownership:
+
+| Selector family | Why it is coupled |
+|---|---|
+| `body.toolbox-hidden`, `body.code-hidden`, and their combination | Defines dock grid columns and visibility. |
+| `body.code-maximized` and `body.bottom-maximized` | Replaces shell tracks and hides non-maximized regions. |
+| `body.mobile-sidebar-open` / `body.mobile-code-open` | Controls fixed drawers and scrims at 1100 px and below. |
+| `.is-active`, `[aria-selected="true"]`, `[data-active="true"]`, `[data-open="true"]` | Required tab/panel/open state contracts. |
+| Resize classes and handles | Required hover/drag feedback for unchanged TypeScript resizing. |
+| Runtime state/provenance selectors | Communicate execution, write, GC, stale/error/done, reference, and selection state. |
+| `body.printing-typing` | Isolates print-only expansion and chrome removal. |
+
+The global focus rule covers buttons, inputs, selects, and focusable separators. `.theme-switch:focus-within` retains its label-level focus treatment because the checkbox itself is visually hidden.
 
 ## `!important` declarations
 
-`!important` is concentrated in purposeful compatibility/accessibility areas:
+There are 14 remaining declarations, all in `workbench.css`:
 
-| File/area | Use | Keep until |
-|---|---|---|
-| `styles.css` `@media print` | Forces shell/panel/tree dimensions, overflow, visibility, and exclusions so typing prints despite later workbench mobile rules | Print layout has a single later-owned stylesheet and browser regression coverage. |
-| `workbench.css` global `:focus-visible` | Ensures the accent focus outline wins component rules | Focus styles are normalized with equivalent or stronger accessible behavior. |
-| `workbench.css` `.visually-hidden` | Standard off-screen accessible text recipe | Replaced by a tested shared utility. |
-| `workbench.css` hidden problem/tool controls | Guarantees `[hidden]` beats component display rules | All conflicting display declarations are removed. |
-| `workbench.css` palette input | Removes the nested input outline because the containing search control owns focus appearance | Palette focus treatment is reworked accessibly. |
-| `workbench.css` at 1100 px | Hides desktop resizers in drawer mode | Responsive resize implementation is test-covered and consolidated. |
-| `workbench.css` reduced-motion query | Minimizes animation/transition and smooth scrolling | Must remain an accessibility invariant. |
+- nine declarations in the standard `.visually-hidden` utility;
+- one global `[hidden] { display: none !important; }` rule so component display declarations cannot expose hidden controls;
+- four reduced-motion declarations that must beat component animation and transition rules.
 
-Do not remove these declarations in a general “no `!important`” cleanup.
+`tokens.css`, `domain.css`, and `codeEditor.css` contain no `!important` declarations.
 
 ## Hard-coded colors
 
-An automated value scan finds roughly 72 distinct color literals/functions in `styles.css`, none in `codeEditor.css`, and roughly 75 in `workbench.css`. Most workbench literals are legitimate dark/light token definitions, but many component declarations still bypass semantic tokens.
+- All screen-theme color literals are in `tokens.css`.
+- `workbench.css` and `codeEditor.css` contain no hard-coded color literals.
+- `domain.css` keeps seven explicit black/white/neutral literals inside `@media print`; paper/ink output is intentionally independent of the active screen theme.
+- Runtime heap/reference hues continue to use `hsl(var(--loc-hue) ...)`. `--loc-hue` is generated per runtime location and is a semantic identity mechanism, not decoration.
+- Blockly renderer and block color mappings were not changed.
 
-| Hard-coded area | Examples/type | Assessment |
-|---|---|---|
-| Theme token definitions | Dark/light hex values in both large files | Expected, but duplicated theme sources should eventually become one authority. |
-| Print | `#000`, `#fff`, neutral grays | Appropriate paper/ink override; keep explicit. |
-| Grammar/toolbox category details | Direct green/blue category values such as `#6fae72`, `#688dc8` | Candidate for the six/seven semantic grammar-family token set, but not in this documentation step. |
-| Runtime references/arrows | HSL generated from `--loc-hue` | Functional color identity; preserve contrast and non-color cues. |
-| Overlays/scrims/modals | `rgba(...)`, transparent mixes, shadow colors | Candidate for overlay/shadow tokens. |
-| White foreground/strokes | Direct `#fff` in selected/primary/runtime states | Audit against light/dark semantic foreground tokens. |
-| Workspace grid | Theme-specific grid hex values also passed directly from `app.ts` to Blockly | Crosses CSS/TypeScript boundary; changing only CSS will not change Blockly grid. |
+## Spacing and geometry
 
-Color literals that encode diagnostic severity, execution state, grammatical category, or heap identity are not decorative and cannot be normalized to one accent.
+Recurring shell padding, margin, and gap values use the shared spacing scale. Panel/header/status dimensions and common controls use semantic dimension tokens. Literal geometry remains where it expresses a real component contract, including:
 
-## Hard-coded spacing and geometry
+- 4 px desktop resizer tracks and their larger pointer hit areas;
+- 40 px editor line-number gutter;
+- workspace grid and Blockly geometry;
+- runtime tree/table/arrow layout;
+- print dimensions;
+- responsive drawer viewport remainders and panel clamps.
 
-The files contain many literal pixel values in addition to the main dimension variables: approximately 76 distinct pixel values in `styles.css`, 6 in `codeEditor.css`, and 72 in `workbench.css`. Common values are 1 px borders, 4/6/8/10/12 px gaps/padding, 14 px text/controls, and 24/30 px control or keyboard-resize increments.
+These values should not be globally replaced with a spacing token merely because the numbers match.
 
-| Category | Current literals | Risk/notes |
-|---|---|---|
-| Shell regions | Header/status/activity heights, sidebar/code/bottom widths, 4/10 px resizer tracks | Some are tokenized; TypeScript and CSS clamping must agree. |
-| Controls | Many 24–34 px heights, 4–12 px gaps/padding, very large radii such as `999px` | Candidates for future spacing/control tokens; not safe as a blind replacement. |
-| Blockly workspace | 24 px main grid; 20 px semantic grid; zoom ranges/speeds in TypeScript | Functional geometry outside CSS. |
-| Resizing | 24 px keyboard steps; sidebar/code clamps; bottom 160 px minimum and 70vh maximum in TypeScript | Behavioral constants; stylesheet consolidation alone cannot change them. |
-| Runtime/typing | Dense table/tree padding, arrow marker sizes, print point/pixel sizes | Domain visualization readability; keep separate from shell spacing. |
-| Responsive drawers | 48 px viewport remainder, fixed offsets, scrim bounds | Frozen pending regression tests. |
+## Typography
 
-There is no complete spacing scale today. Introducing one belongs to a later implementation step and must preserve computed geometry at responsive thresholds.
+- UI family: `--font-family-ui` (Inter, then platform sans-serif fallbacks).
+- Code family: `--font-family-code` (JetBrains Mono, then platform monospace fallbacks).
+- Base shell: 13 px with the default 1.4 line height.
+- Editable code/output: 12 px on an exact 20 px line height shared by every overlay layer.
+- Permitted weights: 400, 500, 600, and 700 through semantic weight tokens.
+- Print typography remains locally sized for paper readability.
 
-## Typography definitions
-
-| Area | Current definition | Finding |
-|---|---|---|
-| UI family | `--font-ui`: Inter followed by system sans-serif stack | Used globally and in controls/status. |
-| Code family | `--font-code`: JetBrains Mono followed by platform monospace stack | Used by generated/editable code, palette keys, semantic values, and runtime tables. |
-| Base shell | Workbench `body` uses `13px/1.4 var(--font-ui)` | Later than legacy body font declarations. |
-| Editor | Approximately `0.9rem/1.5rem` in legacy/editor; workbench later uses fixed 12 px/20 px layers | Exact matching across textarea/highlight/line numbers is functional. |
-| Typing/semantic/print | Mixed rem, px, and print-specific point-like pixel sizes | Separate compact domain typography; not solely shell chrome. |
-| Weight range | Standard 400/500/600/700 plus nonstandard 520, 560, 620, 650, 690, 720, 730, 760, 780, 800, 820, 860, 900, 920 | Conflicts with target visual rule. Normalize later with visual tests; weights in token highlighting and state emphasis may affect alignment/readability. |
-
-No production font-weight changes are made here. The future refactor should restrict normal weights to 400/500/600/700 while checking editor overlay alignment and print output.
+There are no numeric font-weight declarations outside the four token definitions.
 
 ## Responsive breakpoints
 
-| Breakpoint/query | File | Current behavior | Coupled JavaScript |
+| Query | Owner | Behavior | Coupled code |
 |---|---|---|---|
-| `@media print` | `styles.css` | Typing-only printable derivation, hides shell controls, expands overflow | `printing-typing` classes and `window.print()`/`afterprint` |
-| 1180 px max | `styles.css` | CESK/semantic panel grid compaction | No exact JS query |
-| 920 px max | `styles.css` | Stepper/compare semantic layouts collapse to one column | No exact JS query |
-| 1260 px max | Both | Legacy shell narrowing and workbench panel width caps | No exact JS query |
-| 980 px max | `styles.css` | Legacy stacked/mobile shell | Superseded in part by workbench 1100 px drawers |
-| 580 px max | `styles.css` | Legacy narrow-phone adjustments | Overlaps workbench phone rules |
-| 1480 px max | `workbench.css` | Header/command compaction | No exact JS query |
-| 1100 px max | `workbench.css` | Fixed sidebar/inspector drawers, scrims, hidden resizers | `matchMedia('(max-width: 1100px)')` throughout `app.ts` |
-| 900 px max | `workbench.css` | Hamburger/main-menu layout | JS closes menu at `matchMedia('(min-width: 901px)')` |
-| 700 px max | `workbench.css` | Phone shell/status/bottom-panel behavior | Main Blockly performs delayed `zoomToFit()` at `max-width: 700px` |
-| 480 px max | `workbench.css` | Smallest-width control/label reductions | No exact JS query |
-| `prefers-reduced-motion: reduce` | `workbench.css` | Removes effective animations/transitions/smooth scroll | Accessibility invariant |
+| `@media print` | `domain.css` | Typing-only landscape derivation output | `printing-typing`, `window.print()`, and `afterprint` in `typingPanel.ts` |
+| 1480 px max | `workbench.css` | Header command labels compact | None |
+| 1260 px max | `workbench.css` | Docked sidebar/inspector widths cap | None |
+| 1180 px max | `domain.css` | CESK panels compact to two columns | None |
+| 1100 px max | `workbench.css` | Sidebar/inspector become fixed drawers; side resizers hide | `matchMedia('(max-width: 1100px)')` in `app.ts` |
+| 920 px max | `domain.css` | Runtime/compare panels stack | None |
+| 900 px max | `workbench.css` | Header menu becomes the hamburger surface | `matchMedia('(min-width: 901px)')` in `app.ts` |
+| 700 px max | `workbench.css` | Mobile status/bottom-panel/workspace compaction | `matchMedia('(max-width: 700px)')` zoom handling in `app.ts` |
+| 480 px max | `workbench.css` | Phone label/control reductions | None |
+| reduced motion | `workbench.css` | Effectively disables motion | Accessibility invariant |
 
-The 1100, 900/901, and 700 px CSS/JavaScript pairs must remain numerically synchronized. Consolidating the old 980/580 rules is a candidate only after responsive regression tests exist.
+The retired 980 and 580 px legacy shell queries no longer exist.
 
-## Candidate files/areas for later consolidation
+## Candidate consolidation and follow-up work
 
-These are candidates, not changes authorized by this document:
+1. Remove compatibility aliases only after confirming no runtime, Blockly, embedded, or downstream consumer reads them.
+2. Split `workbench.css` into shell submodules only if import order remains explicit and selector ownership stays non-overlapping; line count alone is not a reason to split it.
+3. Add a browser print regression before simplifying `printing-typing` rules further.
+4. Tokenize remaining component geometry selectively when a later visual change actually needs it.
+5. Replace character-based legacy icons with the planned single SVG system during the visual/IA phase, without changing command reachability or ARIA names.
+6. Keep editor metrics together; any font, line-height, gutter, wrapping, or padding change needs editable-code overlay tests and visual comparison.
 
-1. Establish one token/theme owner, retaining compatibility aliases until every legacy consumer is migrated. Include the currently legacy-only `--token-string`.
-2. Move the current shell/header/activity/sidebar/workspace/inspector/status declarations out of `styles.css` ownership, then delete only legacy shell declarations proven fully overridden by `workbench.css`.
-3. Consolidate `codeEditor.css` and the editor-specific section of `workbench.css` into one editor owner after overlay, input, scroll, import, focus, and resize tests exist.
-4. Split still-authoritative domain CSS from legacy shell CSS: typing/print, grammar/code highlighting, semantic runtime/stepper/compare/rewrite, and dialogs/examples can have explicit ownership.
-5. Reconcile the responsive system around the current workbench breakpoints, but leave the drawer/resize implementation unchanged until regression tests cover it.
-6. Replace component-level hard-coded shell colors/spacing with existing semantic tokens and a tested spacing scale; retain grammar, severity, and runtime color semantics.
+## Consolidation verification
 
-## Removal hazards
-
-Do not remove any of the following merely because a later stylesheet appears to duplicate it:
-
-- Legacy syntax token definitions, especially `--token-string`.
-- Typing derivation and `@media print` rules.
-- Semantic/runtime/stepper/compare/rewrite classes and state selectors.
-- Editor mechanics from `codeEditor.css`.
-- State grid rules and responsive drawer/scrim/resizer rules from `workbench.css`.
-- Compatibility variable aliases used by legacy selectors.
-- Reduced-motion and focus-visible rules.
-
-The safest consolidation unit is a complete feature with computed-style and interaction regression coverage, not a selector copied in isolation.
+- Production build parses and bundles all four stylesheets.
+- UI smoke tests cover themes, perspectives, drawers, visibility, resizers, persistence, bottom-panel behavior, shortcuts, command palette, views, and duplicate IDs.
+- Stored visual baselines cover 1440 × 900 light/dark plus major perspectives, 1024 × 768, 768 × 1024, and 390 × 844.
+- The consolidation matches all current visual baselines exactly; no baseline update was required.

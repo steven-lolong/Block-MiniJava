@@ -191,10 +191,10 @@ export function initTypingPanel(getter: GetWorkspace): void {
  * layout that makes it readable in the first place.
  *
  * The target itself is a *node's own* width, not the page's: landscape
- * Letter/A4 at 12mm `@page` margins (styles.css) leaves roughly 965px of
+ * Letter/A4 at 12mm `@page` margins (domain.css) leaves roughly 965px of
  * printable width at 96dpi, but a node sits behind `.typ-tree`'s 14px+14px
  * print padding and `.typ-row-tree`'s 36px+14px padding before and after it
- * (styles.css) — about 78px of fixed overhead the node's own
+ * (domain.css) — about 78px of fixed overhead the node's own
  * `getBoundingClientRect().width` never includes. Leaving that unaccounted
  * for budgeted the scale so tight that the widest row's right edge still
  * missed the page by a few px and silently vanished (same failure mode as
@@ -204,7 +204,7 @@ const PRINT_SAFE_WIDTH_PX = 880;
 
 /** Must match `.typ-rule`/`.typ-row-rule` and `.typ-judgement`/
  * `.typ-row-judgement`'s font-size under `body.printing-typing` in
- * styles.css. `@media print` doesn't activate outside a real print pass, so
+ * domain.css. `@media print` doesn't activate outside a real print pass, so
  * measuring at the screen font sizes (9.5px/12px, smaller than print's
  * 11px/13.5px) would compute a scale that's too generous — the tree still
  * fits on screen-sized text but overflows once print's larger, pretty-print
@@ -215,7 +215,7 @@ const PRINT_RULE_FONT_PX = 11;
 const PRINT_JUDGEMENT_FONT_PX = 13.5;
 
 /** Print the selected method's derivation. The `printing-typing` class (see
- * `@media print` in styles.css) hides the rest of the IDE chrome and forces
+ * `@media print` in domain.css) hides the rest of the IDE chrome and forces
  * every collapsed `.typ-row-tree` open, so the printed page is complete
  * regardless of what the user currently has expanded on screen. */
 export function printTyping(): void {

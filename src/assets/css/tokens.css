@@ -1,0 +1,272 @@
+/*
+ * Authoritative design tokens for the Block-MiniJava workbench.
+ *
+ * Component styles consume the semantic names in this file. The --ide-* size
+ * variables and the aliases at the end are compatibility contracts for the
+ * existing resize, persistence, Blockly, and domain-view implementations.
+ */
+
+:root {
+  color-scheme: dark light;
+
+  /* Typography */
+  --font-family-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family-code: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-md: 12px;
+  --font-size-base: 13px;
+  --font-size-lg: 15px;
+  --font-size-xl: 18px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-compact: 1.2;
+  --line-height-default: 1.4;
+  --line-height-relaxed: 1.5;
+  --line-height-code: 20px;
+
+  /* Spacing */
+  --space-0: 0;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-10: 20px;
+  --space-12: 24px;
+
+  /* Controls and icons */
+  --control-height-compact: 24px;
+  --control-height-default: 30px;
+  --control-height-comfortable: 34px;
+  --icon-size-sm: 12px;
+  --icon-size-md: 16px;
+  --icon-size-lg: 20px;
+
+  /* Shape, motion, and elevation */
+  --radius-none: 0;
+  --radius-sm: 2px;
+  --radius-control: 4px;
+  --radius-dialog: 5px;
+  --radius-round: 999px;
+  --shadow-none: none;
+  --shadow-menu: 0 10px 28px rgb(0 0 0 / 24%);
+  --shadow-drawer-start: 8px 0 24px rgb(0 0 0 / 24%);
+  --shadow-drawer-end: -8px 0 24px rgb(0 0 0 / 24%);
+  --shadow-bottom-panel: 0 -10px 28px rgb(0 0 0 / 28%);
+  --shadow-dialog: 0 14px 38px rgb(0 0 0 / 36%);
+  --shadow-responsive-menu: 0 12px 28px rgb(0 0 0 / 30%);
+  --motion-fast: 120ms ease;
+  --text-on-state: #ffffff;
+  --selection: color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  --focus-ring: var(--accent-primary);
+  --focus-outline: 3px solid color-mix(in srgb, var(--focus-ring) 55%, transparent);
+  --focus-offset: 2px;
+  --surface-modal-backdrop: rgb(0 0 0 / 58%);
+  --surface-drawer-scrim: rgb(7 9 13 / 42%);
+
+  /* Toolbox grammar families; Blockly renderer mappings remain untouched. */
+  --grammar-program: var(--state-execution);
+  --grammar-declaration: var(--state-warning);
+  --grammar-type: #6fae72;
+  --grammar-statement: var(--state-execution-strong);
+  --grammar-expression: #688dc8;
+  --grammar-value: var(--accent-primary);
+
+  /* Runtime-owned layout variables. Do not rename: TypeScript writes these. */
+  --ide-activity-bar-width: 50px;
+  --ide-primary-sidebar-width: 270px;
+  --ide-code-panel-width: 430px;
+  --ide-bottom-panel-height: 276px;
+  --ide-status-bar-height: 24px;
+  --header-height: 46px;
+
+  /* Semantic panel dimensions */
+  --panel-activity-width: var(--ide-activity-bar-width);
+  --panel-sidebar-width: var(--ide-primary-sidebar-width);
+  --panel-inspector-width: var(--ide-code-panel-width);
+  --panel-bottom-height: var(--ide-bottom-panel-height);
+  --panel-status-height: var(--ide-status-bar-height);
+  --panel-header-height: var(--header-height);
+  --panel-toolbar-height: 36px;
+  --panel-tab-height: 32px;
+  --resize-handle-size: 4px;
+
+  /* Layering */
+  --layer-base: 0;
+  --layer-workspace: 1;
+  --layer-content: 3;
+  --layer-interaction: 4;
+  --layer-visualization: 6;
+  --layer-header: 100;
+  --layer-scrim: 30;
+  --layer-drawer: 35;
+  --layer-drawer-top: 45;
+  --layer-menu: 50;
+  --layer-bottom-panel: 120;
+  --layer-modal: 1000;
+
+  /* Breakpoint references. Media queries retain literal values because CSS
+     custom properties are not valid in media-query conditions. */
+  --breakpoint-header-compact: 1480px;
+  --breakpoint-panel-compact: 1260px;
+  --breakpoint-drawer: 1100px;
+  --breakpoint-menu: 900px;
+  --breakpoint-mobile: 700px;
+  --breakpoint-phone: 480px;
+  --breakpoint-runtime-compact: 1180px;
+  --breakpoint-runtime-stack: 920px;
+}
+
+body[data-theme="dark"] {
+  --surface-app: #111318;
+  --surface-raised: #1d2027;
+  --surface-recessed: #191c22;
+  --surface-workspace: #171a20;
+  --surface-activity: #15181e;
+  --surface-sidebar: #1a1d24;
+  --surface-control: #22262e;
+  --surface-hover: #242832;
+  --surface-code: #14171d;
+  --surface-overlay: rgb(6 8 12 / 48%);
+  --workspace-grid: rgb(174 184 198 / 5.5%);
+  --code-line: rgb(255 255 255 / 3.2%);
+
+  --border-default: #303640;
+  --border-strong: #414955;
+  --text-primary: #f1f3f5;
+  --text-secondary: #a9b0bc;
+  --text-muted: #6f7782;
+  --text-emphasis: #d4d8de;
+
+  --accent-primary: #5b8def;
+  --accent-hover: #74a0f5;
+  --state-success: #3fb950;
+  --state-warning: #d9a441;
+  --state-error: #f05d5e;
+  --state-info: #58a6ff;
+  --state-execution: #d8895f;
+  --state-execution-strong: #ee9b6c;
+
+  /* Generated-code syntax is semantic and independent from Blockly colors. */
+  --syntax-keyword: #ff9d76;
+  --syntax-type: #7ee2d2;
+  --syntax-number: #e4bd70;
+  --syntax-string: #b8e08a;
+  --syntax-identifier: #e6e9ee;
+  --syntax-operator: #76b7ff;
+  --syntax-comment: #7d8794;
+  --syntax-builtin: #d7a8f8;
+  --syntax-method: #a7c8ff;
+  --syntax-punctuation: #9aa3ae;
+}
+
+body[data-theme="light"] {
+  --surface-app: #eef1f4;
+  --surface-raised: #ffffff;
+  --surface-recessed: #f3f5f7;
+  --surface-workspace: #f7f8fa;
+  --surface-activity: #e6e9ed;
+  --surface-sidebar: #f3f5f7;
+  --surface-control: #f0f2f5;
+  --surface-hover: #edf0f4;
+  --surface-code: #fbfcfd;
+  --surface-overlay: rgb(6 8 12 / 38%);
+  --workspace-grid: rgb(66 78 96 / 5.5%);
+  --code-line: rgb(41 55 75 / 4.5%);
+
+  --border-default: #d8dde4;
+  --border-strong: #b8c0cb;
+  --text-primary: #202631;
+  --text-secondary: #606b79;
+  --text-muted: #7b8490;
+  --text-emphasis: #3d4653;
+
+  --accent-primary: #356dcc;
+  --accent-hover: #245cb9;
+  --state-success: #25843d;
+  --state-warning: #9c6b12;
+  --state-error: #c73f43;
+  --state-info: #256cb7;
+  --state-execution: #ad5f37;
+  --state-execution-strong: #934925;
+
+  --syntax-keyword: #a54c2e;
+  --syntax-type: #08766d;
+  --syntax-number: #8b5d0b;
+  --syntax-string: #4d7c0f;
+  --syntax-identifier: #202631;
+  --syntax-operator: #1f67a5;
+  --syntax-comment: #68727f;
+  --syntax-builtin: #7945a5;
+  --syntax-method: #235fa2;
+  --syntax-punctuation: #68727f;
+}
+
+/* Compatibility aliases for behavior and specialized domain views. New shell
+ * and editor rules must use the semantic tokens above. */
+body[data-theme] {
+  --font-ui: var(--font-family-ui);
+  --font-code: var(--font-family-code);
+  --toolbox-width: var(--ide-primary-sidebar-width);
+  --code-width: var(--ide-code-panel-width);
+  --viz-height: var(--ide-bottom-panel-height);
+  --radius-panel: var(--radius-none);
+  --shadow-panel: var(--shadow-none);
+  --transition: var(--motion-fast);
+
+  --ide-shell-bg: var(--surface-app);
+  --ide-activity-bg: var(--surface-activity);
+  --ide-sidebar-bg: var(--surface-sidebar);
+  --ide-panel-bg: var(--surface-raised);
+  --ide-surface-raised: var(--surface-hover);
+  --ide-workspace-bg: var(--surface-workspace);
+  --ide-toolbar-bg: var(--surface-recessed);
+  --ide-header-bg: var(--surface-raised);
+  --ide-border: var(--border-default);
+  --ide-border-strong: var(--border-strong);
+  --ide-text: var(--text-primary);
+  --ide-text-muted: var(--text-secondary);
+  --ide-text-disabled: var(--text-muted);
+  --ide-accent: var(--accent-primary);
+  --ide-accent-hover: var(--accent-hover);
+  --ide-success: var(--state-success);
+  --ide-warning: var(--state-warning);
+  --ide-error: var(--state-error);
+  --ide-info: var(--state-info);
+
+  --bg: var(--surface-app);
+  --bg-strong: var(--surface-workspace);
+  --panel: var(--surface-raised);
+  --panel-soft: var(--surface-recessed);
+  --panel-elevated: var(--surface-hover);
+  --surface: var(--surface-control);
+  --border: var(--border-default);
+  --text: var(--text-primary);
+  --muted: var(--text-secondary);
+  --muted-strong: var(--text-emphasis);
+  --copper: var(--state-execution);
+  --copper-strong: var(--state-execution-strong);
+  --aquamarine: var(--accent-primary);
+  --aquamarine-strong: var(--accent-hover);
+  --gold: var(--state-warning);
+  --danger: var(--state-error);
+  --code-bg: var(--surface-code);
+  --bg-grid: var(--workspace-grid);
+
+  --token-keyword: var(--syntax-keyword);
+  --token-type: var(--syntax-type);
+  --token-number: var(--syntax-number);
+  --token-string: var(--syntax-string);
+  --token-identifier: var(--syntax-identifier);
+  --token-operator: var(--syntax-operator);
+  --token-comment: var(--syntax-comment);
+  --token-builtin: var(--syntax-builtin);
+  --token-method: var(--syntax-method);
+  --token-punctuation: var(--syntax-punctuation);
+}

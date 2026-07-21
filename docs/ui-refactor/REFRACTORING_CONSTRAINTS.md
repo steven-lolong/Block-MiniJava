@@ -215,7 +215,7 @@ Panel-local transport controls must remain near the state they operate on. Seman
 
 ### Responsive behavior
 
-The shell currently has layered CSS in `styles.css`, `codeEditor.css`, and the later-loaded `workbench.css`. Cascade order is part of current behavior and is a risk area.
+The stylesheet chain is now separated by responsibility: `tokens.css`, `workbench.css`, `domain.css`, then `codeEditor.css`. Cascade order remains part of behavior, especially for print and editable-code metrics.
 
 - Above 1260 px: sidebar, workspace, and inspector are docked with pointer and keyboard resizers.
 - At 1480 px and below: header labels compact to avoid collision.
@@ -357,6 +357,6 @@ The completed refactor is accepted only when all of the following are true.
 - The right “Code” panel is not generated code only: `codeEditor.ts` replaces it with an editable, highlighted textarea and runtime-created status DOM. Refactoring it as a passive preview would remove a primary language feature.
 - Type diagnostics and derivations come from the same checker walk. Their shared block-location behavior must remain synchronized.
 - The bottom panel is both passive output/diagnostics and active semantics/runtime tooling; treating every tab as equivalent static content will break component lifecycle and resize needs.
-- The CSS cascade contains older responsive rules in `styles.css` and the later workbench overrides in `workbench.css`. Removing apparently redundant selectors without visual/browser regression coverage is unsafe.
-- Current automated tests are strong for language semantics and include a jsdom CESK panel smoke test, but they do not cover the full shell, responsive drawers, resizers, command palette, perspectives, or layout persistence. This is why those implementations are frozen until regression tests exist.
-- Hand-authored documentation under `docs/` is vulnerable to webpack's clean build output. This file must be deliberately preserved during later build work.
+- Responsive shell rules now have one owner in `workbench.css`; the 1100, 900/901, and 700 px CSS/TypeScript thresholds remain coupled and must change together.
+- UI regression tests now cover the shell, responsive drawers, resizers, command palette, perspectives, layout persistence, themes, and visual baselines. Print layout and the full editable-code scroll/import interaction remain higher-risk browser surfaces.
+- Webpack's clean configuration preserves `docs/ui-refactor/`; future output changes must keep that protection.

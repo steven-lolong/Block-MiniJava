@@ -656,6 +656,10 @@ function setCodeHidden(next: boolean): void {
   showButton.title = 'Show MiniJava inspector';
   showButton.setAttribute('aria-label', 'Show MiniJava inspector');
   byId<HTMLButtonElement>('settings-toggle-code').setAttribute('aria-pressed', String(!codeHidden));
+  const viewToggle = byId<HTMLButtonElement>('view-toggle-inspector');
+  viewToggle.setAttribute('aria-checked', String(!codeHidden));
+  const viewState = viewToggle.querySelector<HTMLElement>('.menu-state');
+  if (viewState) viewState.textContent = codeHidden ? 'Hidden' : 'Shown';
 
   requestLayoutResize();
 }
@@ -678,6 +682,10 @@ function setToolboxHidden(next: boolean): void {
   button.setAttribute('aria-label', toolboxHidden ? 'Show sidebar' : 'Hide sidebar');
   showButton.title = 'Show sidebar';
   showButton.setAttribute('aria-label', 'Show sidebar');
+  const viewToggle = byId<HTMLButtonElement>('view-toggle-sidebar');
+  viewToggle.setAttribute('aria-checked', String(!toolboxHidden));
+  const viewState = viewToggle.querySelector<HTMLElement>('.menu-state');
+  if (viewState) viewState.textContent = toolboxHidden ? 'Hidden' : 'Shown';
   updateActivityButtons();
 
   requestLayoutResize();
@@ -1191,6 +1199,118 @@ function updateMenuToggle(open: boolean): void {
   requestLayoutResize();
 }
 
+function closeCompactHeaderMenu(): void {
+  if (!window.matchMedia('(max-width: 900px)').matches) return;
+  byId<HTMLElement>('main-menu').classList.remove('menu-open');
+  updateMenuToggle(false);
+}
+
+function initHeaderMenus(): void {
+  const menuPairs = [
+    ['file-menu-button', 'file-menu'],
+    ['view-menu-button', 'view-menu'],
+    ['more-menu-button', 'more-menu']
+  ] as const;
+
+  const closeExamples = (): void => {
+    byId<HTMLElement>('examples-panel').classList.remove('examples-open');
+    byId<HTMLButtonElement>('examples-button').setAttribute('aria-expanded', 'false');
+  };
+
+  const closeAll = (exceptPanelId?: string): void => {
+    for (const [buttonId, panelId] of menuPairs) {
+      if (panelId === exceptPanelId) continue;
+      byId<HTMLElement>(panelId).hidden = true;
+      byId<HTMLButtonElement>(buttonId).setAttribute('aria-expanded', 'false');
+    }
+    if (exceptPanelId !== 'examples-panel') closeExamples();
+  };
+
+  const focusableItems = (panel: HTMLElement): HTMLElement[] =>
+    Array.from(panel.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"], select, input:not([type="hidden"])'))
+      .filter((item) => !item.hasAttribute('disabled'));
+
+  for (const [buttonId, panelId] of menuPairs) {
+    const button = byId<HTMLButtonElement>(buttonId);
+    const panel = byId<HTMLElement>(panelId);
+    const open = (focus: 'first' | 'last' | null = null): void => {
+      closeAll(panelId);
+      panel.hidden = false;
+      button.setAttribute('aria-expanded', 'true');
+      if (focus) {
+        const items = focusableItems(panel);
+        items[focus === 'first' ? 0 : items.length - 1]?.focus();
+      }
+    };
+    const close = (restoreFocus = false): void => {
+      panel.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
+      if (restoreFocus) button.focus();
+    };
+
+    button.addEventListener('click', () => {
+      if (panel.hidden) open();
+      else close();
+    });
+    button.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        open(event.key === 'ArrowDown' ? 'first' : 'last');
+      } else if (event.key === 'Escape' && !panel.hidden) {
+        event.preventDefault();
+        close(true);
+      }
+    });
+    panel.addEventListener('keydown', (event) => {
+      const items = focusableItems(panel);
+      const current = items.indexOf(document.activeElement as HTMLElement);
+      const offset = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+      if (offset || event.key === 'Home' || event.key === 'End') {
+        event.preventDefault();
+        const target = event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? items.length - 1
+            : (current + offset + items.length) % items.length;
+        items[target]?.focus();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        close(true);
+      }
+    });
+    panel.addEventListener('click', (event) => {
+      if (!(event.target as Element).closest('.global-menu-item')) return;
+      close(true);
+      closeCompactHeaderMenu();
+    }, { capture: true });
+  }
+
+  window.addEventListener('bmj:examples-menu-opened', () => closeAll('examples-panel'));
+  window.addEventListener('bmj:header-menu-action', closeCompactHeaderMenu);
+  document.addEventListener('pointerdown', (event) => {
+    const target = event.target as Node;
+    if (menuPairs.some(([buttonId, panelId]) => byId(buttonId).contains(target) || byId(panelId).contains(target))) return;
+    closeAll();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    const openPair = menuPairs.find(([, panelId]) => !byId<HTMLElement>(panelId).hidden);
+    if (openPair) {
+      event.preventDefault();
+      byId<HTMLElement>(openPair[1]).hidden = true;
+      byId<HTMLButtonElement>(openPair[0]).setAttribute('aria-expanded', 'false');
+      byId<HTMLButtonElement>(openPair[0]).focus();
+      return;
+    }
+    if (byId<HTMLElement>('main-menu').classList.contains('menu-open')) {
+      event.preventDefault();
+      byId<HTMLElement>('main-menu').classList.remove('menu-open');
+      updateMenuToggle(false);
+      byId<HTMLButtonElement>('menu-toggle').focus();
+    }
+  });
+}
+
 function initCommandPalette(): void {
   const click = (id: string): void => byId<HTMLButtonElement>(id).click();
   const commands: IdeCommand[] = [
@@ -1274,6 +1394,10 @@ function wireEvents(): void {
   byId<HTMLButtonElement>('copy-code').addEventListener('click', copyCode);
   byId<HTMLButtonElement>('print-typing').addEventListener('click', printTyping);
   byId<HTMLButtonElement>('run-program').addEventListener('click', runProgram);
+  byId<HTMLButtonElement>('header-run-program').addEventListener('click', () => {
+    runProgram();
+    closeCompactHeaderMenu();
+  });
   byId<HTMLButtonElement>('sidebar-run-program').addEventListener('click', runProgram);
   byId<HTMLButtonElement>('sidebar-open-cesk').addEventListener('click', () => openAnalysisTool('machine'));
   byId<HTMLButtonElement>('sidebar-open-compare').addEventListener('click', () => openAnalysisTool('compare'));
@@ -1286,6 +1410,14 @@ function wireEvents(): void {
   });
   byId<HTMLButtonElement>('settings-toggle-bottom').addEventListener('click', () => {
     setVizOpen(!isVizOpen());
+    markPerspectiveCustom();
+  });
+  byId<HTMLButtonElement>('view-toggle-sidebar').addEventListener('click', () => {
+    setToolboxHidden(!toolboxHidden);
+    markPerspectiveCustom();
+  });
+  byId<HTMLButtonElement>('view-toggle-inspector').addEventListener('click', () => {
+    setCodeHidden(!codeHidden);
     markPerspectiveCustom();
   });
   byId<HTMLButtonElement>('workspace-undo').addEventListener('click', () => workspace?.undo(false));
@@ -1442,5 +1574,6 @@ export function startBlockMiniJava(): void {
     () => workspace,
     onExampleLoaded
   );
+  initHeaderMenus();
   restartAutosaveTimer();
 }

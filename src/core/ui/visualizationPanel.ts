@@ -159,6 +159,10 @@ export function setVizOpen(open: boolean): void {
   for (const id of ['toggle-viz-dock', 'top-toggle-bottom-panel']) {
     document.getElementById(id)?.setAttribute('aria-pressed', String(open));
   }
+  const viewToggle = document.getElementById('top-toggle-bottom-panel');
+  viewToggle?.setAttribute('aria-checked', String(open));
+  const viewState = viewToggle?.querySelector<HTMLElement>('.menu-state');
+  if (viewState) viewState.textContent = open ? 'Shown' : 'Hidden';
   if (!open) {
     document.body.classList.remove('bottom-maximized');
     const maximize = document.getElementById('viz-maximize');

@@ -43,3 +43,22 @@ export async function selectBottomTab(page: Page, kind: string): Promise<void> {
   await expect(page.locator(`#bottom-tab-${kind}`)).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator(`#bottom-panel-${kind}`)).not.toHaveAttribute('hidden', '');
 }
+
+export async function openHeaderMenu(page: Page, name: 'file' | 'view' | 'more'): Promise<void> {
+  const button = page.locator(`#${name}-menu-button`);
+  if (await button.getAttribute('aria-expanded') !== 'true') await button.click();
+  await expect(button).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator(`#${name}-menu`)).toBeVisible();
+}
+
+export async function selectPerspective(page: Page, perspective: string): Promise<void> {
+  await openHeaderMenu(page, 'view');
+  await page.locator('#perspective-select').selectOption(perspective);
+  await page.keyboard.press('Escape');
+}
+
+export async function toggleTheme(page: Page): Promise<void> {
+  await openHeaderMenu(page, 'view');
+  await page.locator('.theme-switch').click();
+  await page.keyboard.press('Escape');
+}

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { expectNoUncaughtErrors, openFreshApp } from './helpers';
+import { expectNoUncaughtErrors, openFreshApp, selectPerspective, toggleTheme } from './helpers';
 
 async function capture(page: Parameters<typeof openFreshApp>[0], name: string): Promise<void> {
   await expect(page).toHaveScreenshot(name, { animations: 'disabled', caret: 'hide' });
@@ -7,7 +7,7 @@ async function capture(page: Parameters<typeof openFreshApp>[0], name: string): 
 
 test('light Edit at 1440 × 900', async ({ page }) => {
   const errors = await openFreshApp(page);
-  await page.locator('.theme-switch').click();
+  await toggleTheme(page);
   await capture(page, 'light-edit-1440x900.png');
   expectNoUncaughtErrors(errors);
 });
@@ -20,22 +20,22 @@ test('dark Edit at 1440 × 900', async ({ page }) => {
 
 test('dark Debug at 1440 × 900', async ({ page }) => {
   const errors = await openFreshApp(page);
-  await page.locator('#perspective-select').selectOption('debug');
+  await selectPerspective(page, 'debug');
   await capture(page, 'dark-debug-1440x900.png');
   expectNoUncaughtErrors(errors);
 });
 
 test('light Type Analysis at 1440 × 900', async ({ page }) => {
   const errors = await openFreshApp(page);
-  await page.locator('.theme-switch').click();
-  await page.locator('#perspective-select').selectOption('types');
+  await toggleTheme(page);
+  await selectPerspective(page, 'types');
   await capture(page, 'light-types-1440x900.png');
   expectNoUncaughtErrors(errors);
 });
 
 test('dark Presentation at 1440 × 900', async ({ page }) => {
   const errors = await openFreshApp(page);
-  await page.locator('#perspective-select').selectOption('presentation');
+  await selectPerspective(page, 'presentation');
   await capture(page, 'dark-presentation-1440x900.png');
   expectNoUncaughtErrors(errors);
 });

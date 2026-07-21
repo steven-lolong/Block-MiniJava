@@ -1,10 +1,13 @@
 import { expect, test } from '@playwright/test';
 import {
   expectNoUncaughtErrors,
+  openHeaderMenu,
   openBottomPanel,
   openFreshApp,
   openPersistedApp,
-  selectBottomTab
+  selectBottomTab,
+  selectPerspective,
+  toggleTheme
 } from './helpers';
 
 test('loads without uncaught browser errors and has no duplicate IDs', async ({ page }) => {
@@ -17,6 +20,49 @@ test('loads without uncaught browser errors and has no duplicate IDs', async ({ 
     return [...counts.entries()].filter(([, count]) => count > 1).map(([id]) => id);
   });
   expect(duplicateIds).toEqual([]);
+  expectNoUncaughtErrors(errors);
+});
+
+test('header menus and compact status preserve global command reachability', async ({ page }) => {
+  const errors = await openFreshApp(page);
+  await expect(page.locator('.brand-name')).toHaveText('Block-MiniJava');
+  await expect(page.locator('.project-name')).toBeVisible();
+  for (const label of ['File', 'Examples', 'Run', 'View', 'More']) {
+    await expect(page.getByRole('button', { name: new RegExp(`^${label}`) }).first()).toBeVisible();
+  }
+
+  const fileButton = page.locator('#file-menu-button');
+  await fileButton.focus();
+  await fileButton.press('ArrowDown');
+  await expect(page.locator('#new-workspace')).toBeFocused();
+  for (const id of ['new-workspace', 'load-workspace', 'save-workspace', 'export-code', 'load-autosave']) {
+    await expect(page.locator(`#${id}`)).toBeVisible();
+  }
+  await page.keyboard.press('Escape');
+  await expect(fileButton).toBeFocused();
+
+  const examplesButton = page.locator('#examples-button');
+  await examplesButton.focus();
+  await examplesButton.press('ArrowDown');
+  await expect(page.locator('#examples-panel [role="menuitem"]').first()).toBeFocused();
+  await page.keyboard.press('Escape');
+
+  await openHeaderMenu(page, 'view');
+  for (const id of ['view-toggle-sidebar', 'view-toggle-inspector', 'top-toggle-bottom-panel', 'perspective-select', 'theme-toggle', 'status-perspective']) {
+    await expect(page.locator(`#${id}`)).toBeVisible();
+  }
+  await page.keyboard.press('Escape');
+  await openHeaderMenu(page, 'more');
+  await expect(page.locator('#command-palette-trigger')).toBeVisible();
+  await expect(page.locator('#about-button')).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  const status = page.locator('.workspace-footer');
+  await expect(status.locator('#status-block-count')).toBeVisible();
+  await expect(status.locator('#status-problems-count')).toBeVisible();
+  await expect(status.locator('#autosave-status')).toBeVisible();
+  await expect(status.locator('#status-perspective')).toHaveCount(0);
+  await expect(status).not.toContainText('BMJ-Thrasos');
   expectNoUncaughtErrors(errors);
 });
 
@@ -36,7 +82,7 @@ test('desktop sidebar and inspector can be hidden and restored', async ({ page }
 
 test('primary Run opens Output and command palette exposes registered commands', async ({ page }) => {
   const errors = await openFreshApp(page);
-  await page.locator('#run-program').click();
+  await page.locator('#header-run-program').click();
   await expect(page.locator('#viz-dock')).toHaveAttribute('data-open', 'true');
   await expect(page.locator('#bottom-tab-output')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#bottom-program-output')).toContainText('[Run]');
@@ -52,20 +98,18 @@ test('primary Run opens Output and command palette exposes registered commands',
 
 test('perspectives coordinate activity, inspector, and bottom panel', async ({ page }) => {
   const errors = await openFreshApp(page);
-  const picker = page.locator('#perspective-select');
-
-  await picker.selectOption('debug');
+  await selectPerspective(page, 'debug');
   await expect(page.locator('body')).toHaveAttribute('data-perspective', 'debug');
   await expect(page.locator('#tab-outline')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#bottom-tab-machine')).toHaveAttribute('aria-selected', 'true');
 
-  await picker.selectOption('types');
+  await selectPerspective(page, 'types');
   await expect(page.locator('body')).toHaveAttribute('data-perspective', 'types');
   await expect(page.locator('#bottom-tab-problems')).toHaveAttribute('aria-selected', 'true');
 
-  await picker.selectOption('presentation');
+  await selectPerspective(page, 'presentation');
   await expect(page.locator('body')).toHaveClass(/presentation-mode/);
-  await picker.selectOption('edit');
+  await selectPerspective(page, 'edit');
   await expect(page.locator('body')).toHaveAttribute('data-perspective', 'edit');
   await expect(page.locator('#tab-code')).toHaveAttribute('aria-selected', 'true');
   expectNoUncaughtErrors(errors);
@@ -132,7 +176,7 @@ test('keyboard resizers change and persist panel dimensions and visibility state
 
 test('theme and autosave interval remain configurable and restore after reload', async ({ page }) => {
   const errors = await openFreshApp(page);
-  await page.locator('.theme-switch').click();
+  await toggleTheme(page);
   await expect(page.locator('body')).toHaveAttribute('data-theme', 'light');
   await page.locator('#activity-settings').click();
   const interval = page.locator('#autosave-interval');
@@ -142,7 +186,7 @@ test('theme and autosave interval remain configurable and restore after reload',
   await page.reload();
   await expect(page.locator('body')).toHaveAttribute('data-theme', 'light');
   await expect(interval).toHaveValue('3');
-  await page.locator('.theme-switch').click();
+  await toggleTheme(page);
   await expect(page.locator('body')).toHaveAttribute('data-theme', 'dark');
   expectNoUncaughtErrors(errors);
 });
@@ -178,6 +222,19 @@ test('global keyboard shortcuts invoke file, palette, search, bottom-tool, and R
 test('mobile sidebar and inspector drawers open and close with their scrims', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const errors = await openFreshApp(page);
+
+  await page.locator('#menu-toggle').click();
+  await expect(page.locator('#main-menu')).toHaveClass(/menu-open/);
+  for (const id of ['file-menu-button', 'examples-button', 'header-run-program', 'view-menu-button', 'more-menu-button']) {
+    await expect(page.locator(`#${id}`)).toBeVisible();
+  }
+  await page.locator('#view-menu-button').click();
+  await expect(page.locator('#view-menu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#view-menu-button')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#main-menu')).not.toHaveClass(/menu-open/);
+
   await page.locator('#activity-search').click();
   await expect(page.locator('body')).toHaveClass(/mobile-sidebar-open/);
   await page.mouse.click(380, 420);
@@ -195,7 +252,7 @@ test('persisted state can be loaded in a fresh browser page', async ({ browser }
   const page = await context.newPage();
   const errors = await openFreshApp(page);
   await page.locator('#toggle-viz-dock').click();
-  await page.locator('#perspective-select').selectOption('debug');
+  await selectPerspective(page, 'debug');
   const restored = await context.newPage();
   const restoredErrors = await openPersistedApp(restored);
   await expect(restored.locator('#viz-dock')).toHaveAttribute('data-open', 'true');

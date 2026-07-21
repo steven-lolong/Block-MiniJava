@@ -10,21 +10,21 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 
 | Command name | Purpose | Current visible locations | Current element IDs | Keyboard shortcut | Command-palette entry | Primary future location | Secondary permitted location | Duplicated | Migration risk |
 |---|---|---|---|---|---|---|---|---|---|
-| Open command palette | Search and run registered application commands | Header command center | `command-palette-trigger`, `command-palette-overlay`, `command-palette-input`, `command-palette-list` | Ctrl/Cmd+Shift+P; F1 | Self, not an entry | Header | Keyboard shortcut | Yes | High: focus restoration, modal state, and document-level keys |
+| Open command palette | Search and run registered application commands | Header More menu | `command-palette-trigger`, `command-palette-overlay`, `command-palette-input`, `command-palette-list` | Ctrl/Cmd+Shift+P; F1 | Self, not an entry | More menu | Keyboard shortcut | Yes | High: focus restoration, modal state, and document-level keys |
 | Close command palette | Dismiss palette and restore prior focus | Overlay, Escape | Same as above | Escape | No | Palette | Overlay dismissal | Yes | Medium |
 | Navigate/run palette result | Select and invoke the filtered command | Palette results (dynamic) | `command-palette-list`; dynamic options use `data-command-id` | Up/Down, Enter | No | Palette | Pointer selection | Yes | Medium |
-| New workspace | Replace the current program with a fresh required program skeleton | Header main menu | `new-workspace` | Ctrl/Cmd+N | Yes (`file.new`) | File menu | Command palette | Yes | High: destructive confirmation/required blocks/autosave |
-| Open workspace or MiniJava source | Choose `.bml`, JSON, `.java`, or text and import it | Header main menu; hidden file input | `load-workspace`, `load-file-input` | Ctrl/Cmd+O | Yes (`file.open`) | File menu | Command palette | Yes | High: shared workspace/source import path |
-| Save workspace | Download serialized workspace as `.bml` | Header main menu; save-name dialog | `save-workspace`, `save-name-modal`, `save-name-input` | Ctrl/Cmd+S | Yes (`file.save`) | File menu | Command palette | Yes | High: dialog return values and filename normalization |
-| Export MiniJava source | Download generated/edited source as `.java` | Header main menu; export-name dialog | `export-code`, `export-name-modal`, `export-name-input` | — | Yes (`file.export`) | File menu | Command palette | Yes | High: editor text is authoritative when present |
-| Restore autosave | Replace workspace with last stored autosave | Header main menu | `load-autosave` | — | Yes (`file.autosave`) | File menu | Command palette | Yes | High: persisted payload version and replacement behavior |
+| New workspace | Replace the current program with a fresh required program skeleton | Header File menu | `new-workspace` | Ctrl/Cmd+N | Yes (`file.new`) | File menu | Command palette | Yes | High: destructive confirmation/required blocks/autosave |
+| Open workspace or MiniJava source | Choose `.bml`, JSON, `.java`, or text and import it | Header File menu; hidden file input | `load-workspace`, `load-file-input` | Ctrl/Cmd+O | Yes (`file.open`) | File menu | Command palette | Yes | High: shared workspace/source import path |
+| Save workspace | Download serialized workspace as `.bml` | Header File menu; save-name dialog | `save-workspace`, `save-name-modal`, `save-name-input` | Ctrl/Cmd+S | Yes (`file.save`) | File menu | Command palette | Yes | High: dialog return values and filename normalization |
+| Export MiniJava source | Download generated/edited source as `.java` | Header File menu; export-name dialog | `export-code`, `export-name-modal`, `export-name-input` | — | Yes (`file.export`) | File menu | Command palette | Yes | High: editor text is authoritative when present |
+| Restore autosave | Replace workspace with last stored autosave | Header File menu | `load-autosave` | — | Yes (`file.autosave`) | File menu | Command palette | Yes | High: persisted payload version and replacement behavior |
 | Choose example | Open dynamic examples menu and select a sample | Header Examples menu | `examples-button`, `examples-panel`; dynamic menu items | Escape closes | No | Examples | Command palette may add named examples | No | High: dynamic menu, outside-click dismissal, and replace/merge decision |
 | Replace with example | Replace existing blocks with selected example | Example-load dialog | `example-load-modal`, `example-load-name` | Dialog-native | No | Examples flow | Command palette only with an explicit confirmation flow | No | High: destructive branch |
 | Merge example | Add selected example beside current program | Example-load dialog | `example-load-modal`, `example-load-name` | Dialog-native | No | Examples flow | — | No | High: block identity/required-root reconciliation |
 | Cancel dialog | Cancel save, export, example, or About flow | Dialog close/action buttons | Buttons have no IDs; owning dialog IDs above plus `about-modal` | Escape/browser dialog behavior | No | Owning dialog | — | Yes | Medium: `value`-based form/dialog routing |
-| About | Show product and renderer information | Header utility/overflow area | `about-button`, `about-modal` | — | No | Overflow menu | Command palette | No | Low |
-| Toggle theme | Switch dark/light application and Blockly themes | Header theme switch | `theme-toggle` | — | Yes (`theme.toggle`) | Settings | Command palette | Yes | High: reinjects/disposes visualization workspaces and persists theme |
-| Toggle compact header menu | Open/close header commands at narrow widths | Header hamburger | `menu-toggle`, `main-menu` | Escape is not wired; resize closes | No | Header | — | No | High: responsive-only state and ARIA expansion |
+| About | Show product and renderer information | Header More menu | `about-button`, `about-modal` | — | No | More menu | Command palette permitted | No | Low |
+| Toggle theme | Switch dark/light application and Blockly themes | Header View menu | `theme-toggle` | — | Yes (`theme.toggle`) | View/Settings | Command palette | Yes | High: reinjects/disposes visualization workspaces and persists theme |
+| Toggle compact header menu | Open/close header commands at narrow widths | Header hamburger | `menu-toggle`, `main-menu` | Escape closes | No | Header | — | No | High: responsive-only state and ARIA expansion |
 
 ## Activity bar, sidebar, and settings commands
 
@@ -33,28 +33,28 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 | Show Blocks activity | Select categorized toolbox sidebar | Activity bar | `activity-blocks` | — | Yes (`view.blocks`) | Left panel | Command palette | Yes | High: activity, drawer visibility, focus, persistence |
 | Search blocks | Select/focus toolbox search | Activity bar; search field | `activity-search`, `toolbox-search` | Ctrl/Cmd+Shift+F | Yes (`view.search`) | Left-panel search | Command palette | Yes | High: activity also opens responsive drawer |
 | Show Run and Analysis activity | Show Run and semantic tool launchers | Activity bar | `activity-run` | — | No | Left-panel/activity navigation if retained | Command palette | No | Medium |
-| Show Settings activity | Show perspectives, layout, theme interval controls | Activity bar; status perspective button | `activity-settings`, `status-perspective` | — | No | Settings | Status bar may link to Settings | Yes | Medium |
-| Hide/show sidebar | Change primary sidebar visibility | Sidebar collapse; workspace reveal; activity-item toggle-on-repeat | `toggle-toolbox`, `show-toolbox-button`; activity buttons | — | Only “Show Blocks Sidebar” (`view.blocks`), not a true toggle | View menu | Settings/layout | Yes | High: `toolbox-hidden` and mobile drawer states differ |
+| Show Settings activity | Show perspectives, layout, theme interval controls | Activity bar; View menu | `activity-settings`, `status-perspective` | — | No | Settings | View menu | Yes | Medium |
+| Hide/show sidebar | Change primary sidebar visibility | View menu; sidebar collapse; workspace reveal; activity-item toggle-on-repeat | `view-toggle-sidebar`, `toggle-toolbox`, `show-toolbox-button`; activity buttons | — | Only “Show Blocks Sidebar” (`view.blocks`), not a true toggle | View menu | Contextual panel controls | Yes | High: `toolbox-hidden` and mobile drawer states differ |
 | Close responsive sidebar | Close sidebar drawer via scrim | Responsive scrim | `sidebar-scrim` | — | No | Responsive drawer | — | No | Critical: drawer implementation is frozen pending tests |
 | Resize sidebar | Change persisted sidebar width | Divider between sidebar/workspace | `sidebar-resizer` | ArrowLeft/ArrowRight (24 px) | No | Layout control | Drag handle | Yes | Critical: pointer capture via window and persisted CSS variable |
 | Filter toolbox | Filter block categories/items | Left panel | `toolbox-search` | Normal text editing | No | Left-panel search | — | No | Medium: dynamic rendering destroys/recreates items |
 | Expand/collapse toolbox category | Show/hide category’s block list | Dynamic category headers | Dynamic `.toolbox-category-header`; generated list IDs | Enter/Space via button semantics | No | Categorized toolbox | — | No | Medium: dynamic `aria-expanded`/`aria-controls` |
 | Add block from toolbox | Instantiate block in main workspace | Dynamic toolbox block button | Dynamic `.toolbox-block`, `data-block-type` | Enter/Space via button semantics | No | Categorized toolbox | — | No | Critical: required blocks, placement, grammar, autosave |
 | Drag block from toolbox | Place a new block at drop coordinates | Toolbox to workspace drag/drop | `blockly-area`; dynamic toolbox button; custom MIME type | — | No | Categorized toolbox | — | No | Critical: behaviorally significant drag data and drop target |
-| Run program | Execute Model A and show output | Workspace toolbar; Run sidebar | `run-program`, `sidebar-run-program` | Ctrl/Cmd+F5 | Yes (`run.program`) | Workspace toolbar primary Run | Header Run and command palette | Yes | Critical: three routes must converge on one handler |
+| Run program | Execute Model A and show output | Header; workspace toolbar; Run sidebar | `header-run-program`, `run-program`, `sidebar-run-program` | Ctrl/Cmd+F5 | Yes (`run.program`) | Header Run | Workspace toolbar and command palette | Yes | Critical: all routes converge on `runProgram` |
 | Open CESK machine | Open Machine bottom tab | Run sidebar; bottom Machine tab | `sidebar-open-cesk`; dynamic `bottom-tab-machine` | Bottom tab arrow navigation | Yes (`analysis.machine`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
 | Compare models | Open Model A/B comparison | Run sidebar; bottom Compare tab | `sidebar-open-compare`; dynamic `bottom-tab-compare` | Bottom tab arrow navigation | Yes (`analysis.compare`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
 | Open rewrite semantics | Open substitution/rewrite tool | Run sidebar; bottom Rewrite tab | `sidebar-open-rewrite`; dynamic `bottom-tab-subst` | Bottom tab arrow navigation | Yes (`analysis.rewrite`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
 | Visualize call-by-structure | Visualize selected or first block | Run sidebar; bottom tab; eligible block context menu | `sidebar-open-structure`; dynamic `bottom-tab-structure` | Bottom tab arrow navigation | No | Bottom Semantics/runtime tools | Block context menu | Yes | Critical: selected-block semantics and Blockly rendering |
 | Visualize call-by-value | Visualize selected or first block | Run sidebar; bottom tab; eligible block context menu | `sidebar-open-value`; dynamic `bottom-tab-value` | Bottom tab arrow navigation | No | Bottom Semantics/runtime tools | Block context menu | Yes | Critical: selected-block semantics and Blockly rendering |
-| Toggle inspector from settings | Show/hide right inspector | Settings sidebar | `settings-toggle-code` | — | Yes (`view.inspector`) | View menu | Settings/layout and palette | Yes | High |
-| Toggle bottom tools from settings | Show/hide bottom panel | Settings sidebar | `settings-toggle-bottom` | Ctrl/Cmd+J | Yes (`view.bottom`) | View menu | Settings/layout and palette | Yes | High |
+| Toggle inspector | Show/hide right inspector | View menu; Settings sidebar | `view-toggle-inspector`, `settings-toggle-code` | — | Yes (`view.inspector`) | View menu | Settings/layout and palette | Yes | High |
+| Toggle bottom tools | Show/hide bottom panel | View menu; Settings sidebar | `top-toggle-bottom-panel`, `settings-toggle-bottom` | Ctrl/Cmd+J | Yes (`view.bottom`) | View menu | Settings/layout and palette | Yes | High |
 | Set autosave interval | Persist interval from 2–20 minutes | Settings sidebar | `autosave-interval`, `autosave-interval-label` | Range-input keys | No | Settings | — | No | High: timer restart and persistence |
-| Switch Edit perspective | Apply editing-oriented saved layout | Header select; Settings cards | `perspective-select`; `.perspective-option[data-perspective="edit"]` | — | Yes (`perspective.edit`) | Settings/Perspectives | Header View selector or palette | Yes | Critical: coordinated multi-panel state |
-| Switch Debug perspective | Open Run activity, Outline, Machine | Header select; Settings cards | `perspective-select`; debug perspective option | — | Yes (`perspective.debug`) | Settings/Perspectives | Header View selector or palette | Yes | Critical |
-| Switch Type Analysis perspective | Open Outline and Problems and refresh diagnostics | Header select; Settings cards | `perspective-select`; types perspective option | — | Yes (`perspective.types`) | Settings/Perspectives | Header View selector or palette | Yes | Critical |
-| Switch Presentation perspective | Hide sidebar, inspector, and bottom panel | Header select; Settings cards | `perspective-select`; presentation perspective option | — | Yes (`perspective.presentation`) | Settings/Perspectives | Header View selector or palette | Yes | Critical |
-| Open perspective settings | Navigate status item to Settings activity | Status bar | `status-perspective` | — | No | Status bar | Settings | Yes | Medium |
+| Switch Edit perspective | Apply editing-oriented saved layout | View menu; Settings cards | `perspective-select`; `.perspective-option[data-perspective="edit"]` | — | Yes (`perspective.edit`) | Settings/Perspectives | View menu or palette | Yes | Critical: coordinated multi-panel state |
+| Switch Debug perspective | Open Run activity, Outline, Machine | View menu; Settings cards | `perspective-select`; debug perspective option | — | Yes (`perspective.debug`) | Settings/Perspectives | View menu or palette | Yes | Critical |
+| Switch Type Analysis perspective | Open Outline and Problems and refresh diagnostics | View menu; Settings cards | `perspective-select`; types perspective option | — | Yes (`perspective.types`) | Settings/Perspectives | View menu or palette | Yes | Critical |
+| Switch Presentation perspective | Hide sidebar, inspector, and bottom panel | View menu; Settings cards | `perspective-select`; presentation perspective option | — | Yes (`perspective.presentation`) | Settings/Perspectives | View menu or palette | Yes | Critical |
+| Open perspective settings | Navigate to Settings activity | View menu | `status-perspective` | — | No | View menu | Settings activity | Yes | Medium |
 
 ## Workspace and inspector commands
 
@@ -122,14 +122,38 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 | Download screenshot | Serialize non-empty Blockly workspace to PNG | Blockly workspace context menu, including semantic workspaces | Registry ID `miniJavaDownloadScreenshot` | Blockly-owned | No | Workspace context menu | Overflow menu or palette | No | Critical: SVG cloning, styles, renderer geometry |
 | Blockly built-in block/workspace actions | Library-owned delete, duplicate, comments, collapse, disable, cleanup/other enabled entries | Blockly context menus | Blockly registry-owned; no application IDs | Blockly-owned | No | Blockly context menu | Command palette only if explicitly bridged | No | Critical: list varies with Blockly/config; do not suppress wholesale |
 
+## Implemented header and status reachability audit
+
+The global-header and status-bar phase establishes these primary routes while
+retaining every prior shortcut and contextual route:
+
+| Surface | Commands now reachable | Preserved secondary routes |
+|---|---|---|
+| File | New, Open, Save, Export MiniJava, Restore autosave | `file.*` palette entries; Ctrl/Cmd+N, O, S; dialogs and hidden file input |
+| Examples | Open example list, replace, merge, cancel | Native dialog cancellation and Escape dismissal |
+| Run | Run program | Workspace Run, Run sidebar, `run.program`, Ctrl/Cmd+F5 |
+| View | Sidebar, inspector, bottom tools, perspective, theme, Settings/layout | Contextual show/hide controls, Settings activity, `view.*`, `perspective.*`, `theme.toggle`, Ctrl/Cmd+J |
+| More | Command palette, About | Ctrl/Cmd+Shift+P and F1 for the palette |
+| Status | Show Problems | Problems bottom tab and `view.problems` |
+| Workspace/inspector/bottom panels | Undo, Redo, zoom/reset/Fit, Copy, Print, panel maximize/close, semantic and runtime controls | Existing palette entries, shortcuts, tabs, and Blockly context menus recorded above |
+
+The renderer name and internal implementation details are no longer present in
+normal status chrome. `status-perspective` and `status-perspective-label` retain
+their identities in View, so the existing state updater and Settings launcher
+remain connected without duplicating perspective state in the status bar.
+
+All File, View, More, and Examples menus support Arrow Up/Down, Home/End, and
+Escape with focus restoration. The responsive `menu-toggle`/`main-menu`
+relationship remains the mobile container for the same commands.
+
 ## Duplication findings for later migration
 
 The following duplication can be reduced later without deleting reachability, after handlers are centralized and regression coverage exists:
 
-- Keep `run-program` as the workspace primary action and Header Run as the second explicit route; the Run-sidebar copy can be removed once its activity still exposes analysis tools and the palette retains `run.program`.
-- Keep one View-menu bottom-panel toggle plus `Ctrl/Cmd+J`; the header `top-toggle-bottom-panel`, workspace `toggle-viz-dock`, and Settings `settings-toggle-bottom` do not all need to remain visible.
+- Keep Header Run as the primary action and `run-program` in the workspace toolbar as its explicit secondary route; the Run-sidebar copy can be removed once its activity still exposes analysis tools and the palette retains `run.program`.
+- Keep one View-menu bottom-panel toggle plus `Ctrl/Cmd+J`; the View `top-toggle-bottom-panel`, workspace `toggle-viz-dock`, and Settings `settings-toggle-bottom` do not all need to remain visible.
 - Keep one View-menu inspector toggle plus inspector-local hide/show affordances needed for recovery; the Settings duplicate can later be removed.
-- Keep perspectives in Settings and the command palette; either the header selector or the status-bar launcher can become a single compact secondary route.
+- Keep perspectives in Settings and the command palette, with the View selector as the compact secondary route; no perspective control needs to return to the status bar.
 - Machine, Compare, and Rewrite should remain primary bottom-panel tabs with palette entries; sidebar launch buttons are redundant once the bottom tab strip is reachable when closed.
 - Structure and Value should remain bottom tools and method-call context actions; generic sidebar copies are optional.
 - Fit, zoom, and undo/redo currently overlap with Blockly-owned controls/keyboard behavior. Remove only a visibly duplicated control, never the underlying Blockly capability.

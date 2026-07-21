@@ -55,68 +55,102 @@
     <div id="app" class="app-shell" data-ide-region="shell">
       <header class="app-header" data-ide-region="application-header" aria-label="Application header">
         <div class="brand-zone">
-          <a class="brand-banner" href="#" aria-label="B-MJ Block-based MiniJava">
+          <a class="brand-banner" href="#" aria-label="Block-MiniJava">
             <img src="assets/images/only-logo.png" alt="" />
-            <span class="brand-name">B-MJ</span>
+            <span class="brand-name">Block-MiniJava</span>
           </a>
           <div class="project-status">
             <div class="project-name">Project.java</div>
-            <div class="project-context">Block MiniJava</div>
+            <div class="project-context">Block program</div>
           </div>
         </div>
 
-        <button id="command-palette-trigger" class="command-center" type="button" aria-haspopup="dialog" aria-controls="command-palette-overlay" title="Open Command Palette (Ctrl+Shift+P)">
-          <svg class="app-icon icon icon-search" aria-hidden="true"><use href="#icon-search" /></svg>
-          <span class="command-center-label">Search or run a command</span>
-          <kbd>Ctrl Shift P</kbd>
-        </button>
-
         <div class="header-command-zone">
-          <label class="perspective-picker" for="perspective-select" title="Choose a workbench perspective">
-            <span class="perspective-picker-label">Perspective</span>
-            <select id="perspective-select" aria-label="Workbench perspective">
-              <option value="edit">Edit</option>
-              <option value="debug">Debug</option>
-              <option value="types">Type Analysis</option>
-              <option value="presentation">Presentation</option>
-              <option value="custom" hidden>Custom</option>
-            </select>
-          </label>
-
           <nav id="main-menu" class="main-menu ide-command-toolbar" data-ide-region="command-toolbar" aria-label="Main menu">
-            <button id="new-workspace" class="menu-button" type="button" title="New workspace">
-              <svg class="app-icon icon icon-new" aria-hidden="true"><use href="#icon-add" /></svg><span class="menu-label">New</span>
-            </button>
-            <button id="load-workspace" class="menu-button" type="button" title="Open .bml workspace or MiniJava source">
-              <svg class="app-icon icon icon-folder" aria-hidden="true"><use href="#icon-open" /></svg><span class="menu-label">Open</span>
-            </button>
-            <button id="save-workspace" class="menu-button" type="button" title="Save workspace">
-              <svg class="app-icon icon icon-save" aria-hidden="true"><use href="#icon-save" /></svg><span class="menu-label">Save</span>
-            </button>
-            <button id="export-code" class="menu-button" type="button" title="Export generated Java">
-              <svg class="app-icon icon icon-export" aria-hidden="true"><use href="#icon-export" /></svg><span class="menu-label">Export</span>
-            </button>
-            <button id="top-toggle-bottom-panel" class="menu-button" type="button" title="Toggle visualization and bottom tools" aria-label="Toggle visualization and bottom tools" aria-pressed="false">
-              <svg class="app-icon icon icon-viz" aria-hidden="true"><use href="#icon-bottom" /></svg><span class="menu-label">Visualize</span>
-            </button>
-            <button id="load-autosave" class="menu-button" type="button" title="Load autosaved workspace">
-              <svg class="app-icon icon icon-restore" aria-hidden="true"><use href="#icon-restore" /></svg><span class="menu-label">Autosave</span>
-            </button>
-            <div class="examples-menu-wrapper">
-              <button id="examples-button" class="menu-button" type="button" title="Load an example program" aria-haspopup="true" aria-expanded="false" aria-controls="examples-panel">
-                <svg class="app-icon icon icon-examples" aria-hidden="true"><use href="#icon-examples" /></svg><span class="menu-label">Examples</span>
+            <div class="global-menu">
+              <button id="file-menu-button" class="menu-button global-menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="file-menu">
+                <span class="menu-label">File</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+              </button>
+              <div id="file-menu" class="global-menu-panel" role="menu" aria-label="File" hidden>
+                <button id="new-workspace" class="global-menu-item" type="button" role="menuitem" title="New workspace">
+                  <svg class="app-icon icon icon-new" aria-hidden="true"><use href="#icon-add" /></svg><span>New workspace</span><kbd>Ctrl N</kbd>
+                </button>
+                <button id="load-workspace" class="global-menu-item" type="button" role="menuitem" title="Open .bml workspace or MiniJava source">
+                  <svg class="app-icon icon icon-folder" aria-hidden="true"><use href="#icon-open" /></svg><span>Open…</span><kbd>Ctrl O</kbd>
+                </button>
+                <button id="save-workspace" class="global-menu-item" type="button" role="menuitem" title="Save workspace">
+                  <svg class="app-icon icon icon-save" aria-hidden="true"><use href="#icon-save" /></svg><span>Save workspace</span><kbd>Ctrl S</kbd>
+                </button>
+                <button id="export-code" class="global-menu-item" type="button" role="menuitem" title="Export MiniJava source">
+                  <svg class="app-icon icon icon-export" aria-hidden="true"><use href="#icon-export" /></svg><span>Export MiniJava…</span>
+                </button>
+                <div class="global-menu-separator" role="separator"></div>
+                <button id="load-autosave" class="global-menu-item" type="button" role="menuitem" title="Load autosaved workspace">
+                  <svg class="app-icon icon icon-restore" aria-hidden="true"><use href="#icon-restore" /></svg><span>Restore autosave</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="examples-menu-wrapper global-menu">
+              <button id="examples-button" class="menu-button" type="button" title="Load an example program" aria-haspopup="menu" aria-expanded="false" aria-controls="examples-panel">
+                <span class="menu-label">Examples</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
               </button>
               <div id="examples-panel" class="examples-panel" role="menu" aria-label="Example programs"></div>
             </div>
-            <button id="about-button" class="menu-button header-utility" type="button" title="About Block MiniJava" aria-label="About Block MiniJava">
-              <svg class="app-icon icon icon-info" aria-hidden="true"><use href="#icon-info" /></svg><span class="menu-label">About</span>
+
+            <button id="header-run-program" class="menu-button menu-button-primary header-run-button" type="button" title="Run the program (Ctrl+F5)">
+              <svg class="app-icon icon icon-run" aria-hidden="true"><use href="#icon-run" /></svg><span class="menu-label">Run</span>
             </button>
-            <label class="theme-switch" title="Switch between dark and light themes">
-              <svg class="app-icon icon icon-sun" aria-hidden="true"><use href="#icon-sun" /></svg>
-              <input id="theme-toggle" type="checkbox" checked aria-label="Dark theme on" />
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-              <svg class="app-icon icon icon-moon" aria-hidden="true"><use href="#icon-moon" /></svg>
-            </label>
+
+            <div class="global-menu">
+              <button id="view-menu-button" class="menu-button global-menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu">
+                <span class="menu-label">View</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+              </button>
+              <div id="view-menu" class="global-menu-panel global-menu-panel-end" role="menu" aria-label="View" hidden>
+                <button id="view-toggle-sidebar" class="global-menu-item" type="button" role="menuitemcheckbox" aria-checked="true">
+                  <svg class="app-icon" aria-hidden="true"><use href="#icon-blocks" /></svg><span>Blocks sidebar</span><span class="menu-state">Shown</span>
+                </button>
+                <button id="view-toggle-inspector" class="global-menu-item" type="button" role="menuitemcheckbox" aria-checked="true">
+                  <svg class="app-icon" aria-hidden="true"><use href="#icon-code" /></svg><span>MiniJava inspector</span><span class="menu-state">Shown</span>
+                </button>
+                <button id="top-toggle-bottom-panel" class="global-menu-item" type="button" role="menuitemcheckbox" aria-label="Toggle bottom tools" aria-checked="false" aria-pressed="false">
+                  <svg class="app-icon icon icon-viz" aria-hidden="true"><use href="#icon-bottom" /></svg><span>Bottom tools</span><span class="menu-state">Hidden</span>
+                </button>
+                <div class="global-menu-separator" role="separator"></div>
+                <label class="global-menu-field" for="perspective-select">
+                  <span>Perspective</span>
+                  <select id="perspective-select" aria-label="Workbench perspective">
+                    <option value="edit">Edit</option>
+                    <option value="debug">Debug</option>
+                    <option value="types">Type Analysis</option>
+                    <option value="presentation">Presentation</option>
+                    <option value="custom" hidden>Custom</option>
+                  </select>
+                </label>
+                <label class="theme-switch global-menu-field" title="Switch between dark and light themes">
+                  <span>Dark theme</span>
+                  <input id="theme-toggle" type="checkbox" checked aria-label="Dark theme on" />
+                  <span class="switch-track"><span class="switch-thumb"></span></span>
+                </label>
+                <button id="status-perspective" class="global-menu-item" type="button" role="menuitem" title="Open settings and layout">
+                  <svg class="app-icon" aria-hidden="true"><use href="#icon-settings" /></svg><span>Settings and layout…</span><span id="status-perspective-label" class="menu-state">Edit</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="global-menu">
+              <button id="more-menu-button" class="menu-button global-menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="more-menu">
+                <span class="menu-label">More</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+              </button>
+              <div id="more-menu" class="global-menu-panel global-menu-panel-end" role="menu" aria-label="More" hidden>
+                <button id="command-palette-trigger" class="global-menu-item" type="button" role="menuitem" aria-haspopup="dialog" aria-controls="command-palette-overlay" title="Open Command Palette (Ctrl+Shift+P)">
+                  <svg class="app-icon icon icon-search" aria-hidden="true"><use href="#icon-search" /></svg><span>Command palette…</span><kbd>Ctrl Shift P</kbd>
+                </button>
+                <button id="about-button" class="global-menu-item" type="button" role="menuitem" title="About Block-MiniJava">
+                  <svg class="app-icon icon icon-info" aria-hidden="true"><use href="#icon-info" /></svg><span>About Block-MiniJava</span>
+                </button>
+              </div>
+            </div>
           </nav>
           <button id="menu-toggle" class="menu-button hamburger menu-toggle-button" type="button" aria-label="Toggle menu" aria-controls="main-menu" aria-expanded="false" title="Menu">
             <svg class="app-icon icon icon-menu" aria-hidden="true"><use href="#icon-menu" /></svg><span class="menu-label">Menu</span>
@@ -430,14 +464,11 @@
 
       <footer class="workspace-footer ide-status-bar" data-ide-region="status-bar" aria-label="IDE status">
         <div class="status-group">
-          <button id="status-perspective" class="status-item status-button" type="button" title="Choose a workbench perspective"><svg class="app-icon status-icon" aria-hidden="true"><use href="#icon-settings" /></svg><span id="status-perspective-label">Edit</span></button>
           <span class="status-item status-block-count-item"><svg class="app-icon status-icon" aria-hidden="true"><use href="#icon-blocks" /></svg><span id="status-block-count">0 blocks</span></span>
           <button id="status-problems-button" class="status-item status-button" type="button" title="Show Problems"><svg class="app-icon status-icon status-problem-icon" aria-hidden="true"><use href="#icon-problems" /></svg><span id="status-problems-count">0 Problems</span></button>
         </div>
         <div class="status-group status-group-end">
           <span id="autosave-status" class="autosave-status" aria-live="polite">Autosave ready</span>
-          <span class="status-item status-technical">MiniJava</span>
-          <span class="status-item status-technical">BMJ-Thrasos</span>
         </div>
       </footer>
 

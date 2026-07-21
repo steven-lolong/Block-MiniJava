@@ -55,6 +55,22 @@ export function initExamplesMenu(getWorkspace: WorkspaceGetter, onLoaded: (examp
   const panel = document.getElementById('examples-panel') as HTMLDivElement | null;
   if (!button || !panel) return;
 
+  const items = (): HTMLButtonElement[] => Array.from(panel.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+  const close = (restoreFocus = false): void => {
+    panel.classList.remove('examples-open');
+    button.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) button.focus();
+  };
+  const open = (focus: 'first' | 'last' | null = null): void => {
+    panel.classList.add('examples-open');
+    button.setAttribute('aria-expanded', 'true');
+    window.dispatchEvent(new CustomEvent('bmj:examples-menu-opened'));
+    if (focus) {
+      const menuItems = items();
+      menuItems[focus === 'first' ? 0 : menuItems.length - 1]?.focus();
+    }
+  };
+
   panel.innerHTML = '';
   const heading = document.createElement('div');
   heading.className = 'examples-group-heading';
@@ -70,28 +86,52 @@ export function initExamplesMenu(getWorkspace: WorkspaceGetter, onLoaded: (examp
     item.innerHTML = `${iconMarkup('examples', 'examples-item-icon')}<span class="examples-item-label"></span>`;
     item.querySelector('.examples-item-label')!.textContent = example.label;
     item.addEventListener('click', () => {
-      panel.classList.remove('examples-open');
-      button.setAttribute('aria-expanded', 'false');
+      close();
+      window.dispatchEvent(new CustomEvent('bmj:header-menu-action'));
       loadExample(example, getWorkspace, onLoaded);
     });
     panel.appendChild(item);
   }
 
   button.addEventListener('click', () => {
-    const open = panel.classList.toggle('examples-open');
-    button.setAttribute('aria-expanded', String(open));
+    if (panel.classList.contains('examples-open')) close();
+    else open();
+  });
+  button.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      open(event.key === 'ArrowDown' ? 'first' : 'last');
+    } else if (event.key === 'Escape' && panel.classList.contains('examples-open')) {
+      event.preventDefault();
+      close(true);
+    }
+  });
+  panel.addEventListener('keydown', (event) => {
+    const menuItems = items();
+    const current = menuItems.indexOf(document.activeElement as HTMLButtonElement);
+    const offset = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+    if (offset || event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      const target = event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? menuItems.length - 1
+          : (current + offset + menuItems.length) % menuItems.length;
+      menuItems[target]?.focus();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      close(true);
+    }
   });
 
   document.addEventListener('click', (event) => {
     const target = event.target as Node;
     if (panel.contains(target) || button.contains(target)) return;
-    panel.classList.remove('examples-open');
-    button.setAttribute('aria-expanded', 'false');
+    close();
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape') return;
-    panel.classList.remove('examples-open');
-    button.setAttribute('aria-expanded', 'false');
+    if (event.key !== 'Escape' || !panel.classList.contains('examples-open')) return;
+    close(true);
   });
 }

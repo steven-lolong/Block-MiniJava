@@ -39,14 +39,14 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 | Expand/collapse toolbox category | Show/hide category’s block list | Dynamic category headers | Dynamic `.toolbox-category-header`; generated list IDs | Enter/Space via button semantics | No | Categorized toolbox | — | No | Medium: dynamic `aria-expanded`/`aria-controls` |
 | Add block from toolbox | Instantiate block in main workspace | Dynamic toolbox block button | Dynamic `.toolbox-block`, `data-block-type` | Enter/Space via button semantics | No | Categorized toolbox | — | No | Critical: required blocks, placement, grammar, autosave |
 | Drag block from toolbox | Place a new block at drop coordinates | Toolbox to workspace drag/drop | `blockly-area`; dynamic toolbox button; custom MIME type | — | No | Categorized toolbox | — | No | Critical: behaviorally significant drag data and drop target |
-| Run program | Execute Model A and show output | Header; workspace toolbar | `header-run-program`, `run-program` | Ctrl/Cmd+F5 | Yes (`run.program`) | Header Run | Workspace toolbar and command palette | Yes | Critical: all routes converge on `runProgram` |
+| Run program | Execute Model A and show output | Workspace toolbar | `run-program` | Ctrl/Cmd+F5 | Yes (`run.program`) | Workspace toolbar | Command palette and shortcut | Yes | Critical: all routes converge on `runProgram` |
 | Open CESK machine | Open the CESK leaf view | Semantics → CESK | Dynamic `bottom-tab-machine` | Nested-tab arrow navigation | Yes (`analysis.machine`) | Bottom Semantics | Command palette | Yes | High |
 | Compare models | Open Model A/B comparison | Semantics → A vs B | Dynamic `bottom-tab-compare` | Nested-tab arrow navigation | Yes (`analysis.compare`) | Bottom Semantics | Command palette | Yes | High |
 | Open rewrite semantics | Open substitution/rewrite tool | Semantics → Rewrite | Dynamic `bottom-tab-subst` | Nested-tab arrow navigation | Yes (`analysis.rewrite`) | Bottom Semantics | Command palette | Yes | High |
 | Visualize call-by-structure | Visualize selected or first block | Semantics → Call-by-Structure; eligible block context menu | Dynamic `bottom-tab-structure` | Nested-tab arrow navigation | Yes (`analysis.structure`) | Bottom Semantics | Block context menu and palette | Yes | Critical: selected-block semantics and Blockly rendering |
 | Visualize call-by-value | Visualize selected or first block | Semantics → Call-by-Value; eligible block context menu | Dynamic `bottom-tab-value` | Nested-tab arrow navigation | Yes (`analysis.value`) | Bottom Semantics | Block context menu and palette | Yes | Critical: selected-block semantics and Blockly rendering |
-| Toggle inspector | Show/hide right inspector | View menu; inspector header | `view-toggle-inspector`, `toggle-code-column` | — | Yes (`view.inspector`) | View menu | Inspector-local close and palette | Yes | High |
-| Toggle bottom tools | Show/hide bottom panel | View menu; bottom-panel close | `top-toggle-bottom-panel`, `viz-collapse` | Ctrl/Cmd+J | Yes (`view.bottom`) | View menu | Bottom panel and palette | Yes | High |
+| Toggle inspector | Show/hide right inspector | View menu; inspector header; workspace restore when hidden | `view-toggle-inspector`, `toggle-code-column`, `show-inspector-button` | — | Yes (`view.inspector`) | View menu | Contextual workspace restore, inspector-local close, and palette | Yes | High |
+| Toggle bottom tools | Show/hide bottom panel | Workspace toolbar; View menu; bottom-panel close | `workspace-toggle-bottom-panel`, `top-toggle-bottom-panel`, `viz-collapse` | Ctrl/Cmd+J | Yes (`view.bottom`) | Workspace toolbar | View menu, bottom panel, and palette | Yes | High |
 | Set autosave interval | Persist interval from 2–20 minutes | View menu | `autosave-interval`, `autosave-interval-label` | Range-input keys | No | View menu | — | No | High: timer restart and persistence |
 | Switch Edit perspective | Apply editing-oriented saved layout | View menu | `perspective-select` | — | Yes (`perspective.edit`) | View menu | Command palette | Yes | Critical: coordinated multi-panel state |
 | Switch Debug perspective | Open Outline and Machine | View menu | `perspective-select` | — | Yes (`perspective.debug`) | View menu | Command palette | Yes | Critical |
@@ -82,7 +82,7 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 
 | Command name | Purpose | Current visible locations | Current element IDs | Keyboard shortcut | Command-palette entry | Primary future location | Secondary permitted location | Duplicated | Migration risk |
 |---|---|---|---|---|---|---|---|---|---|
-| Toggle bottom panel | Open/close bottom tools | Header menu; bottom-panel close | `top-toggle-bottom-panel`, `viz-collapse`, `viz-dock` | Ctrl/Cmd+J | Yes (`view.bottom`) | View menu | Bottom panel or palette | Yes | Critical: persisted state and maximization reset |
+| Toggle bottom panel | Open/close bottom tools | Workspace toolbar; View menu; bottom-panel close | `workspace-toggle-bottom-panel`, `top-toggle-bottom-panel`, `viz-collapse`, `viz-dock` | Ctrl/Cmd+J | Yes (`view.bottom`) | Workspace toolbar | View menu, bottom panel, or palette | Yes | Critical: persisted state and maximization reset |
 | Select Problems | Show/refresh type diagnostics | Bottom tab; status bar | dynamic `bottom-tab-problems`, `status-problems-button` | Bottom tab Left/Right/Home/End | Yes (`view.problems`) | Bottom panel / Problems | Status bar and palette | Yes | High |
 | Select Output | Show latest run/semantic output | Bottom tab; Run opens it implicitly | dynamic `bottom-tab-output`, `bottom-program-output` | Bottom tab navigation | Yes (`view.output`) | Bottom panel / Output | Run result and palette | Yes | Medium |
 | Select Semantics | Reveal the semantic/runtime region and restore its last selected leaf view | Bottom primary tab strip | `bottom-tab-semantics`, `bottom-panel-semantics` | Primary-tab Left/Right/Home/End | Yes (`view.semantics`) | Bottom panel / Semantics | Command palette | Yes | High: parent selection is derived from the active leaf kind and must not replace it in persistence |
@@ -128,7 +128,7 @@ retaining every prior shortcut and contextual route:
 |---|---|---|
 | File | New, Open, Save, Export MiniJava, Restore autosave | `file.*` palette entries; Ctrl/Cmd+N, O, S; dialogs and hidden file input |
 | Examples | Open example list, replace, merge, cancel | Native dialog cancellation and Escape dismissal |
-| Run | Run program | Header Run, workspace Run, `run.program`, Ctrl/Cmd+F5 |
+| Workspace | Run program; toggle bottom tools; restore hidden toolbox/inspector | Workspace toolbar, `run.program`, `view.bottom`, `view.blocks`, `view.inspector`, Ctrl/Cmd+F5, Ctrl/Cmd+J |
 | View | Sidebar, inspector, bottom tools, perspective, theme, autosave interval | Contextual panel controls, `view.*`, `perspective.*`, `theme.toggle`, Ctrl/Cmd+J |
 | More | Command palette, About | Ctrl/Cmd+Shift+P and F1 for the palette |
 | Status | Show Problems | Problems bottom tab and `view.problems` |
@@ -155,9 +155,9 @@ relationship remains the mobile container for the same commands.
 
 The following duplication can be reduced later without deleting reachability, after handlers are centralized and regression coverage exists:
 
-- Header Run is primary and the labeled workspace `run-program` button is its explicit secondary route; the palette retains `run.program`.
-- View owns the bottom-panel toggle and `Ctrl/Cmd+J`; the workspace toolbar contains no output control.
-- View owns inspector recovery; the workspace toolbar contains no inspector control.
+- The labelled workspace `run-program` button is the single visible Run action; the palette and Ctrl/Cmd+F5 retain nonvisual access.
+- The workspace owns the contextual bottom-panel toggle; View, the panel close action, the palette, and Ctrl/Cmd+J remain secondary routes.
+- View owns the general inspector preference; `show-inspector-button` appears in the workspace only while the inspector is not visible.
 - Perspectives and the autosave interval remain in View and the command palette retains perspective/theme commands.
 - CESK, A vs B, Rewrite, Call-by-Structure, and Call-by-Value remain reachable through the Semantics secondary tabs, context menus where applicable, and the command palette.
 - Fit, zoom, undo, and redo keep their Blockly-backed behavior while the toolbar removes the nonessential zoom-reset readout.

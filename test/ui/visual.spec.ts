@@ -7,9 +7,7 @@ async function capture(page: Parameters<typeof openFreshApp>[0], name: string): 
 
 async function loadExample(page: Page, label: string): Promise<void> {
   await page.locator('#examples-button').click();
-  await page.locator('#examples-panel [role="menuitem"]').filter({ hasText: label }).evaluate((item) =>
-    (item as HTMLButtonElement).click()
-  );
+  await page.locator('#examples-panel [role="menuitem"]').filter({ hasText: label }).click();
   await expect(page.locator('#example-load-modal')).toHaveAttribute('open', '');
   await page.locator('#example-load-modal button[value="replace"]').click();
   await expect(page.locator('#loaded-file-label')).toContainText(`${label}.bml`);

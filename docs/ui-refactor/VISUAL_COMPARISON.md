@@ -39,7 +39,7 @@ Image directory: [`screenshots/final/`](screenshots/final/)
 ## Comparison checklist
 
 - [x] No ambiguous icon row at 1440px: Undo, Redo, Zoom out, Zoom in, and Fit use recognizable icon-only controls; Run remains labelled and primary.
-- [x] No duplicated primary command surfaces: command routes are contextual rather than a repeated toolbox command strip. The intentional header/workspace Run affordances point to the same primary action.
+- [x] No duplicated primary command surfaces: Run appears once in the workspace toolbar; the header no longer repeats it.
 - [x] No mixed application icon family: application chrome uses the shared SVG sprite; Blockly-native canvas controls remain library-owned editing controls.
 - [x] No excessive decorative cards: panels are structural regions with restrained borders and radii, rather than nested marketing-style containers.
 - [x] No internal renderer terminology in the status bar: status text uses user-facing MiniJava and workspace language.

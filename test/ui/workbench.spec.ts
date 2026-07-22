@@ -42,9 +42,10 @@ test('header menus and compact status preserve global command reachability', asy
   const errors = await openFreshApp(page);
   await expect(page.locator('.brand-name')).toHaveText('Block-MiniJava');
   await expect(page.locator('.project-name')).toBeVisible();
-  for (const label of ['File', 'Examples', 'Run', 'View', 'More']) {
+  for (const label of ['File', 'Examples', 'View', 'More']) {
     await expect(page.getByRole('button', { name: new RegExp(`^${label}`) }).first()).toBeVisible();
   }
+  await expect(page.locator('#header-run-program')).toHaveCount(0);
 
   const fileButton = page.locator('#file-menu-button');
   await fileButton.focus();
@@ -85,14 +86,17 @@ test('desktop sidebar and inspector can be hidden and restored', async ({ page }
   const errors = await openFreshApp(page);
   await page.locator('#toggle-toolbox').click();
   await expect(page.locator('body')).toHaveClass(/toolbox-hidden/);
+  await expect(page.locator('#show-toolbox-button')).toBeVisible();
   await page.locator('#show-toolbox-button').click();
   await expect(page.locator('body')).not.toHaveClass(/toolbox-hidden/);
+  await expect(page.locator('#show-toolbox-button')).toBeHidden();
 
   await page.locator('#toggle-code-column').click();
   await expect(page.locator('body')).toHaveClass(/code-hidden/);
-  await openHeaderMenu(page, 'view');
-  await page.locator('#view-toggle-inspector').click();
+  await expect(page.locator('#show-inspector-button')).toBeVisible();
+  await page.locator('#show-inspector-button').click();
   await expect(page.locator('body')).not.toHaveClass(/code-hidden/);
+  await expect(page.locator('#show-inspector-button')).toBeHidden();
   expectNoUncaughtErrors(errors);
 });
 
@@ -141,9 +145,22 @@ test('blocks-only sidebar and quiet workspace toolbar preserve editing workflows
     'workspace-zoom-out',
     'workspace-zoom-in',
     'workspace-fit',
-    'run-program'
+    'workspace-toggle-bottom-panel',
+    'run-program',
+    'show-inspector-button'
   ]);
+  await expect(page.locator('#show-toolbox-button')).toBeHidden();
+  await expect(page.locator('#show-inspector-button')).toBeHidden();
   await expect(page.locator('#run-program')).toContainText('Run');
+
+  const bottomToggle = page.locator('#workspace-toggle-bottom-panel');
+  await bottomToggle.click();
+  await expect(page.locator('#viz-dock')).toHaveAttribute('data-open', 'true');
+  await expect(bottomToggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(bottomToggle).toHaveAttribute('aria-label', 'Hide bottom tools');
+  await bottomToggle.click();
+  await expect(page.locator('#viz-dock')).toHaveAttribute('data-open', 'false');
+  await expect(bottomToggle).toHaveAttribute('aria-label', 'Show bottom tools');
 
   await page.locator('#toolbox-search').fill('integer');
   await expect(page.locator('#toolbox-content [data-block-type="mj_expr_integer"]')).toBeVisible();
@@ -182,9 +199,7 @@ test('blocks-only sidebar and quiet workspace toolbar preserve editing workflows
 test('grammatical block families integrate with both themes and preserve Blockly visual states', async ({ page }) => {
   const errors = await openFreshApp(page);
   await page.locator('#examples-button').click();
-  await page.locator('#examples-panel [role="menuitem"]').filter({ hasText: 'Simple Sum' }).evaluate((item) =>
-    (item as HTMLButtonElement).click()
-  );
+  await page.locator('#examples-panel [role="menuitem"]').filter({ hasText: 'Simple Sum' }).click();
   await page.locator('#example-load-modal button[value="replace"]').click();
   await expect(page.locator('#loaded-file-label')).toContainText('Simple Sum.bml');
 
@@ -257,7 +272,7 @@ test('grammatical block families integrate with both themes and preserve Blockly
 
 test('primary Run opens Output and command palette exposes registered commands', async ({ page }) => {
   const errors = await openFreshApp(page);
-  await page.locator('#header-run-program').click();
+  await page.locator('#run-program').click();
   await expect(page.locator('#viz-dock')).toHaveAttribute('data-open', 'true');
   await expect(page.locator('#bottom-tab-output')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#bottom-program-output')).toContainText('[Run]');
@@ -439,9 +454,7 @@ test('Problems and Output remain distinct bottom-panel results', async ({ page }
 test('Call-by-Structure and Call-by-Value retain their Blockly visualization state inside Semantics', async ({ page }) => {
   const errors = await openFreshApp(page);
   await page.locator('#examples-button').click();
-  await page.locator('#examples-panel [role="menuitem"]').filter({ hasText: 'Simple Sum' }).evaluate((item) =>
-    (item as HTMLButtonElement).click()
-  );
+  await page.locator('#examples-panel [role="menuitem"]').filter({ hasText: 'Simple Sum' }).click();
   await expect(page.locator('#example-load-modal')).toHaveAttribute('open', '');
   await page.locator('#example-load-modal button[value="replace"]').click();
   await expect(page.locator('#loaded-file-label')).toContainText('Simple Sum.bml');
@@ -601,9 +614,10 @@ test('mobile sidebar and inspector drawers open and close with their scrims', as
 
   await page.locator('#menu-toggle').click();
   await expect(page.locator('#main-menu')).toHaveClass(/menu-open/);
-  for (const id of ['file-menu-button', 'examples-button', 'header-run-program', 'view-menu-button', 'more-menu-button']) {
+  for (const id of ['file-menu-button', 'examples-button', 'view-menu-button', 'more-menu-button']) {
     await expect(page.locator(`#${id}`)).toBeVisible();
   }
+  await expect(page.locator('#header-run-program')).toHaveCount(0);
   await page.locator('#view-menu-button').click();
   await expect(page.locator('#view-menu')).toBeVisible();
   await page.keyboard.press('Escape');

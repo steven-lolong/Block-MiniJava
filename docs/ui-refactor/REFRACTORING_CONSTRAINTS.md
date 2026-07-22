@@ -20,9 +20,9 @@ This is an information-architecture and presentation refactor, not a functionali
 
 ### Target information architecture
 
-- Header: project and file identity, File menu, Examples, Run, View, and an overflow menu.
+- Header: project and file identity, File menu, Examples, View, and an overflow menu.
 - Left panel: block search and categorized toolbox.
-- Workspace toolbar: Undo, Redo, Zoom, Fit workspace, and the primary Run action.
+- Workspace toolbar: Undo, Redo, Zoom, Fit workspace, bottom-tools toggle, the primary Run action, and contextual restore controls for hidden side panels.
 - Right inspector: Code, Types, and Outline.
 - Bottom panel: Problems, Output, and Semantics; existing semantic/runtime tools are leaf views inside Semantics.
 - Status bar: block count, problem count, and autosave state.
@@ -162,11 +162,11 @@ The completed refactor must assign each application command one clear primary lo
 | Export MiniJava `.java` | Header, palette `file.export`, filename dialog | File menu |
 | Restore autosave | Header, palette `file.autosave` | File menu or overflow |
 | Load example, replace/merge/cancel | Examples menu and confirmation dialog | Examples |
-| Run program | Header Run, workspace Run, palette `run.program`, `Ctrl/Cmd+F5`; opens Output | Header Run and workspace primary Run are the two intentionally retained contextual entries |
+| Run program | Workspace Run, palette `run.program`, `Ctrl/Cmd+F5`; opens Output | Workspace primary Run is the single visible Run entry |
 | Search blocks | Activity/sidebar and palette `view.search`, `Ctrl/Cmd+Shift+F` | Left panel search |
 | Show blocks/sidebar | Activity/reveal controls and palette `view.blocks` | View menu plus contextual drawer control |
-| Toggle inspector | Inspector/reveal/settings controls and palette `view.inspector` | View menu plus contextual drawer control |
-| Toggle bottom panel | Header/workspace/settings controls and palette `view.bottom`, `Ctrl/Cmd+J` | View menu plus contextual panel control |
+| Toggle inspector | Inspector/reveal/settings controls and palette `view.inspector` | View menu plus a contextual workspace restore shown only while the inspector is not visible |
+| Toggle bottom panel | Workspace/View controls and palette `view.bottom`, `Ctrl/Cmd+J` | Workspace toolbar plus View and panel-local secondary routes |
 | Show Problems | Status item and palette `view.problems` | Bottom Problems tab/status count |
 | Code, Types, Outline | Inspector tabs with keyboard navigation; stable internal `typing` IDs continue to back the visible Types view | Right inspector |
 | Copy MiniJava code | Inspector action | Code inspector and palette |

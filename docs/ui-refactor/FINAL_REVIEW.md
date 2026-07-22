@@ -217,7 +217,7 @@ No block definition, block structure, connection check, output/input type, seria
 The following branch behavior remains intact:
 
 - **Left panel:** Blocks title, search, categorized toolbox, expansion, drag/drop, click-to-add, persistent visibility, responsive drawer, scrim, Escape close, focus return, and desktop resizer.
-- **Workspace toolbar:** undo, redo, zoom out, zoom in, fit, and labelled primary Run; reset zoom and screenshot remain in the command palette.
+- **Workspace toolbar:** undo, redo, zoom out, zoom in, fit, bottom-tools toggle, labelled primary Run, and contextual restoration of hidden side panels; reset zoom and screenshot remain in the command palette.
 - **Right inspector:** Code, Types, and Outline with independent active-tab persistence, maximization, resizing, and compact drawer behavior.
 - **Bottom panel:** Problems, Output, and Semantics, with nested Call-by-Structure, Call-by-Value, CESK, A vs B, and Rewrite views, maximization, resizing, and active-view persistence.
 - **Blockly:** custom `bmj-thrasos` renderer, grammar-aware connector shapes, comments/collapse/disable behavior, grid snapping, theme updates, metrics, SVG resize, selection, serialization, and examples.
@@ -230,7 +230,7 @@ The palette is a fallback, not a duplicate toolbar. Frequent commands remain whe
 | Command group | Palette count | Primary visible routes |
 |---|---:|---|
 | File | 6 | File menu, Examples button, keyboard shortcuts |
-| Run | 1 | Header Run, workspace Run, `Ctrl+F5` |
+| Run | 1 | Workspace Run, `Ctrl+F5` |
 | Analysis | 5 | Semantics secondary tabs and command palette |
 | View | 12 | View settings, inspector/bottom tabs, activity controls, `Ctrl+J` |
 | Code and Types | 2 | Inspector actions and command palette |
@@ -239,7 +239,7 @@ The palette is a fallback, not a duplicate toolbar. Frequent commands remain whe
 | Preferences and Help | 2 | View settings and More/About |
 | **Total** | **39** | F1 or `Ctrl+Shift+P` always opens the palette |
 
-Intentional duplicates are limited to meaningful context: Run appears in the header and workspace toolbar, panel views have both tab and palette access, and global keyboard shortcuts retain their existing actions.
+The workspace toolbar is the single visible Run surface. Panel views retain contextual tab plus palette access, and global keyboard shortcuts retain their existing actions.
 
 ## 4. Responsive verification matrix
 

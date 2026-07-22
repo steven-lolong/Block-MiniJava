@@ -76,6 +76,24 @@ for (const viewport of viewports.filter((candidate) => candidate.compactPanels))
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     const errors = await openFreshApp(page);
 
+    const showToolbox = page.locator('#show-toolbox-button');
+    await expect(showToolbox).toBeVisible();
+    await showToolbox.click();
+    await expect(page.locator('body')).toHaveClass(/mobile-sidebar-open/);
+    await expect(showToolbox).toBeHidden();
+    await page.keyboard.press('Escape');
+    await expect(showToolbox).toBeVisible();
+    await expect(showToolbox).toBeFocused();
+
+    const showInspector = page.locator('#show-inspector-button');
+    await expect(showInspector).toBeVisible();
+    await showInspector.click();
+    await expect(page.locator('body')).toHaveClass(/mobile-code-open/);
+    await expect(showInspector).toBeHidden();
+    await page.keyboard.press('Escape');
+    await expect(showInspector).toBeVisible();
+    await expect(showInspector).toBeFocused();
+
     const activity = page.locator('#activity-search');
     await activity.click();
     await expect(page.locator('body')).toHaveClass(/mobile-sidebar-open/);

@@ -178,8 +178,14 @@ export function isVizOpen(): boolean {
 
 export function setVizOpen(open: boolean): void {
   dock().dataset.open = String(open);
-  for (const id of ['top-toggle-bottom-panel']) {
-    document.getElementById(id)?.setAttribute('aria-pressed', String(open));
+  for (const id of ['top-toggle-bottom-panel', 'workspace-toggle-bottom-panel']) {
+    const button = document.getElementById(id) as HTMLButtonElement | null;
+    button?.setAttribute('aria-pressed', String(open));
+    if (id === 'workspace-toggle-bottom-panel' && button) {
+      const label = open ? 'Hide bottom tools' : 'Show bottom tools';
+      button.setAttribute('aria-label', label);
+      button.title = label;
+    }
   }
   const viewToggle = document.getElementById('top-toggle-bottom-panel');
   const viewState = viewToggle?.querySelector<HTMLElement>('.menu-state');
@@ -336,6 +342,7 @@ export function initVisualizationPanel(layoutChange: () => void): void {
   });
   byId<HTMLButtonElement>('viz-collapse').addEventListener('click', () => setVizOpen(false));
   byId<HTMLButtonElement>('top-toggle-bottom-panel').addEventListener('click', () => setVizOpen(!isVizOpen()));
+  byId<HTMLButtonElement>('workspace-toggle-bottom-panel').addEventListener('click', () => setVizOpen(!isVizOpen()));
   byId<HTMLButtonElement>('viz-maximize').addEventListener('click', (event) => {
     const button = event.currentTarget as HTMLButtonElement;
     const maximized = document.body.classList.toggle('bottom-maximized');

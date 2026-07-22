@@ -151,6 +151,7 @@ function closeCompactDrawer(kind: 'sidebar' | 'code', restoreFocus = true): bool
   document.body.classList.remove(className);
   document.body.classList.remove(kind === 'sidebar' ? 'is-resizing-sidebar' : 'is-resizing-code');
   updateActivityButtons();
+  syncResponsivePanelControls();
   requestLayoutResize();
   if (restoreFocus) {
     const fallback = kind === 'sidebar'
@@ -164,6 +165,12 @@ function closeCompactDrawer(kind: 'sidebar' | 'code', restoreFocus = true): bool
 
 function syncResponsivePanelControls(): void {
   const compact = isCompactPanelLayout();
+  const sidebarVisible = !toolboxHidden
+    && (!compact || document.body.classList.contains('mobile-sidebar-open'));
+  const inspectorVisible = !codeHidden
+    && (!compact || document.body.classList.contains('mobile-code-open'));
+  byId<HTMLButtonElement>('show-toolbox-button').hidden = sidebarVisible;
+  byId<HTMLButtonElement>('show-inspector-button').hidden = inspectorVisible;
   const sidebarResizable = !compact && !toolboxHidden && !codeMaximized;
   const codeResizable = !compact && !codeHidden && !codeMaximized;
   for (const [id, enabled] of [
@@ -594,6 +601,7 @@ function applyPerspective(perspective: Perspective): void {
     applyingPerspective = false;
     if (window.matchMedia('(max-width: 1100px)').matches) {
       document.body.classList.remove('mobile-sidebar-open', 'mobile-code-open');
+      syncResponsivePanelControls();
     }
     requestLayoutResize();
   }
@@ -731,12 +739,8 @@ function setToolboxHidden(next: boolean, trigger?: HTMLElement): void {
   localStorage.setItem(SIDEBAR_VISIBLE_KEY, String(!toolboxHidden));
 
   const button = byId<HTMLButtonElement>('toggle-toolbox');
-  const showButton = byId<HTMLButtonElement>('show-toolbox-button');
-
   button.title = toolboxHidden ? 'Show sidebar' : 'Hide sidebar';
   button.setAttribute('aria-label', toolboxHidden ? 'Show sidebar' : 'Hide sidebar');
-  showButton.title = 'Show sidebar';
-  showButton.setAttribute('aria-label', 'Show sidebar');
   const viewToggle = byId<HTMLButtonElement>('view-toggle-sidebar');
   viewToggle.setAttribute('aria-pressed', String(!toolboxHidden));
   const viewState = viewToggle.querySelector<HTMLElement>('.menu-state');
@@ -1340,7 +1344,8 @@ function initHeaderMenus(): void {
   window.addEventListener('bmj:header-menu-action', closeCompactHeaderMenu);
   document.addEventListener('pointerdown', (event) => {
     const target = event.target as Node;
-    if (menuPairs.some(([buttonId, panelId]) => byId(buttonId).contains(target) || byId(panelId).contains(target))) return;
+    const inExamples = byId('examples-button').contains(target) || byId('examples-panel').contains(target);
+    if (inExamples || menuPairs.some(([buttonId, panelId]) => byId(buttonId).contains(target) || byId(panelId).contains(target))) return;
     closeAll();
   });
   document.addEventListener('keydown', (event) => {
@@ -1457,16 +1462,15 @@ function wireEvents(): void {
     setToolboxHidden(false, event.currentTarget as HTMLButtonElement);
     markPerspectiveCustom();
   });
+  byId<HTMLButtonElement>('show-inspector-button').addEventListener('click', (event) => {
+    toggleInspector(event.currentTarget as HTMLButtonElement);
+  });
   byId<HTMLButtonElement>('toggle-code-maximize').addEventListener('click', () => setCodeMaximized(!codeMaximized));
   byId<HTMLButtonElement>('sidebar-scrim').addEventListener('click', () => closeCompactDrawer('sidebar'));
   byId<HTMLButtonElement>('code-scrim').addEventListener('click', () => closeCompactDrawer('code'));
   byId<HTMLButtonElement>('copy-code').addEventListener('click', copyCode);
   byId<HTMLButtonElement>('print-typing').addEventListener('click', printTyping);
   byId<HTMLButtonElement>('run-program').addEventListener('click', runProgram);
-  byId<HTMLButtonElement>('header-run-program').addEventListener('click', () => {
-    runProgram();
-    closeCompactHeaderMenu();
-  });
   byId<HTMLButtonElement>('view-toggle-sidebar').addEventListener('click', (event) => {
     toggleToolbox(event.currentTarget as HTMLButtonElement);
   });

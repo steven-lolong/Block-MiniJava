@@ -91,10 +91,6 @@
               <div id="examples-panel" class="examples-panel" role="menu" aria-label="Example programs"></div>
             </div>
 
-            <button id="header-run-program" class="menu-button menu-button-primary header-run-button" type="button" title="Run the program (Ctrl+F5)">
-              <svg class="app-icon icon icon-run" aria-hidden="true"><use href="#icon-run" /></svg><span class="menu-label">Run</span>
-            </button>
-
             <div class="global-menu">
               <button id="view-menu-button" class="menu-button global-menu-trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="view-menu">
                 <span class="menu-label">View</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
@@ -195,7 +191,7 @@
             <div class="workspace-header panel-header">
               <div class="workspace-title-group">
                 <div class="workspace-title-row">
-                  <button id="show-toolbox-button" class="icon-button visibility-toggle workspace-reveal-button" type="button" aria-label="Show sidebar" title="Show sidebar">
+                  <button id="show-toolbox-button" class="icon-button visibility-toggle workspace-reveal-button" type="button" aria-label="Show sidebar" title="Show sidebar" hidden>
                     <svg class="app-icon panel-collapse-glyph" aria-hidden="true"><use href="#icon-chevron-right" /></svg>
                   </button>
                   <h2 class="column-title">
@@ -217,7 +213,9 @@
                   <button id="workspace-fit" class="icon-button" type="button" title="Fit blocks in workspace" aria-label="Fit blocks in workspace"><svg class="app-icon toolbar-glyph toolbar-fit" aria-hidden="true"><use href="#icon-fit" /></svg></button>
                 </div>
                 <div class="toolbar-separator" aria-hidden="true"></div>
+                <button id="workspace-toggle-bottom-panel" class="icon-button" type="button" title="Show bottom tools" aria-label="Show bottom tools" aria-controls="viz-dock" aria-pressed="false"><svg class="app-icon toolbar-glyph" aria-hidden="true"><use href="#icon-bottom" /></svg></button>
                 <button id="run-program" class="workspace-run-button" type="button" title="Run the program and show its output (Ctrl+F5)" aria-label="Run the program"><svg class="app-icon icon icon-run" aria-hidden="true"><use href="#icon-run" /></svg><span>Run</span></button>
+                <button id="show-inspector-button" class="icon-button visibility-toggle workspace-reveal-button" type="button" title="Show MiniJava inspector" aria-label="Show MiniJava inspector" hidden><svg class="app-icon toolbar-glyph" aria-hidden="true"><use href="#icon-code" /></svg></button>
               </div>
             </div>
             <div id="blockly-area" class="blockly-area">

@@ -24,6 +24,7 @@ import { initSubstPanel } from './substPanel';
 import { appendConsoleLog, mirrorProgramOutput } from './programConsole';
 import { injectMachine, run } from '../semantics/minijavaMachine';
 import { installCommandPalette, type IdeCommand } from './commandPalette';
+import { downloadScreenshot } from './screenshot';
 
 const AUTOSAVE_KEY = 'block-minijava.autosave.v2';
 const THEME_KEY = 'block-minijava.theme';
@@ -267,11 +268,6 @@ function createBlockInWorkspace(type: string, position: { x: number; y: number }
   saveAutosave();
 }
 
-function updateZoomIndicator(): void {
-  const label = document.getElementById('zoom-size');
-  if (label) label.textContent = `${Math.round(currentScale() * 100)}%`;
-}
-
 function updateCode(): void {
   if (!workspace) return;
   latestCode = generateMiniJava(workspace);
@@ -403,13 +399,13 @@ function runProgram(): void {
   openBottomTool('output');
   const initial = injectMachine(workspace, 'A');
   if ('injectError' in initial) {
-    mirrorProgramOutput('Run', [], `⨯ ${initial.injectError}`);
+    mirrorProgramOutput('Run', [], `Error: ${initial.injectError}`);
     return;
   }
   const final = run(initial);
   const note = final.status === 'done'
     ? `— program finished in ${final.stepCount} step(s) —`
-    : `⨯ ${final.error}`;
+    : `Error: ${final.error}`;
   mirrorProgramOutput('Run', final.output, note);
 }
 
@@ -531,6 +527,37 @@ function showProblems(): void {
   if (workspace) refreshTypeDiagnostics(workspace);
 }
 
+function openInspectorView(panel: InspectorPanel): void {
+  const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+  setCodeHidden(false, trigger);
+  selectInspectorPanel(panel);
+}
+
+function resetWorkspaceZoom(): void {
+  if (!workspace) return;
+  workspace.setScale(1);
+  workspace.scrollCenter();
+}
+
+function toggleBottomMaximized(): void {
+  if (!isVizOpen()) setVizOpen(true);
+  byId<HTMLButtonElement>('viz-maximize').click();
+}
+
+function openAboutDialog(): void {
+  const modal = byId<HTMLDialogElement>('about-modal');
+  if (typeof modal.showModal === 'function') modal.showModal();
+  else modal.setAttribute('open', 'open');
+}
+
+function openExamplesPicker(): void {
+  if (window.matchMedia('(max-width: 900px)').matches) {
+    byId<HTMLElement>('main-menu').classList.add('menu-open');
+    updateMenuToggle(true);
+  }
+  byId<HTMLButtonElement>('examples-button').click();
+}
+
 function applyPerspective(perspective: Perspective): void {
   applyingPerspective = true;
   try {
@@ -617,7 +644,6 @@ function loadAutosave(): void {
       ? `Autosave · ${new Date(payload.savedAt).toLocaleString()}`
       : 'Autosave loaded';
     updateCode();
-    updateZoomIndicator();
     scheduleAutosaveStatus('Autosave loaded');
   } catch (error) {
     console.error(error);
@@ -668,7 +694,7 @@ function setCodeHidden(next: boolean, trigger?: HTMLElement): void {
   column.title = codeHidden ? 'Show inspector' : 'Hide inspector';
   column.setAttribute('aria-label', codeHidden ? 'Show inspector' : 'Hide inspector');
   const viewToggle = byId<HTMLButtonElement>('view-toggle-inspector');
-  viewToggle.setAttribute('aria-checked', String(!codeHidden));
+  viewToggle.setAttribute('aria-pressed', String(!codeHidden));
   const viewState = viewToggle.querySelector<HTMLElement>('.menu-state');
   if (viewState) viewState.textContent = codeHidden ? 'Hidden' : 'Shown';
 
@@ -712,7 +738,7 @@ function setToolboxHidden(next: boolean, trigger?: HTMLElement): void {
   showButton.title = 'Show sidebar';
   showButton.setAttribute('aria-label', 'Show sidebar');
   const viewToggle = byId<HTMLButtonElement>('view-toggle-sidebar');
-  viewToggle.setAttribute('aria-checked', String(!toolboxHidden));
+  viewToggle.setAttribute('aria-pressed', String(!toolboxHidden));
   const viewState = viewToggle.querySelector<HTMLElement>('.menu-state');
   if (viewState) viewState.textContent = toolboxHidden ? 'Hidden' : 'Shown';
   updateActivityButtons();
@@ -881,7 +907,6 @@ function onExampleLoaded(example: MiniJavaExample): void {
   byId<HTMLDivElement>('loaded-file-label').textContent = `${example.label}.bml`;
   scheduleAutosaveStatus(`Loaded ${example.label}`);
   updateCode();
-  updateZoomIndicator();
   saveAutosave();
 }
 
@@ -1171,7 +1196,6 @@ function initBlockly(): void {
       return;
     }
     if (event.type === Blockly.Events.VIEWPORT_CHANGE) {
-      updateZoomIndicator();
       return;
     }
     if (!isBlockWorkspaceMutation(event)) return;
@@ -1182,12 +1206,10 @@ function initBlockly(): void {
 
   updateCode();
   scheduleOutlineRender();
-  updateZoomIndicator();
   requestLayoutResize();
   if (window.matchMedia('(max-width: 700px)').matches) {
     window.setTimeout(() => {
       workspace?.zoomToFit();
-      updateZoomIndicator();
     }, 100);
   }
 }
@@ -1202,7 +1224,6 @@ function installCodeEditor(): void {
       ensureRequiredBlocks(workspace);
       byId<HTMLDivElement>('loaded-file-label').textContent = label;
       updateCode();
-      updateZoomIndicator();
       saveAutosave();
       scheduleAutosaveStatus('Code imported to blocks');
     },
@@ -1257,7 +1278,7 @@ function initHeaderMenus(): void {
   };
 
   const focusableItems = (panel: HTMLElement): HTMLElement[] =>
-    Array.from(panel.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"], select, input:not([type="hidden"])'))
+    Array.from(panel.querySelectorAll<HTMLElement>('button:not([disabled]), select:not([disabled]), input:not([type="hidden"]):not([disabled])'))
       .filter((item) => !item.hasAttribute('disabled'));
 
   for (const [buttonId, panelId] of menuPairs) {
@@ -1349,23 +1370,45 @@ function initCommandPalette(): void {
     { id: 'file.save', category: 'File', label: 'Save Workspace', shortcut: 'Ctrl S', run: downloadWorkspace },
     { id: 'file.export', category: 'File', label: 'Export MiniJava Source', run: exportGeneratedCode },
     { id: 'file.autosave', category: 'File', label: 'Restore Autosave', run: loadAutosave },
+    { id: 'file.examples', category: 'File', label: 'Choose Example Program', run: openExamplesPicker },
     { id: 'run.program', category: 'Run', label: 'Run Program', shortcut: 'Ctrl F5', keywords: ['output', 'execute'], run: runProgram },
+    { id: 'analysis.structure', category: 'Analysis', label: 'Open Call-by-Structure', run: () => openBottomTool('structure') },
+    { id: 'analysis.value', category: 'Analysis', label: 'Open Call-by-Value', run: () => openBottomTool('value') },
     { id: 'analysis.machine', category: 'Analysis', label: 'Open CESK Machine', run: () => openBottomTool('machine') },
     { id: 'analysis.compare', category: 'Analysis', label: 'Compare Model A and Model B', run: () => openBottomTool('compare') },
     { id: 'analysis.rewrite', category: 'Analysis', label: 'Open Rewrite Semantics', run: () => openBottomTool('subst') },
     { id: 'view.blocks', category: 'View', label: 'Show Blocks Sidebar', run: () => setActiveActivity('blocks') },
     { id: 'view.search', category: 'View', label: 'Search Blocks', shortcut: 'Ctrl Shift F', run: () => setActiveActivity('search') },
     { id: 'view.problems', category: 'View', label: 'Show Problems', run: showProblems },
+    { id: 'view.output', category: 'View', label: 'Show Output', run: () => openBottomTool('output') },
+    { id: 'view.semantics', category: 'View', label: 'Show Semantics', run: () => { setVizOpen(true); click('bottom-tab-semantics'); } },
+    { id: 'view.code', category: 'View', label: 'Open Code Inspector', run: () => openInspectorView('code') },
+    { id: 'view.types', category: 'View', label: 'Open Types Inspector', run: () => openInspectorView('typing') },
+    { id: 'view.outline', category: 'View', label: 'Open Outline Inspector', run: () => openInspectorView('outline') },
     { id: 'view.inspector', category: 'View', label: 'Toggle MiniJava Inspector', run: toggleInspector },
     { id: 'view.bottom', category: 'View', label: 'Toggle Bottom Tools', shortcut: 'Ctrl J', run: () => { setVizOpen(!isVizOpen()); markPerspectiveCustom(); } },
+    { id: 'view.inspectorMaximize', category: 'View', label: 'Maximize or Restore Inspector', run: () => setCodeMaximized(!codeMaximized) },
+    { id: 'view.bottomMaximize', category: 'View', label: 'Maximize or Restore Bottom Tools', run: toggleBottomMaximized },
+    { id: 'editor.copy', category: 'Code', label: 'Copy MiniJava Code', run: copyCode },
+    { id: 'types.print', category: 'Types', label: 'Print Typing Derivation', run: () => {
+      openInspectorView('typing');
+      window.requestAnimationFrame(printTyping);
+    } },
     { id: 'workspace.undo', category: 'Workspace', label: 'Undo Block Change', run: () => workspace?.undo(false) },
     { id: 'workspace.redo', category: 'Workspace', label: 'Redo Block Change', run: () => workspace?.undo(true) },
+    { id: 'workspace.zoomOut', category: 'Workspace', label: 'Zoom Out', run: () => workspace?.zoomCenter(-1) },
+    { id: 'workspace.zoomIn', category: 'Workspace', label: 'Zoom In', run: () => workspace?.zoomCenter(1) },
+    { id: 'workspace.zoomReset', category: 'Workspace', label: 'Reset Zoom to 100%', run: resetWorkspaceZoom },
     { id: 'workspace.fit', category: 'Workspace', label: 'Fit Blocks in View', run: () => workspace?.zoomToFit() },
+    { id: 'workspace.screenshot', category: 'Workspace', label: 'Download Workspace Screenshot', run: () => {
+      if (workspace) downloadScreenshot(workspace);
+    } },
     { id: 'perspective.edit', category: 'Perspective', label: 'Switch to Edit Perspective', run: () => applyPerspective('edit') },
     { id: 'perspective.debug', category: 'Perspective', label: 'Switch to Debug Perspective', run: () => applyPerspective('debug') },
     { id: 'perspective.types', category: 'Perspective', label: 'Switch to Type Analysis Perspective', run: () => applyPerspective('types') },
     { id: 'perspective.presentation', category: 'Perspective', label: 'Switch to Presentation Perspective', run: () => applyPerspective('presentation') },
-    { id: 'theme.toggle', category: 'Preferences', label: 'Toggle Color Theme', run: () => applyTheme(currentTheme === 'dark' ? 'light' : 'dark') }
+    { id: 'theme.toggle', category: 'Preferences', label: 'Toggle Color Theme', run: () => applyTheme(currentTheme === 'dark' ? 'light' : 'dark') },
+    { id: 'help.about', category: 'Help', label: 'About Block-MiniJava', run: openAboutDialog }
   ];
   installCommandPalette(commands);
 }
@@ -1436,7 +1479,6 @@ function wireEvents(): void {
   byId<HTMLButtonElement>('workspace-zoom-in').addEventListener('click', () => workspace?.zoomCenter(1));
   byId<HTMLButtonElement>('workspace-fit').addEventListener('click', () => {
     workspace?.zoomToFit();
-    updateZoomIndicator();
   });
 
   for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.activity-item[data-activity]'))) {
@@ -1468,11 +1510,7 @@ function wireEvents(): void {
     const isDark = (event.currentTarget as HTMLInputElement).checked;
     applyTheme(isDark ? 'dark' : 'light');
   });
-  byId<HTMLButtonElement>('about-button').addEventListener('click', () => {
-    const modal = byId<HTMLDialogElement>('about-modal');
-    if (typeof modal.showModal === 'function') modal.showModal();
-    else modal.setAttribute('open', 'open');
-  });
+  byId<HTMLButtonElement>('about-button').addEventListener('click', openAboutDialog);
   byId<HTMLInputElement>('autosave-interval').addEventListener('input', updateAutosaveIntervalLabel);
   byId<HTMLButtonElement>('menu-toggle').addEventListener('click', () => {
     const menu = byId<HTMLElement>('main-menu');

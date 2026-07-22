@@ -8,8 +8,8 @@ There are no application stylesheet `<link>` elements in `src/index.html`. Webpa
 
 | Order | File | Approximate size | Authoritative responsibility |
 |---:|---|---:|---|
-| 1 | `src/assets/css/tokens.css` | 217 lines | Design tokens, dark/light theme values, runtime dimension contracts, and the few aliases still consumed by domain views. |
-| 2 | `src/assets/css/workbench.css` | 2,231 lines | Global reset/utilities, application shell, header, activity/sidebar, workspace, inspector shell, dialogs, bottom-panel shell, status bar, command palette, and responsive behavior. |
+| 1 | `src/assets/css/tokens.css` | 198 lines | Design tokens, dark/light theme values, runtime dimension contracts, and the two aliases still consumed by domain views. |
+| 2 | `src/assets/css/workbench.css` | 2,235 lines | Global reset/utilities, application shell, header, activity/sidebar, workspace, inspector shell, dialogs, bottom-panel shell, status bar, command palette, and responsive behavior. |
 | 3 | `src/assets/css/domain.css` | 918 lines | Typing derivations and print layout, CESK/runtime views, comparison and rewrite views, and domain-state animation. |
 | 4 | `src/assets/css/codeEditor.css` | 163 lines | Generated/editable MiniJava text, output text, textarea/highlight alignment, line numbers, editor status, and syntax tokens. |
 
@@ -19,7 +19,7 @@ The order follows dependency rather than override intent: tokens first, shell st
 
 ### `tokens.css`: the single token authority
 
-This file defines application-shell theme colors and global scales. The deliberate exception is Blockly block rendering: `src/core/renderer/theme.ts` owns the seven block-family palettes and the complete block-type classification. `tokens.css` mirrors each family primary as `--grammar-*` so the custom HTML toolbox uses the same category accents. `:root` owns theme-independent geometry, typography, spacing, motion, elevation, z-index, and panel-size references. `body[data-theme="dark"]` and `body[data-theme="light"]` own theme values.
+This file defines application-shell theme colors and global scales. The deliberate exception is Blockly block rendering: `src/core/renderer/theme.ts` owns the seven block-family palettes and the complete block-type classification. `tokens.css` mirrors the six source-toolbox family primaries as `--grammar-*`; the renderer-only runtime family has no HTML toolbox token. `:root` owns theme-independent geometry, typography, spacing, motion, elevation, z-index, and panel-size references. `body[data-theme="dark"]` and `body[data-theme="light"]` own theme values.
 
 The file also preserves three runtime-written variables as compatibility contracts:
 
@@ -85,9 +85,9 @@ No legacy stylesheet remains in the import chain, and `workbench.css` no longer 
 | Borders | `--border-default`, `--border-strong` |
 | Text | `--text-primary`, `--text-secondary`, `--text-muted`, `--text-emphasis`, `--text-on-state` |
 | Product/focus | `--accent-primary`, `--accent-hover`, `--selection`, `--focus-ring`, `--focus-outline`, `--focus-offset` |
-| State | `--state-success`, `--state-warning`, `--state-error`, `--state-info`, `--state-execution`, `--state-execution-strong` |
+| State | `--state-success`, `--state-warning`, `--state-error`, `--state-info`, `--state-execution-strong` |
 | Syntax | `--syntax-keyword`, `--syntax-type`, `--syntax-number`, `--syntax-string`, `--syntax-identifier`, `--syntax-operator`, `--syntax-comment`, `--syntax-builtin`, `--syntax-method`, `--syntax-punctuation` |
-| Grammar/toolbox | Seven family tokens: `--grammar-structure`, `--grammar-declaration`, `--grammar-type`, `--grammar-statement`, `--grammar-expression`, `--grammar-value`, and `--grammar-runtime`; these mirror the renderer-owned primary palette for toolbox accents |
+| Grammar/toolbox | Six source-toolbox tokens: `--grammar-structure`, `--grammar-declaration`, `--grammar-type`, `--grammar-statement`, `--grammar-expression`, and `--grammar-value`; these mirror the corresponding renderer-owned primaries |
 | Typography | `--font-family-ui`, `--font-family-code`, five font sizes, four allowed font weights, and compact/default/relaxed/code line heights |
 | Spacing | `--space-1` through `--space-10` for recurring shell spacing |
 | Controls/icons | Compact/default/comfortable control heights, shared compact/default padding, and small/medium icon sizes |
@@ -97,7 +97,7 @@ No legacy stylesheet remains in the import chain, and `workbench.css` no longer 
 
 ### Compatibility aliases
 
-The only aliases retained are `--font-code`, `--radius-panel`, `--ide-border`, `--ide-text`, `--ide-accent`, `--bg`, `--panel`, `--surface`, `--border`, `--text`, `--muted`, `--copper`, and `--aquamarine`. Repository-wide usage shows that specialized domain and print styles still consume them. New shell and editor work uses canonical tokens; remove an alias only while migrating each remaining consumer.
+The only aliases retained are `--font-code` and `--radius-panel`. Repository-wide usage proves that specialized domain and dialog styles still consume them. Eleven aliases and three theme tokens with no source consumer were removed during final review. New shell and editor work uses canonical tokens; remove either remaining alias only while migrating its consumers.
 
 ## Duplicate selectors and removed conflicts
 
@@ -157,7 +157,7 @@ Recurring shell padding, margin, and gap values use the shared spacing scale. Pa
 
 - 4 px desktop resizer tracks and their larger pointer hit areas;
 - 40 px editor line-number gutter;
-- workspace grid and Blockly geometry;
+- workspace grid and Blockly geometry; the main grid's stroke consumes `--workspace-grid`, while Blockly still owns its spacing, length, snapping, zoom, and move behavior;
 - runtime tree/table/arrow layout;
 - print dimensions;
 - responsive drawer viewport remainders and panel clamps.
@@ -209,7 +209,7 @@ The retired 980 and 580 px legacy shell queries no longer exist.
 
 ## Candidate consolidation and follow-up work
 
-1. Migrate the remaining domain-view consumers before removing their compatibility aliases.
+1. Migrate the two remaining domain/dialog consumers before removing `--font-code` or `--radius-panel`.
 2. Split `workbench.css` into shell submodules only if import order remains explicit and selector ownership stays non-overlapping; line count alone is not a reason to split it.
 3. Add a browser print regression before simplifying `printing-typing` rules further.
 4. Tokenize remaining component geometry selectively when a later visual change actually needs it.

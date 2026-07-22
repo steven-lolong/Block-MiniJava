@@ -79,6 +79,13 @@ export async function expectWorkbenchAccessibility(page: Page): Promise<void> {
       const menuItems = menu.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]');
       if (!menuItems.length) issues.push(`menu has no menu items: ${menu.id || 'unnamed'}`);
     }
+    for (const item of Array.from(document.querySelectorAll<HTMLElement>(
+      '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]'
+    ))) {
+      if (!item.closest('[role="menu"], [role="menubar"]')) {
+        issues.push(`menu item has no menu owner: ${item.id || item.outerHTML.slice(0, 80)}`);
+      }
+    }
 
     const toRgb = (value: string): [number, number, number] | null => {
       const hex = value.trim().replace('#', '');
@@ -101,10 +108,17 @@ export async function expectWorkbenchAccessibility(page: Page): Promise<void> {
     const contrast = {
       primaryOnRaised: contrastRatio(root.getPropertyValue('--text-primary'), root.getPropertyValue('--surface-raised')),
       secondaryOnRaised: contrastRatio(root.getPropertyValue('--text-secondary'), root.getPropertyValue('--surface-raised')),
+      secondaryOnRecessed: contrastRatio(root.getPropertyValue('--text-secondary'), root.getPropertyValue('--surface-recessed')),
       primaryOnWorkspace: contrastRatio(root.getPropertyValue('--text-primary'), root.getPropertyValue('--surface-workspace')),
-      accentOnWorkspace: contrastRatio(root.getPropertyValue('--accent-primary'), root.getPropertyValue('--surface-workspace'))
+      accentOnWorkspace: contrastRatio(root.getPropertyValue('--accent-primary'), root.getPropertyValue('--surface-workspace')),
+      focusOnRaised: contrastRatio(root.getPropertyValue('--accent-primary'), root.getPropertyValue('--surface-raised'))
     };
-    if (contrast.primaryOnRaised < 4.5 || contrast.secondaryOnRaised < 4.5 || contrast.primaryOnWorkspace < 4.5 || contrast.accentOnWorkspace < 3) {
+    if (contrast.primaryOnRaised < 4.5
+      || contrast.secondaryOnRaised < 4.5
+      || contrast.secondaryOnRecessed < 4.5
+      || contrast.primaryOnWorkspace < 4.5
+      || contrast.accentOnWorkspace < 3
+      || contrast.focusOnRaised < 3) {
       issues.push(`insufficient shell contrast: ${JSON.stringify(contrast)}`);
     }
     return { issues, contrast };

@@ -17,12 +17,12 @@ All literal IDs below are queried by `getElementById`/`byId`, observed, or suppl
 
 | Area | IDs | Classification | Dependency |
 |---|---|---|---|
-| Mandatory shell/layout anchors | `app`, `toolbox-column`, `blockly-area`, `blockly-div`, `code-column`, `viz-dock`, `perspective-select`, `run-program` | Must preserve exactly | The four explicitly named compatibility IDs plus Blockly injection, layout measurement, observer, perspective, and run anchors. `app` is CSS/region identity even though application TS does not query it directly. |
+| Mandatory shell/layout anchors | `app`, `toolbox-column`, `blockly-area`, `blockly-div`, `code-column`, `viz-dock`, `perspective-select`, `run-program` | Must preserve exactly | The four explicitly named compatibility IDs plus Blockly injection, layout measurement, observer, perspective, and run anchors. The palette controller queries `app` to synchronize modal `inert` state. |
 | Layout observer and geometry | `blockly-area`, `toolbox-column`, `code-column`, `viz-dock` | Must preserve exactly | One `ResizeObserver` watches these four and drives Blockly/editor/visualization resize coordination. |
 | File/project identity | `new-workspace`, `load-workspace`, `save-workspace`, `export-code`, `load-autosave`, `load-file-input`, `loaded-file-label`, `save-name-modal`, `save-name-input`, `export-name-modal`, `export-name-input` | May move but must retain identity | Direct event bindings, file routing, dialogs, project-label observer, and download naming. |
 | Header/global | `main-menu`, `menu-toggle`, `theme-toggle`, `about-button`, `about-modal` | May move but must retain identity | Compact menu state, theme state, and About dialog. |
 | Examples | `examples-button`, `examples-panel`, `example-load-modal`, `example-load-name` | May move but must retain identity | Menu construction/dismissal and replace/merge dialog. |
-| Command palette | `command-palette-trigger`, `command-palette-overlay`, `command-palette-input`, `command-palette-list` | Must preserve exactly | Palette focus trap-like behavior, filter/results, overlay dismissal, global shortcut, and focus restoration. |
+| Command palette | `app`, `command-palette-trigger`, `command-palette-overlay`, `command-palette-input`, `command-palette-list` | Must preserve exactly | Modal focus containment, background `inert` state, combobox/filter/results, overlay dismissal, global shortcut, and focus restoration. |
 | Sidebar/activity content | `toolbox-content`, `toolbox-search`, `sidebar-title`, `sidebar-title-icon`, `toggle-toolbox`, `show-toolbox-button`, `sidebar-scrim` | Must preserve exactly | Blocks-only toolbox, persisted desktop visibility, and a transient responsive drawer close with focus return. |
 | View preferences | `autosave-interval`, `autosave-interval-label` | Must preserve exactly | Moved from the removed Settings sidebar into View; retains timer restart and persistence behavior. |
 | Resizers | `sidebar-resizer`, `code-resizer`, `viz-resizer` | Must preserve exactly | Pointer and keyboard resize roots; side handles become untabbable in drawers and the bottom handle becomes untabbable while maximized. |
@@ -36,7 +36,7 @@ All literal IDs below are queried by `getElementById`/`byId`, observed, or suppl
 | Compare controls/content | `compare-load`, `compare-back`, `compare-step`, `compare-play`, `compare-status`, `compare-status-a`, `compare-status-b`, `compare-frames-a`, `compare-frames-b`, `compare-heap-a`, `compare-output-a`, `compare-output-b` | Must preserve exactly | Direct bindings plus IDs passed through render helpers. There is intentionally no `compare-heap-b` because Model B is storeless. |
 | Rewrite controls/content | `subst-load`, `subst-back`, `subst-step`, `subst-play`, `subst-status`, `subst-correspondence`, `subst-workspace` | Must preserve exactly | Direct semantic-control bindings and Blockly injection host. |
 | Dynamically assigned bottom leaf IDs | `bottom-tab-{problems,output,structure,value,machine,compare,subst}` and `bottom-panel-{problems,output,structure,value,machine,compare,subst}` | Must preserve exactly | `initVisualizationPanel` assigns these IDs and wires their reciprocal ARIA relationships. The static Semantics parent does not replace any leaf identity. |
-| Editor-generated IDs | `generated-code-editor`, `code-editor-status` | May rename after updating references and tests | Created by `codeEditor.ts`; coupled primarily to labels/styles and editor tests rather than static HTML. Preserve during the current refactor. |
+| Editor-generated IDs | `generated-code-editor`, `code-editor-keyboard-help`, `code-editor-status` | May rename after updating references and tests | Created by `codeEditor.ts`; the help ID is the editor's `aria-describedby` target and documents its keyboard exit. Preserve during the current refactor. |
 
 Static IDs such as `activity-blocks`, `activity-search`, `tab-code`, `tab-typing`, and `tab-outline` are not looked up by their ID in TypeScript, but they are ARIA targets, stable automation hooks, or explicitly part of the current DOM contract. Classify them as **May move but must retain identity**, not presentation-only.
 
@@ -117,19 +117,19 @@ The toolbox drag MIME value `application/x-block-minijava-block` is not a DOM at
 |---|---|---|
 | Header menu controller | `menu-toggle[aria-controls="main-menu"]`; `aria-expanded` mirrors `.menu-open` | Must preserve exactly |
 | Examples controller | `examples-button[aria-controls="examples-panel"]`; `aria-expanded` mirrors `.examples-open` | Must preserve exactly |
-| Palette controller/dialog | Trigger controls `command-palette-overlay`; dialog labelled by `command-palette-title`; listbox/results expose option roles and `aria-selected` | Must preserve exactly |
+| Palette controller/dialog | Trigger controls `command-palette-overlay`; dialog is labelled by `command-palette-title`; the input is a combobox controlling `command-palette-list`, with `aria-activedescendant` pointing to the selected option; opening makes `app` inert and closing restores prior focus | Must preserve exactly |
 | Inspector tabs | `tab-code` → `panel-code`, `tab-typing` → `panel-typing`, `tab-outline` → `panel-outline`; panels point back with `aria-labelledby` | Must preserve exactly |
 | Bottom primary tabs | `bottom-tab-problems` → `bottom-panel-problems`, `bottom-tab-output` → `bottom-panel-output`, and `bottom-tab-semantics` → `bottom-panel-semantics` | Must preserve exactly |
 | Bottom semantic tabs | Runtime-generated `bottom-tab-{structure,value,machine,compare,subst}[aria-controls="bottom-panel-{kind}"]`; each nested panel points back via `aria-labelledby` | Must preserve exactly |
 | Toolbox categories | Dynamic header `aria-controls` generated list ID and updates `aria-expanded` | Must preserve exactly |
 | Typing rows | Dynamic toggle updates `aria-expanded` | Must preserve exactly |
 | Activity/sidebar | Activity buttons update `aria-pressed`; sidebar views update `aria-hidden` | Must preserve exactly |
-| Panel toggles | Bottom toggles and maximize buttons update `aria-pressed`; hide/show labels update with state | Must preserve exactly |
+| View/panel toggles | View is a settings dialog containing ordinary buttons, selects, and inputs—not menu items; sidebar, inspector, bottom, and maximize buttons update `aria-pressed`; hide/show labels update with state | Must preserve exactly |
 | Resizers | Three separators retain role, orientation, label, and `tabindex="0"` | Must preserve exactly |
 | Dialog labels | `about-modal`, save/export/example dialogs point to their title IDs | Must preserve exactly |
 | Live regions | Loaded file, autosave, bottom info/problems/output, stepper/compare/rewrite status/correspondence retain `aria-live` behavior | May move but must retain identity |
 
-Roving keyboard focus is implemented independently for inspector tabs, the three primary bottom tabs, and the five nested Semantics tabs with Left/Right/Home/End. Palette results use Up/Down/Enter/Escape. The two bottom tablists must not be flattened into one focus sequence.
+Roving keyboard focus is implemented independently for inspector tabs, the three primary bottom tabs, and the five nested Semantics tabs with Left/Right/Home/End. Palette results use Up/Down/Enter/Escape while DOM focus stays on the combobox; Tab is contained until the modal closes. In the editable code view, plain Tab inserts two spaces, while Shift+Tab or Escape followed by Tab exits. The two bottom tablists must not be flattened into one focus sequence.
 
 ## Event roots and delegated/dynamic behavior
 
@@ -139,7 +139,7 @@ Roving keyboard focus is implemented independently for inspector tabs, the three
 | `window` | Resize, custom `bmj:problem-located`, resizer pointermove/pointerup, `afterprint`/timers | Must preserve exactly | `bmj:problem-located` closes the compact sidebar after navigation. |
 | Main Blockly workspace | Blockly change events and built-in input/context behavior | Must preserve exactly | Drives required-block enforcement, code generation, autosave, typing, outline, diagnostics, and semantic stale state. |
 | `blockly-area` | `dragenter`, `dragover`, `dragleave`, `drop` | Must preserve exactly | Custom toolbox insertion coordinate path. |
-| `command-palette-overlay` | Background `pointerdown` closes | May move but must retain identity | Must distinguish backdrop from dialog children. |
+| `command-palette-overlay` | Background `pointerdown` closes; `keydown` contains Tab focus | May move but must retain identity | Must distinguish backdrop from dialog children and keep focus inside while open. |
 | `examples-button` plus `document` | Menu open, selection, outside dismissal | May move but must retain identity | Dynamic example items have individual click handlers. |
 | Dynamic render roots | `toolbox-content`, `program-outline`, problems lists, typing tree, runtime hosts | Must preserve exactly | Items are recreated and bind handlers during render; replacing with static delegation would be a behavior change. |
 

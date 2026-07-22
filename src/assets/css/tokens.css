@@ -60,7 +60,7 @@
   --text-on-state: #ffffff;
   --selection: color-mix(in srgb, var(--accent-primary) 35%, transparent);
   --focus-ring: var(--accent-primary);
-  --focus-outline: 3px solid color-mix(in srgb, var(--focus-ring) 55%, transparent);
+  --focus-outline: 3px solid var(--focus-ring);
   --focus-offset: 2px;
   --surface-modal-backdrop: rgb(0 0 0 / 58%);
   --surface-drawer-scrim: rgb(7 9 13 / 42%);
@@ -107,7 +107,6 @@ body[data-theme="dark"] {
   --surface-code: #14171d;
   --surface-overlay: rgb(6 8 12 / 48%);
   --workspace-grid: rgb(174 184 198 / 5.5%);
-  --code-line: rgb(255 255 255 / 3.2%);
 
   --border-default: #303640;
   --border-strong: #414955;
@@ -122,7 +121,6 @@ body[data-theme="dark"] {
   --state-warning: #d9a441;
   --state-error: #f05d5e;
   --state-info: #58a6ff;
-  --state-execution: #d8895f;
   --state-execution-strong: #ee9b6c;
 
   /* Broad grammar colors shared by the custom toolbox and Blockly theme. */
@@ -132,7 +130,6 @@ body[data-theme="dark"] {
   --grammar-statement: #80602f;
   --grammar-expression: #455f7f;
   --grammar-value: #5c713e;
-  --grammar-runtime: #585e68;
 
   /* Generated-code syntax is semantic and independent from Blockly colors. */
   --syntax-keyword: #ff9d76;
@@ -159,7 +156,6 @@ body[data-theme="light"] {
   --surface-code: #fbfcfd;
   --surface-overlay: rgb(6 8 12 / 38%);
   --workspace-grid: rgb(66 78 96 / 5.5%);
-  --code-line: rgb(41 55 75 / 4.5%);
 
   --border-default: #d8dde4;
   --border-strong: #b8c0cb;
@@ -174,7 +170,6 @@ body[data-theme="light"] {
   --state-warning: #9c6b12;
   --state-error: #c73f43;
   --state-info: #256cb7;
-  --state-execution: #ad5f37;
   --state-execution-strong: #934925;
 
   --grammar-structure: #754650;
@@ -183,7 +178,6 @@ body[data-theme="light"] {
   --grammar-statement: #75552a;
   --grammar-expression: #3a5878;
   --grammar-value: #526638;
-  --grammar-runtime: #515761;
 
   --syntax-keyword: #a54c2e;
   --syntax-type: #08766d;
@@ -197,21 +191,8 @@ body[data-theme="light"] {
   --syntax-punctuation: #68727f;
 }
 
-/* Compatibility aliases retained by specialized domain views. New shell and
- * editor rules use the semantic tokens above. */
+/* Compatibility aliases retained by specialized domain views. */
 body[data-theme] {
   --font-code: var(--font-family-code);
   --radius-panel: var(--radius-none);
-  --ide-border: var(--border-default);
-  --ide-text: var(--text-primary);
-  --ide-accent: var(--accent-primary);
-
-  --bg: var(--surface-app);
-  --panel: var(--surface-raised);
-  --surface: var(--surface-control);
-  --border: var(--border-default);
-  --text: var(--text-primary);
-  --muted: var(--text-secondary);
-  --copper: var(--state-execution);
-  --aquamarine: var(--accent-primary);
 }

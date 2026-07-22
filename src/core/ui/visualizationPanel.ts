@@ -128,7 +128,7 @@ function updateInfo(): void {
     return;
   }
   const view = views[active];
-  byId<HTMLDivElement>('viz-dock-info').textContent = view.block ? `${TITLE[active]} · ${view.block.type}` : '';
+  byId<HTMLDivElement>('viz-dock-info').textContent = view.block ? TITLE[active] : '';
 }
 
 function updateToolActions(): void {
@@ -182,7 +182,6 @@ export function setVizOpen(open: boolean): void {
     document.getElementById(id)?.setAttribute('aria-pressed', String(open));
   }
   const viewToggle = document.getElementById('top-toggle-bottom-panel');
-  viewToggle?.setAttribute('aria-checked', String(open));
   const viewState = viewToggle?.querySelector<HTMLElement>('.menu-state');
   if (viewState) viewState.textContent = open ? 'Shown' : 'Hidden';
   if (!open) {

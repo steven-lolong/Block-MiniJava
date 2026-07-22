@@ -125,7 +125,7 @@
   padding: var(--space-6) 7px var(--space-6) 0;
   border-right: 1px solid var(--border-default);
   background: var(--surface-recessed);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font: var(--font-size-xs)/var(--line-height-code) var(--font-family-code);
   text-align: right;
   pointer-events: none;

@@ -193,7 +193,6 @@ body.toolbox-hidden #show-toolbox-button {
 
 .about-modal::backdrop {
   background: var(--surface-modal-backdrop);
-  backdrop-filter: blur(5px);
 }
 
 .about-header img {
@@ -276,7 +275,6 @@ body.toolbox-hidden #show-toolbox-button {
 
 body {
   overflow: hidden;
-  background-size: 28px 28px, 28px 28px, auto;
   font-family: var(--font-family-ui);
   width: 100%;
   height: 100%;
@@ -519,7 +517,7 @@ kbd {
 .global-menu-item kbd,
 .menu-state {
   justify-self: end;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
 
@@ -611,7 +609,6 @@ kbd {
 
 .menu-button:hover,
 .icon-button:hover,
-.zoom-pill:hover,
 .theme-switch:hover,
 .text-button:hover {
   border-color: transparent;
@@ -622,7 +619,6 @@ kbd {
 
 .menu-button:active,
 .icon-button:active,
-.zoom-pill:active,
 .text-button:active,
 .sidebar-command:active,
 .stepper-button:active {
@@ -980,7 +976,6 @@ body.toolbox-hidden.code-hidden .ide-layout {
 .toolbox-search input {
   width: 100%;
   border: 1px solid var(--border-default);
-  outline: none;
   height: var(--control-height-default);
   padding: 0 30px 0 9px;
   border-color: var(--border-default);
@@ -995,7 +990,7 @@ body.toolbox-hidden.code-hidden .ide-layout {
   box-shadow: 0 0 0 1px var(--accent-primary);
 }
 
-.toolbox-search span {
+.toolbox-search > .app-icon {
   position: absolute;
   pointer-events: none;
   top: 50%;
@@ -1236,6 +1231,10 @@ body:not(.code-hidden) #toggle-code-column {
   background: var(--surface-workspace);
 }
 
+#blockly-div [id^="blocklyGridPattern"] line {
+  stroke: var(--workspace-grid);
+}
+
 .blockly-area.workspace-drop-target::after {
   content: "Drop block here";
   position: absolute;
@@ -1316,7 +1315,7 @@ body:not(.code-hidden) #toggle-code-column {
   align-items: center;
   padding: 0 var(--space-5);
   border-bottom: 1px solid var(--border-default);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--font-size-xs);
 }
 
@@ -1365,7 +1364,7 @@ body:not(.code-hidden) #toggle-code-column {
 .outline-type {
   max-width: 100px;
   overflow: hidden;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-family: var(--font-family-code);
   font-size: var(--font-size-xs);
   text-overflow: ellipsis;
@@ -1749,6 +1748,11 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   background: transparent;
   color: var(--text-primary);
   font-size: var(--font-size-base);
+}
+
+.command-palette-search:focus-within {
+  outline: var(--focus-outline);
+  outline-offset: calc(-1 * var(--focus-offset));
 }
 
 .command-palette-list {

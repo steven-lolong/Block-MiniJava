@@ -100,13 +100,13 @@
                 <span class="menu-label">View</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
               </button>
               <div id="view-menu" class="global-menu-panel global-menu-panel-end" role="dialog" aria-label="View settings" hidden>
-                <button id="view-toggle-sidebar" class="global-menu-item" type="button" role="menuitemcheckbox" aria-checked="true">
+                <button id="view-toggle-sidebar" class="global-menu-item" type="button" aria-pressed="true">
                   <svg class="app-icon" aria-hidden="true"><use href="#icon-blocks" /></svg><span>Blocks sidebar</span><span class="menu-state">Shown</span>
                 </button>
-                <button id="view-toggle-inspector" class="global-menu-item" type="button" role="menuitemcheckbox" aria-checked="true">
+                <button id="view-toggle-inspector" class="global-menu-item" type="button" aria-pressed="true">
                   <svg class="app-icon" aria-hidden="true"><use href="#icon-code" /></svg><span>MiniJava inspector</span><span class="menu-state">Shown</span>
                 </button>
-                <button id="top-toggle-bottom-panel" class="global-menu-item" type="button" role="menuitemcheckbox" aria-label="Toggle bottom tools" aria-checked="false" aria-pressed="false">
+                <button id="top-toggle-bottom-panel" class="global-menu-item" type="button" aria-label="Toggle bottom tools" aria-pressed="false">
                   <svg class="app-icon icon icon-viz" aria-hidden="true"><use href="#icon-bottom" /></svg><span>Bottom tools</span><span class="menu-state">Hidden</span>
                 </button>
                 <div class="global-menu-separator" role="separator"></div>
@@ -432,7 +432,7 @@
         <h2 id="command-palette-title" class="visually-hidden">Command Palette</h2>
         <label class="command-palette-search" for="command-palette-input">
           <svg class="app-icon" aria-hidden="true"><use href="#icon-search" /></svg>
-          <input id="command-palette-input" type="search" placeholder="Type a command" aria-label="Type a command" autocomplete="off" />
+          <input id="command-palette-input" type="search" role="combobox" aria-autocomplete="list" aria-controls="command-palette-list" aria-expanded="false" placeholder="Type a command" aria-label="Type a command" autocomplete="off" />
         </label>
         <div id="command-palette-list" class="command-palette-list" role="listbox" aria-label="Available commands"></div>
         <div class="command-palette-help"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>Enter</kbd> run</span><span><kbd>Esc</kbd> close</span></div>
@@ -442,30 +442,18 @@
     <dialog id="about-modal" class="about-modal" aria-labelledby="about-title">
       <form method="dialog" class="about-card">
         <div class="about-header">
-          <img src="assets/images/only-logo.png" alt="B-MJ icon" />
+          <img src="assets/images/only-logo.png" alt="Block-MiniJava logo" />
           <div>
-            <h2 id="about-title">B-MJ</h2>
-            <p>Block-based MiniJava</p>
+            <h2 id="about-title">Block-MiniJava</h2>
+            <p>Block-based MiniJava workbench</p>
           </div>
           <button class="icon-button" value="close" aria-label="Close about dialog" title="Close">
             <svg class="app-icon" aria-hidden="true"><use href="#icon-close" /></svg>
           </button>
         </div>
         <div class="about-body">
-          <p><strong>B-MJ</strong> is a Blockly-based web IDE for constructing MiniJava programs with grammar-aware blocks.</p>
-          <p>Work performed in the workspace can be saved to a file with the <code>.bml</code> extension.</p>
-          <p>B-MJ uses the <strong>BMJ-Thrasos</strong> extension of the Thrasos renderer. Its connector shapes distinguish MiniJava non-terminals.</p>
-          <div class="code">
-            <pre><code class="grammar-highlight">class Main {
-  public static void main(String[] args) {
-    System.out.println("version 1.0");
-    System.out.println("CESK machine and rewrite semantics");
-    System.out.println("Call-by-Structure and Call-by-Value");
-    System.out.println("CESK mark-and-sweep garbage collection");
-    System.out.println("Blocks and Text");
-  }
-}</code></pre>
-          </div>
+          <p>Block-MiniJava combines grammar-aware blocks with editable MiniJava source, type information, program structure, diagnostics, and output.</p>
+          <p>Its semantic tools include Call-by-Structure, Call-by-Value, CESK execution, model comparison, rewrite semantics, and mark-and-sweep garbage collection. Workspaces use <code>.bml</code>; MiniJava source can be opened or exported.</p>
         </div>
         <div class="about-footer">
           <p>Copyright &copy; 2024-2026 <a href="https://l-workshop.my.id/" target="_blank">L-Workshop</a>. All rights reserved.</p>

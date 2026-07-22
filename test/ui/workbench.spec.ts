@@ -10,6 +10,21 @@ import {
   toggleTheme
 } from './helpers';
 
+const applicationCommandIds = [
+  'analysis.compare', 'analysis.machine', 'analysis.rewrite', 'analysis.structure', 'analysis.value',
+  'editor.copy',
+  'file.autosave', 'file.examples', 'file.export', 'file.new', 'file.open', 'file.save',
+  'help.about',
+  'perspective.debug', 'perspective.edit', 'perspective.presentation', 'perspective.types',
+  'run.program',
+  'theme.toggle', 'types.print',
+  'view.blocks', 'view.bottom', 'view.bottomMaximize', 'view.code', 'view.inspector',
+  'view.inspectorMaximize', 'view.outline', 'view.output', 'view.problems', 'view.search',
+  'view.semantics', 'view.types',
+  'workspace.fit', 'workspace.redo', 'workspace.screenshot', 'workspace.undo',
+  'workspace.zoomIn', 'workspace.zoomOut', 'workspace.zoomReset'
+].sort();
+
 test('loads without uncaught browser errors and has no duplicate IDs', async ({ page }) => {
   const errors = await openFreshApp(page);
   await expect(page.locator('#run-program')).toBeVisible();
@@ -87,6 +102,35 @@ test('blocks-only sidebar and quiet workspace toolbar preserve editing workflows
   await expect(page.locator('.sidebar-view')).toHaveCount(1);
   await expect(page.locator('#toolbox-search')).toBeVisible();
   await expect(page.locator('#toolbox-content .toolbox-category')).toHaveCount(6);
+
+  const searchGeometry = await page.locator('.toolbox-search').evaluate((label) => {
+    const input = label.querySelector('input')!.getBoundingClientRect();
+    const icon = label.querySelector('.app-icon')!.getBoundingClientRect();
+    return {
+      iconCenterX: icon.left + icon.width / 2,
+      iconCenterY: icon.top + icon.height / 2,
+      inputLeft: input.left,
+      inputRight: input.right,
+      inputTop: input.top,
+      inputBottom: input.bottom
+    };
+  });
+  expect(searchGeometry.iconCenterX).toBeGreaterThan(searchGeometry.inputRight - 30);
+  expect(searchGeometry.iconCenterX).toBeLessThan(searchGeometry.inputRight);
+  expect(searchGeometry.iconCenterY).toBeGreaterThan(searchGeometry.inputTop);
+  expect(searchGeometry.iconCenterY).toBeLessThan(searchGeometry.inputBottom);
+
+  const gridUsesThemeToken = await page.evaluate(() => {
+    const line = document.querySelector<SVGLineElement>('#blockly-div pattern[id^="blocklyGridPattern"] line');
+    if (!line) return false;
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--workspace-grid)';
+    document.body.appendChild(probe);
+    const tokenColor = getComputedStyle(probe).color;
+    probe.remove();
+    return getComputedStyle(line).stroke === tokenColor;
+  });
+  expect(gridUsesThemeToken).toBe(true);
 
   const toolbarIds = await page.locator('.workspace-tools button').evaluateAll((buttons) =>
     buttons.map((button) => button.id)
@@ -221,9 +265,42 @@ test('primary Run opens Output and command palette exposes registered commands',
   await page.keyboard.press('Control+Shift+P');
   await expect(page.locator('#command-palette-overlay')).not.toHaveAttribute('hidden', '');
   await expect(page.locator('.command-palette-option[data-command-id="run.program"]')).toBeVisible();
-  await expect(page.locator('.command-palette-option')).toHaveCount(22);
+  const commandIds = await page.locator('.command-palette-option').evaluateAll((options) =>
+    options.map((option) => (option as HTMLElement).dataset.commandId ?? '').sort()
+  );
+  expect(commandIds).toEqual(applicationCommandIds);
   await page.keyboard.press('Escape');
   await expect(page.locator('#command-palette-overlay')).toHaveAttribute('hidden', '');
+  expectNoUncaughtErrors(errors);
+});
+
+test('new command-palette bridges invoke their existing view and workspace handlers', async ({ page }) => {
+  const errors = await openFreshApp(page);
+  const runCommand = async (id: string): Promise<void> => {
+    await page.keyboard.press('F1');
+    await page.locator(`.command-palette-option[data-command-id="${id}"]`).click();
+  };
+
+  await runCommand('workspace.zoomIn');
+  await expect.poll(() => page.evaluate(() => (window as any).Blockly.getMainWorkspace().getScale())).toBeGreaterThan(1);
+  await runCommand('workspace.zoomReset');
+  await expect.poll(() => page.evaluate(() => (window as any).Blockly.getMainWorkspace().getScale())).toBe(1);
+
+  await runCommand('view.types');
+  await expect(page.locator('#tab-typing')).toHaveAttribute('aria-selected', 'true');
+  await runCommand('analysis.value');
+  await expect(page.locator('#bottom-tab-value')).toHaveAttribute('aria-selected', 'true');
+  await runCommand('view.bottomMaximize');
+  await expect(page.locator('body')).toHaveClass(/bottom-maximized/);
+  await runCommand('view.bottomMaximize');
+  await expect(page.locator('body')).not.toHaveClass(/bottom-maximized/);
+
+  await runCommand('help.about');
+  await expect(page.locator('#about-modal')).toHaveAttribute('open', '');
+  await page.keyboard.press('Escape');
+  await runCommand('file.examples');
+  await expect(page.locator('#examples-panel')).toHaveClass(/examples-open/);
+  await page.keyboard.press('Escape');
   expectNoUncaughtErrors(errors);
 });
 
@@ -316,6 +393,32 @@ test('right inspector preserves code editing, code-to-block synchronization, Typ
   });
   await page.locator('#tab-code').click();
   await expect(editor).toHaveValue(/System\.out\.println\(11\);/);
+  expectNoUncaughtErrors(errors);
+});
+
+test('editable code preserves indentation while providing standard keyboard exits', async ({ page }) => {
+  const errors = await openFreshApp(page);
+  const editor = page.locator('#generated-code-editor');
+
+  await editor.focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(editor).not.toBeFocused();
+
+  await editor.focus();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#code-editor-status')).toHaveText('Press Tab to move focus out of the editor.');
+  await page.keyboard.press('Tab');
+  await expect(editor).not.toBeFocused();
+
+  await editor.focus();
+  const before = await editor.inputValue();
+  await editor.evaluate((element) => {
+    const textarea = element as HTMLTextAreaElement;
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  });
+  await page.keyboard.press('Tab');
+  await expect(editor).toHaveValue(`${before}  `);
+  await expect(editor).toBeFocused();
   expectNoUncaughtErrors(errors);
 });
 

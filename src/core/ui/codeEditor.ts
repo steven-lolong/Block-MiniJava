@@ -33,6 +33,7 @@ let lineNumbers: HTMLElement | null = null;
 let status: HTMLElement | null = null;
 let parseTimer: number | null = null;
 let suppressWorkspaceSyncUntil = 0;
+let tabExitArmed = false;
 
 function setStatus(message: string, state: EditorStatus = 'idle'): void {
   if (!status) return;
@@ -204,7 +205,20 @@ function handleEditorKeydown(
   options: MiniJavaCodeEditorOptions,
   event: KeyboardEvent
 ): void {
-  if (!editor || event.key !== 'Tab') return;
+  if (!editor) return;
+  if (event.key === 'Escape') {
+    tabExitArmed = true;
+    setStatus('Press Tab to move focus out of the editor.', 'idle');
+    return;
+  }
+  if (event.key !== 'Tab') {
+    tabExitArmed = false;
+    return;
+  }
+  if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey || tabExitArmed) {
+    tabExitArmed = false;
+    return;
+  }
 
   event.preventDefault();
   const start = editor.selectionStart;
@@ -243,7 +257,14 @@ function createEditorDom(): boolean {
   editor.autocomplete = 'off';
   editor.setAttribute('autocapitalize', 'off');
   editor.setAttribute('aria-label', 'Editable MiniJava code');
+  editor.setAttribute('aria-describedby', 'code-editor-keyboard-help');
   pane.appendChild(editor);
+
+  const keyboardHelp = document.createElement('span');
+  keyboardHelp.id = 'code-editor-keyboard-help';
+  keyboardHelp.className = 'visually-hidden';
+  keyboardHelp.textContent = 'Tab inserts two spaces. Press Escape then Tab, or Shift Tab, to leave the editor.';
+  pane.appendChild(keyboardHelp);
 
   highlight = generatedCode;
 
@@ -266,6 +287,9 @@ export function installEditableMiniJavaCodeEditor(
   editor.addEventListener('input', () => scheduleEditorImport(workspace, options));
   editor.addEventListener('scroll', syncHighlightScroll);
   editor.addEventListener('keydown', (event) => handleEditorKeydown(workspace, options, event));
+  editor.addEventListener('blur', () => {
+    tabExitArmed = false;
+  });
 
   // Panel resizes change the wrap width and can add/remove the scrollbar.
   if ('ResizeObserver' in window) {

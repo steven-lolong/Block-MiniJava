@@ -96,7 +96,7 @@ The tables below record the current behavioral contract. A later refactor may ad
 | Command palette | `command-palette-overlay`, `command-palette-title`, `command-palette-input`, `command-palette-list` |
 | Dialogs | `about-modal`, `about-title`, `save-name-modal`, `save-name-title`, `save-name-input`, `export-name-modal`, `export-name-title`, `export-name-input`, `example-load-modal`, `example-load-title`, `example-load-name` |
 
-The code editor also creates `generated-code-editor` and `code-editor-status` at runtime. The bottom-panel initializer creates `bottom-tab-{kind}` and `bottom-panel-{kind}` for each bottom kind. The toolbox creates `toolbox-category-{category}` IDs. These dynamic naming schemes are stable contracts.
+The code editor also creates `generated-code-editor`, `code-editor-keyboard-help`, and `code-editor-status` at runtime. The bottom-panel initializer creates `bottom-tab-{kind}` and `bottom-panel-{kind}` for each bottom kind. The toolbox creates `toolbox-category-{category}` IDs. Command results create `command-option-{sanitized-command-id}` IDs for `aria-activedescendant`. These dynamic naming schemes are stable contracts.
 
 ### Behaviorally significant `data-*` attributes
 
@@ -136,9 +136,9 @@ The layout classes are behavioral state, not styling conveniences. Do not rename
 
 ### ARIA and focus relationships
 
-- Keep `command-palette-trigger[aria-controls="command-palette-overlay"]`, the palette's `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, listbox/option roles, selected state, focus-on-open, focus restoration, Escape behavior, and keyboard navigation.
+- Keep `command-palette-trigger[aria-controls="command-palette-overlay"]`, the palette's `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, combobox/listbox/option relationships, selected state, focus-on-open, background `inert` state, Tab containment, focus restoration, Escape behavior, and keyboard navigation.
 - Keep `examples-button[aria-controls="examples-panel"]`, `aria-haspopup`, `aria-expanded`, the menu role, menu-item roles, outside-click close, and Escape close.
-- Keep File, More, and Examples as menus. Keep View as a labelled non-modal settings dialog with `aria-haspopup="dialog"`; it contains controls that are not valid menu items.
+- Keep File, More, and Examples as menus. Keep View as a labelled non-modal settings dialog with `aria-haspopup="dialog"`; its toggles are ordinary `aria-pressed` buttons because its mixed buttons, selects, and inputs are not valid menu items.
 - Keep the inspector `tablist`; each tab's `aria-controls="panel-*"`; each panel's `aria-labelledby="tab-*"`; roving `tabindex`; `aria-selected`; and Left/Right/Home/End navigation.
 - Keep two independent bottom tablists: the primary Problems/Output/Semantics list and the nested Call-by-Structure/Call-by-Value/CESK/A vs B/Rewrite list. Preserve every `bottom-tab-*`/`bottom-panel-*` relationship, roving `tabindex`, `aria-selected`, `aria-hidden`, and Left/Right/Home/End navigation within its own list.
 - Keep resizers focusable with `role="separator"`, the correct `aria-orientation`, and arrow-key resizing while usable. A side resizer must be `aria-hidden` and untabbable in a drawer/maximized layout; the bottom resizer must be untabbable while closed or maximized.
@@ -181,7 +181,7 @@ The completed refactor must assign each application command one clear primary lo
 | About | Header today | Overflow menu and palette |
 | Download workspace screenshot | Blockly workspace context menu | Context menu and palette |
 
-The present palette has 22 commands: `file.new`, `file.open`, `file.save`, `file.export`, `file.autosave`, `run.program`, `analysis.machine`, `analysis.compare`, `analysis.rewrite`, `view.blocks`, `view.search`, `view.problems`, `view.inspector`, `view.bottom`, `workspace.undo`, `workspace.redo`, `workspace.fit`, four `perspective.*` commands, and `theme.toggle`. The completed refactor must retain these IDs and add missing application commands such as the other semantic views, zoom/reset, copy, print, maximization, About, and screenshot rather than making them unreachable when duplicate controls are removed.
+The completed palette has 39 commands: six `file.*` commands; `run.program`; five `analysis.*` semantic-view commands; twelve `view.*` navigation, visibility, and maximization commands; `editor.copy`; `types.print`; seven `workspace.*` history, zoom, fit, and screenshot commands; four `perspective.*` commands; `theme.toggle`; and `help.about`. The original 22 IDs remain unchanged. Panel-local transport, arrangement, disclosure, resize, and dialog-choice controls remain local because they act on immediately adjacent state rather than representing global application commands.
 
 ### Semantic and runtime commands
 
@@ -212,7 +212,7 @@ Panel-local transport controls must remain near the state they operate on. Seman
 - Left/Right/Home/End: inspector tabs, primary bottom tabs, and nested Semantics tabs; each tablist navigates independently.
 - Left/Right: resize side panels in 24 px steps.
 - Up/Down: resize bottom panel in 24 px steps.
-- `Tab` in the editable code view inserts two spaces and schedules import; it is intentionally editor behavior.
+- Plain `Tab` in the editable code view inserts two spaces and schedules import. `Shift+Tab` or `Escape` followed by `Tab` must move focus out; the editor exposes this contract through `code-editor-keyboard-help`.
 - Blockly's own undo/redo and keyboard navigation must continue to work; the refactor must not intercept those keystrokes globally.
 
 ## 5. Existing responsive and persistence behavior

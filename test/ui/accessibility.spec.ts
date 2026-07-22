@@ -77,6 +77,38 @@ test('keyboard-only routes reach file, examples, toolbox search, Run, panels, pe
   expectNoUncaughtErrors(errors);
 });
 
+test('command palette contains focus and exposes an active listbox option', async ({ page }) => {
+  const errors = await openFreshApp(page);
+  const restoreTarget = page.locator('#workspace-undo');
+  const input = page.locator('#command-palette-input');
+
+  await restoreTarget.focus();
+  await page.keyboard.press('F1');
+  await expect(input).toBeFocused();
+  await expect(input).toHaveAttribute('role', 'combobox');
+  await expect(input).toHaveAttribute('aria-controls', 'command-palette-list');
+  await expect(input).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#app')).toHaveAttribute('inert', '');
+
+  const firstActive = await input.getAttribute('aria-activedescendant');
+  expect(firstActive).toBeTruthy();
+  await expect(page.locator(`#${firstActive}`)).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.command-palette-option').first()).toHaveAttribute('tabindex', '-1');
+
+  await page.keyboard.press('Tab');
+  await expect(input).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  const secondActive = await input.getAttribute('aria-activedescendant');
+  expect(secondActive).not.toBe(firstActive);
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#command-palette-overlay')).toHaveAttribute('hidden', '');
+  await expect(input).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#app')).not.toHaveAttribute('inert', '');
+  await expect(restoreTarget).toBeFocused();
+  expectNoUncaughtErrors(errors);
+});
+
 test('reduced-motion preference removes nonessential animation timing', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const errors = await openFreshApp(page);

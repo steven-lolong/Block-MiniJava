@@ -70,7 +70,7 @@ The results below measure WCAG relative luminance contrast between the rendered 
 
 - Every identifier in `MINI_JAVA_BLOCK_TYPES` has exactly one explicit semantic category.
 - A MiniJava block style is derived from that category; no MiniJava block may fall back to a Classic/Blockly default style.
-- `src/core/renderer/theme.ts` is authoritative for the block-type mapping, seven style names, and Blockly palettes. The matching `--grammar-*` primary values in `tokens.css` exist only to align the custom HTML toolbox accents and must change with the renderer palette.
+- `src/core/renderer/theme.ts` is authoritative for the block-type mapping, seven style names, and Blockly palettes. The six source-toolbox `--grammar-*` values in `tokens.css` align the HTML toolbox accents with the matching renderer families. Runtime-only blocks remain renderer-owned because they never appear in that toolbox.
 - Category colors never change connection checks, connector geometry, block fields, inputs, serialization, generation, type checking, or runtime semantics.
 - `mj_value_object`, `mj_value_null`, and `mj_viz_description` remain display-only and absent from the source-program toolbox.
 - Selected, disabled, highlighted/executing, warning, error, and insertion-marker states remain Blockly or application states layered over the category fill.

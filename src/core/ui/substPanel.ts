@@ -231,7 +231,7 @@ function updateAgreement(rule: string | null): void {
   agreement =
     expected === rule
       ? `machine agrees: ${salientCount}/${machineSalient.length} salient rules`
-      : `⚠ diverged from the machine at rule ${salientCount} (machine: ${expected ?? 'none'}, rewrite: ${rule})`;
+      : `Warning: diverged from the machine at rule ${salientCount} (machine: ${expected ?? 'none'}, rewrite: ${rule})`;
 }
 
 function stepOnce(): void {

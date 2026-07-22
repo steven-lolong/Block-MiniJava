@@ -33,7 +33,7 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 | Show Blocks activity | Reveal the categorized toolbox sidebar | Activity bar | `activity-blocks` | — | Yes (`view.blocks`) | Left panel | Command palette | Yes | High: drawer visibility and persisted state |
 | Search blocks | Focus toolbox search and reveal its drawer when needed | Activity bar; search field | `activity-search`, `toolbox-search` | Ctrl/Cmd+Shift+F | Yes (`view.search`) | Left-panel search | Command palette | Yes | High: activity also opens responsive drawer |
 | Hide/show sidebar | Change primary sidebar visibility | View menu; sidebar collapse; workspace reveal; activity-item toggle-on-repeat | `view-toggle-sidebar`, `toggle-toolbox`, `show-toolbox-button`; activity buttons | — | Only “Show Blocks Sidebar” (`view.blocks`), not a true toggle | View menu | Contextual panel controls | Yes | High: `toolbox-hidden` and mobile drawer states differ |
-| Close responsive sidebar | Close sidebar drawer via scrim | Responsive scrim | `sidebar-scrim` | — | No | Responsive drawer | — | No | Critical: drawer implementation is frozen pending tests |
+| Close responsive sidebar | Close the transient sidebar drawer without changing its saved visibility | Responsive scrim; Escape; repeated activity action | `sidebar-scrim` | Escape | No | Responsive drawer | Activity bar | No | Critical: restore focus to the opener and retain `sidebar.visible` |
 | Resize sidebar | Change persisted sidebar width | Divider between sidebar/workspace | `sidebar-resizer` | ArrowLeft/ArrowRight (24 px) | No | Layout control | Drag handle | Yes | Critical: pointer capture via window and persisted CSS variable |
 | Filter toolbox | Filter block categories/items | Left panel | `toolbox-search` | Normal text editing | No | Left-panel search | — | No | Medium: dynamic rendering destroys/recreates items |
 | Expand/collapse toolbox category | Show/hide category’s block list | Dynamic category headers | Dynamic `.toolbox-category-header`; generated list IDs | Enter/Space via button semantics | No | Categorized toolbox | — | No | Medium: dynamic `aria-expanded`/`aria-controls` |
@@ -63,12 +63,12 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 | Zoom in | Increase Blockly scale around center | Workspace toolbar; Blockly-injected controls/wheel | `workspace-zoom-in` | Ctrl+wheel/pinch through Blockly | No | Workspace toolbar | Blockly native controls | Yes | High |
 | Fit workspace | Fit blocks in viewport | Workspace toolbar; Blockly-injected zoom controls | `workspace-fit` | — | Yes (`workspace.fit`) | Workspace toolbar | Command palette | Yes | High |
 | Hide inspector | Hide right inspector | Inspector header | `toggle-code-column` | — | Palette toggle (`view.inspector`) | View menu | Inspector-local close | Yes | High |
-| Close responsive inspector | Close inspector drawer via scrim | Responsive scrim | `code-scrim` | — | No | Responsive drawer | — | No | Critical: drawer implementation is frozen pending tests |
+| Close responsive inspector | Close the transient inspector drawer without changing its saved visibility | Responsive scrim; Escape | `code-scrim` | Escape | No | Responsive drawer | View trigger | No | Critical: inspector remains above its scrim and focus returns to the opener |
 | Resize inspector | Change persisted inspector width | Divider between workspace/inspector | `code-resizer` | ArrowLeft/ArrowRight (24 px) | No | Layout control | Drag handle | Yes | Critical: layout geometry reverses pointer direction |
 | Maximize/restore inspector | Toggle inspector maximization | Inspector header | `toggle-code-maximize` | — | No | Inspector | View menu/palette | No | High: body state changes entire grid |
-| Select Code inspector | Show editable generated MiniJava | Inspector tabs | `tab-code`, `panel-code` | Left/Right/Home/End | No | Right inspector / Code | Command palette permitted | No | High: editor overlay and ARIA tab relationship |
-| Select Types inspector | Show typing derivation | Inspector tabs | `tab-typing`, `panel-typing` | Left/Right/Home/End | No | Right inspector / Types | Command palette permitted | No | High |
-| Select Outline inspector | Show program structure and locate blocks | Inspector tabs | `tab-outline`, `panel-outline`, `program-outline` | Left/Right/Home/End | No | Right inspector / Outline | Command palette permitted | No | High |
+| Select Code inspector | Show editable generated MiniJava and persist the intended inspector tab | Inspector tabs | `tab-code`, `panel-code` | Left/Right/Home/End | No | Right inspector / Code | Command palette permitted | No | High: editor overlay, ARIA tab relationship, and `layout.inspector.panel` |
+| Select Types inspector | Show typing derivation and persist the intended inspector tab | Inspector tabs | `tab-typing`, `panel-typing` | Left/Right/Home/End | No | Right inspector / Types | Command palette permitted | No | High |
+| Select Outline inspector | Show program structure, locate blocks, and persist the intended inspector tab | Inspector tabs | `tab-outline`, `panel-outline`, `program-outline` | Left/Right/Home/End | No | Right inspector / Outline | Command palette permitted | No | High |
 | Edit MiniJava source | Edit text and debounce import back into blocks | Code inspector | Dynamic `generated-code-editor`; `panel-code`, `generated-code`, `load-file-input` | Standard text keys; Tab inserts two spaces | No | Right inspector / Code | File Open for source files | No | Critical: bidirectional block/text synchronization |
 | Copy MiniJava code | Copy current editor/generated text | Inspector header | `copy-code` | — | No | Code inspector | Command palette | No | Medium |
 | Print typing derivation | Print active derivation with print-only layout | Inspector header, visible only on Types | `print-typing`, print header IDs | Browser print flow | No | Types inspector | Command palette | No | Critical: DOM detachment and print CSS state |
@@ -137,8 +137,10 @@ The renderer name and internal implementation details are no longer present in
 normal status chrome. Perspective selection and the autosave interval live in
 View; the Blocks sidebar contains only block-location tools.
 
-All File, View, More, and Examples menus support Arrow Up/Down, Home/End, and
-Escape with focus restoration. The responsive `menu-toggle`/`main-menu`
+All File, More, and Examples menus support Arrow Up/Down, Home/End, and
+Escape with focus restoration. View is a labelled settings popup (rather than
+a menu, because it contains form controls) and preserves the same Escape and
+focus-restoration behavior. The responsive `menu-toggle`/`main-menu`
 relationship remains the mobile container for the same commands.
 
 ## Duplication findings for later migration

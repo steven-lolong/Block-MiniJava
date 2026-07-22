@@ -34,6 +34,7 @@ const SIDEBAR_WIDTH_KEY = 'block-minijava.layout.sidebar.width';
 const SIDEBAR_VISIBLE_KEY = 'block-minijava.layout.sidebar.visible';
 const ACTIVE_ACTIVITY_KEY = 'block-minijava.layout.activity';
 const PERSPECTIVE_KEY = 'block-minijava.layout.perspective';
+const INSPECTOR_PANEL_KEY = 'block-minijava.layout.inspector.panel';
 
 let workspace: Blockly.WorkspaceSvg | null = null;
 let codeEditor: EditableMiniJavaCodeEditor | null = null;
@@ -55,6 +56,10 @@ let compactPanelLayout = window.matchMedia('(max-width: 1100px)').matches;
 let layoutResizeFrame: number | null = null;
 let layoutResizeTimers: number[] = [];
 let layoutResizeObserver: ResizeObserver | null = null;
+const drawerFocusReturn: Record<'sidebar' | 'code', HTMLElement | null> = {
+  sidebar: null,
+  code: null
+};
 
 const TOOLBOX_BLOCK_MIME = 'application/x-block-minijava-block';
 const [GOAL_BLOCK_TYPE, MAIN_BLOCK_TYPE] = MINI_JAVA_REQUIRED_BLOCK_TYPES;
@@ -120,6 +125,55 @@ function requestLayoutResize(settle = true): void {
     window.setTimeout(syncLayoutSize, 60),
     window.setTimeout(syncLayoutSize, 180)
   ];
+}
+
+function isCompactPanelLayout(): boolean {
+  return window.matchMedia('(max-width: 1100px)').matches;
+}
+
+/**
+ * Compact drawers are a transient representation of a visible panel. Closing
+ * one must not overwrite the user's persisted panel-visibility preference.
+ */
+function rememberDrawerFocusReturn(kind: 'sidebar' | 'code', trigger?: HTMLElement): void {
+  if (!isCompactPanelLayout() || !trigger) return;
+  drawerFocusReturn[kind] = window.matchMedia('(max-width: 900px)').matches
+    && trigger.closest('#main-menu')
+    ? byId<HTMLButtonElement>('menu-toggle')
+    : trigger;
+}
+
+function closeCompactDrawer(kind: 'sidebar' | 'code', restoreFocus = true): boolean {
+  if (!isCompactPanelLayout()) return false;
+  const className = kind === 'sidebar' ? 'mobile-sidebar-open' : 'mobile-code-open';
+  if (!document.body.classList.contains(className)) return false;
+  document.body.classList.remove(className);
+  document.body.classList.remove(kind === 'sidebar' ? 'is-resizing-sidebar' : 'is-resizing-code');
+  updateActivityButtons();
+  requestLayoutResize();
+  if (restoreFocus) {
+    const fallback = kind === 'sidebar'
+      ? byId<HTMLButtonElement>(`activity-${activeActivity}`)
+      : byId<HTMLButtonElement>('menu-toggle');
+    const target = drawerFocusReturn[kind] ?? fallback;
+    window.requestAnimationFrame(() => target.focus());
+  }
+  return true;
+}
+
+function syncResponsivePanelControls(): void {
+  const compact = isCompactPanelLayout();
+  const sidebarResizable = !compact && !toolboxHidden && !codeMaximized;
+  const codeResizable = !compact && !codeHidden && !codeMaximized;
+  for (const [id, enabled] of [
+    ['sidebar-resizer', sidebarResizable],
+    ['code-resizer', codeResizable]
+  ] as const) {
+    const resizer = byId<HTMLDivElement>(id);
+    resizer.tabIndex = enabled ? 0 : -1;
+    resizer.setAttribute('aria-hidden', String(!enabled));
+  }
+  if (compact) document.body.classList.remove('is-resizing-sidebar', 'is-resizing-code');
 }
 
 function initLayoutResizeCoordinator(): void {
@@ -359,7 +413,7 @@ function runProgram(): void {
   mirrorProgramOutput('Run', final.output, note);
 }
 
-function selectInspectorPanel(panel: InspectorPanel): void {
+function selectInspectorPanel(panel: InspectorPanel, persist = true): void {
   for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('.inspector-tab'))) {
     const isActive = tab.dataset.panel === panel;
     tab.classList.toggle('is-active', isActive);
@@ -372,6 +426,7 @@ function selectInspectorPanel(panel: InspectorPanel): void {
   if (panel === 'outline') scheduleOutlineRender();
   if (panel === 'typing') scheduleTypingRender();
   byId<HTMLButtonElement>('print-typing').hidden = panel !== 'typing';
+  if (persist) localStorage.setItem(INSPECTOR_PANEL_KEY, panel);
   requestLayoutResize(false);
 }
 
@@ -592,14 +647,16 @@ function setCodeMaximized(next: boolean): void {
   button.title = next ? 'Restore inspector' : 'Maximize inspector';
   const glyph = button.querySelector<SVGElement>('.toolbar-glyph');
   if (glyph) setIconUse(glyph, next ? 'collapse' : 'expand');
+  syncResponsivePanelControls();
   requestLayoutResize();
 }
 
-function setCodeHidden(next: boolean): void {
+function setCodeHidden(next: boolean, trigger?: HTMLElement): void {
   codeHidden = next;
   if (next && codeMaximized) setCodeMaximized(false);
   document.body.classList.toggle('code-hidden', codeHidden);
-  if (window.matchMedia('(max-width: 1100px)').matches) {
+  if (isCompactPanelLayout()) {
+    if (!next) rememberDrawerFocusReturn('code', trigger);
     document.body.classList.toggle('mobile-code-open', !codeHidden);
   } else if (codeHidden) {
     document.body.classList.remove('mobile-code-open');
@@ -615,23 +672,32 @@ function setCodeHidden(next: boolean): void {
   const viewState = viewToggle.querySelector<HTMLElement>('.menu-state');
   if (viewState) viewState.textContent = codeHidden ? 'Hidden' : 'Shown';
 
+  syncResponsivePanelControls();
   requestLayoutResize();
 }
 
-function toggleInspector(): void {
-  const compact = window.matchMedia('(max-width: 1100px)').matches;
+function toggleInspector(trigger?: HTMLElement): void {
+  const compact = isCompactPanelLayout();
   const drawerOpen = document.body.classList.contains('mobile-code-open');
   // In compact layouts an inspector can be visible by preference while its
   // drawer is closed. The first invocation must reveal that drawer.
-  setCodeHidden(compact && !drawerOpen ? false : !codeHidden);
+  setCodeHidden(compact && !drawerOpen ? false : !codeHidden, trigger);
   markPerspectiveCustom();
 }
 
 
-function setToolboxHidden(next: boolean): void {
+function toggleToolbox(trigger?: HTMLElement): void {
+  const compact = isCompactPanelLayout();
+  const drawerOpen = document.body.classList.contains('mobile-sidebar-open');
+  setToolboxHidden(compact && !drawerOpen ? false : !toolboxHidden, trigger);
+  markPerspectiveCustom();
+}
+
+function setToolboxHidden(next: boolean, trigger?: HTMLElement): void {
   toolboxHidden = next;
   document.body.classList.toggle('toolbox-hidden', toolboxHidden);
-  if (window.matchMedia('(max-width: 1100px)').matches) {
+  if (isCompactPanelLayout()) {
+    if (!next) rememberDrawerFocusReturn('sidebar', trigger);
     document.body.classList.toggle('mobile-sidebar-open', !toolboxHidden);
   } else if (toolboxHidden) {
     document.body.classList.remove('mobile-sidebar-open');
@@ -651,6 +717,7 @@ function setToolboxHidden(next: boolean): void {
   if (viewState) viewState.textContent = toolboxHidden ? 'Hidden' : 'Shown';
   updateActivityButtons();
 
+  syncResponsivePanelControls();
   requestLayoutResize();
 }
 
@@ -969,7 +1036,7 @@ function initSidebarResizer(): void {
     window.addEventListener('pointerup', stopResize);
   });
   resizer.addEventListener('keydown', (event) => {
-    if (toolboxHidden) return;
+    if (toolboxHidden || isCompactPanelLayout() || codeMaximized) return;
     const step = event.key === 'ArrowLeft' ? -24 : event.key === 'ArrowRight' ? 24 : 0;
     if (!step) return;
     event.preventDefault();
@@ -1023,7 +1090,7 @@ function initCodeResizer(): void {
   });
 
   resizer.addEventListener('keydown', (event) => {
-    if (codeHidden) return;
+    if (codeHidden || isCompactPanelLayout() || codeMaximized) return;
     const current = readCodeWidth();
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
@@ -1343,13 +1410,13 @@ function wireEvents(): void {
     setToolboxHidden(!toolboxHidden);
     markPerspectiveCustom();
   });
-  byId<HTMLButtonElement>('show-toolbox-button').addEventListener('click', () => {
-    setToolboxHidden(false);
+  byId<HTMLButtonElement>('show-toolbox-button').addEventListener('click', (event) => {
+    setToolboxHidden(false, event.currentTarget as HTMLButtonElement);
     markPerspectiveCustom();
   });
   byId<HTMLButtonElement>('toggle-code-maximize').addEventListener('click', () => setCodeMaximized(!codeMaximized));
-  byId<HTMLButtonElement>('sidebar-scrim').addEventListener('click', () => setToolboxHidden(true));
-  byId<HTMLButtonElement>('code-scrim').addEventListener('click', () => setCodeHidden(true));
+  byId<HTMLButtonElement>('sidebar-scrim').addEventListener('click', () => closeCompactDrawer('sidebar'));
+  byId<HTMLButtonElement>('code-scrim').addEventListener('click', () => closeCompactDrawer('code'));
   byId<HTMLButtonElement>('copy-code').addEventListener('click', copyCode);
   byId<HTMLButtonElement>('print-typing').addEventListener('click', printTyping);
   byId<HTMLButtonElement>('run-program').addEventListener('click', runProgram);
@@ -1357,12 +1424,11 @@ function wireEvents(): void {
     runProgram();
     closeCompactHeaderMenu();
   });
-  byId<HTMLButtonElement>('view-toggle-sidebar').addEventListener('click', () => {
-    setToolboxHidden(!toolboxHidden);
-    markPerspectiveCustom();
+  byId<HTMLButtonElement>('view-toggle-sidebar').addEventListener('click', (event) => {
+    toggleToolbox(event.currentTarget as HTMLButtonElement);
   });
-  byId<HTMLButtonElement>('view-toggle-inspector').addEventListener('click', () => {
-    toggleInspector();
+  byId<HTMLButtonElement>('view-toggle-inspector').addEventListener('click', (event) => {
+    toggleInspector(event.currentTarget as HTMLButtonElement);
   });
   byId<HTMLButtonElement>('workspace-undo').addEventListener('click', () => workspace?.undo(false));
   byId<HTMLButtonElement>('workspace-redo').addEventListener('click', () => workspace?.undo(true));
@@ -1379,10 +1445,14 @@ function wireEvents(): void {
       const compact = window.matchMedia('(max-width: 1100px)').matches;
       const sidebarOpen = !toolboxHidden && (!compact || document.body.classList.contains('mobile-sidebar-open'));
       if (activity === activeActivity && sidebarOpen) {
-        setToolboxHidden(true);
-        markPerspectiveCustom();
+        if (compact) closeCompactDrawer('sidebar');
+        else {
+          setToolboxHidden(true);
+          markPerspectiveCustom();
+        }
       } else {
         setActiveActivity(activity);
+        rememberDrawerFocusReturn('sidebar', button);
       }
     });
   }
@@ -1410,6 +1480,12 @@ function wireEvents(): void {
     updateMenuToggle(isOpen);
   });
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !event.defaultPrevented) {
+      if (closeCompactDrawer('code') || closeCompactDrawer('sidebar')) {
+        event.preventDefault();
+        return;
+      }
+    }
     const modifier = event.ctrlKey || event.metaKey;
     const key = event.key.toLocaleLowerCase();
     if (modifier && !event.shiftKey && key === 's') {
@@ -1439,7 +1515,7 @@ function wireEvents(): void {
     subtree: true
   });
   window.addEventListener('bmj:problem-located', () => {
-    if (window.matchMedia('(max-width: 1100px)').matches) setToolboxHidden(true);
+    if (isCompactPanelLayout()) closeCompactDrawer('sidebar', false);
   });
   document.addEventListener('fullscreenchange', () => requestLayoutResize());
   window.addEventListener('resize', () => {
@@ -1449,6 +1525,7 @@ function wireEvents(): void {
     }
     compactPanelLayout = compact;
     updateActivityButtons();
+    syncResponsivePanelControls();
     if (window.matchMedia('(min-width: 901px)').matches) {
       byId<HTMLElement>('main-menu').classList.remove('menu-open');
       updateMenuToggle(false);
@@ -1462,8 +1539,11 @@ function restorePreferences(): void {
   currentTheme = savedTheme === 'light' ? 'light' : 'dark';
   const savedInterval = localStorage.getItem(AUTOSAVE_INTERVAL_KEY);
   if (savedInterval) {
-    const value = Math.min(20, Math.max(2, Number(savedInterval)));
-    if (!Number.isNaN(value)) byId<HTMLInputElement>('autosave-interval').value = String(value);
+    const parsed = Number(savedInterval);
+    if (Number.isFinite(parsed)) {
+      const value = Math.min(20, Math.max(2, parsed));
+      byId<HTMLInputElement>('autosave-interval').value = String(value);
+    }
   }
   const savedCodeWidth = Number(localStorage.getItem(CODE_WIDTH_KEY));
   if (Number.isFinite(savedCodeWidth) && savedCodeWidth > 0) setCodeWidth(savedCodeWidth);
@@ -1477,12 +1557,17 @@ function restorePreferences(): void {
 
   const savedPerspective = localStorage.getItem(PERSPECTIVE_KEY) as Perspective | null;
   setPerspectiveIdentity(savedPerspective && PERSPECTIVES.includes(savedPerspective) ? savedPerspective : 'edit', false);
+  const savedInspectorPanel = localStorage.getItem(INSPECTOR_PANEL_KEY) as InspectorPanel | null;
+  selectInspectorPanel(savedInspectorPanel && ['code', 'typing', 'outline'].includes(savedInspectorPanel)
+    ? savedInspectorPanel
+    : 'code', false);
   if (compactPanelLayout) {
     document.body.classList.remove('mobile-sidebar-open', 'mobile-code-open');
     updateActivityButtons();
   }
   applyTheme(currentTheme);
   updateAutosaveIntervalLabel();
+  syncResponsivePanelControls();
 }
 
 export function startBlockMiniJava(): void {

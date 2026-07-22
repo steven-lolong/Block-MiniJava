@@ -541,6 +541,7 @@ test('persisted state can be loaded in a fresh browser page', async ({ browser }
   const restoredErrors = await openPersistedApp(restored);
   await expect(restored.locator('#viz-dock')).toHaveAttribute('data-open', 'true');
   await expect(restored.locator('body')).toHaveAttribute('data-perspective', 'debug');
+  await expect(restored.locator('#tab-outline')).toHaveAttribute('aria-selected', 'true');
   await expect(restored.locator('#bottom-tab-semantics')).toHaveAttribute('aria-selected', 'true');
   await expect(restored.locator('#bottom-tab-machine')).toHaveAttribute('aria-selected', 'true');
   await expect(restored.locator('#bottom-panel-semantics')).not.toHaveAttribute('hidden', '');

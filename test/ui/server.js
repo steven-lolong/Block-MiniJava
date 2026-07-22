@@ -2,6 +2,7 @@
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
+const port = Number(process.env.BMJ_UI_TEST_PORT || '4173');
 
 const docsRoot = path.resolve(__dirname, '../../docs');
 const contentTypes = {
@@ -38,6 +39,6 @@ http.createServer((request, response) => {
     });
     response.end(body);
   });
-}).listen(4173, '127.0.0.1', () => {
-  console.log('Block-MiniJava test server listening on http://127.0.0.1:4173');
+}).listen(port, '127.0.0.1', () => {
+  console.log(`Block-MiniJava test server listening on http://127.0.0.1:${port}`);
 });

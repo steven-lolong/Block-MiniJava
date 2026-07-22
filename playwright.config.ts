@@ -1,5 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
+const uiTestPort = Number(process.env.BMJ_UI_TEST_PORT || '4173');
+const uiTestUrl = `http://127.0.0.1:${uiTestPort}`;
+
 /** Browser coverage for the application shell and its persisted responsive layout. */
 export default defineConfig({
   testDir: './test/ui',
@@ -18,7 +21,7 @@ export default defineConfig({
     }
   },
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: uiTestUrl,
     browserName: 'chromium',
     viewport: { width: 1440, height: 900 },
     colorScheme: 'dark',
@@ -29,7 +32,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'npm run build && node test/ui/server.js',
-    url: 'http://127.0.0.1:4173',
+    url: uiTestUrl,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000
   },

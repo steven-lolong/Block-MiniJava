@@ -57,7 +57,7 @@
         <div class="brand-zone">
           <a class="brand-banner" href="#" aria-label="Block-MiniJava">
             <img src="assets/images/only-logo.png" alt="" />
-            <span class="brand-name">Block-MiniJava</span>
+            <h1 class="brand-name">Block-MiniJava</h1>
           </a>
           <div class="project-status">
             <div class="project-name">Project.java</div>
@@ -103,10 +103,10 @@
             </button>
 
             <div class="global-menu">
-              <button id="view-menu-button" class="menu-button global-menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="view-menu">
+              <button id="view-menu-button" class="menu-button global-menu-trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="view-menu">
                 <span class="menu-label">View</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
               </button>
-              <div id="view-menu" class="global-menu-panel global-menu-panel-end" role="menu" aria-label="View" hidden>
+              <div id="view-menu" class="global-menu-panel global-menu-panel-end" role="dialog" aria-label="View settings" hidden>
                 <button id="view-toggle-sidebar" class="global-menu-item" type="button" role="menuitemcheckbox" aria-checked="true">
                   <svg class="app-icon" aria-hidden="true"><use href="#icon-blocks" /></svg><span>Blocks sidebar</span><span class="menu-state">Shown</span>
                 </button>
@@ -179,7 +179,7 @@
         <main class="ide-layout" data-ide-region="editor-area" aria-label="Block MiniJava IDE">
           <aside id="toolbox-column" class="toolbox-column panel-card" data-ide-region="primary-sidebar" aria-label="MiniJava toolbox">
             <div class="column-header panel-header toolbox-header">
-              <div class="column-title"><svg id="sidebar-title-icon" class="app-icon icon icon-blocks" aria-hidden="true"><use href="#icon-blocks" /></svg><span id="sidebar-title">Blocks</span></div>
+              <h2 class="column-title"><svg id="sidebar-title-icon" class="app-icon icon icon-blocks" aria-hidden="true"><use href="#icon-blocks" /></svg><span id="sidebar-title">Blocks</span></h2>
               <button id="toggle-toolbox" class="icon-button visibility-toggle" type="button" aria-label="Hide sidebar" title="Hide sidebar">
                 <svg class="app-icon panel-collapse-glyph" aria-hidden="true"><use href="#icon-chevron-left" /></svg>
               </button>
@@ -205,10 +205,10 @@
                   <button id="show-toolbox-button" class="icon-button visibility-toggle workspace-reveal-button" type="button" aria-label="Show sidebar" title="Show sidebar">
                     <svg class="app-icon panel-collapse-glyph" aria-hidden="true"><use href="#icon-chevron-right" /></svg>
                   </button>
-                  <div class="column-title">
+                  <h2 class="column-title">
                     <svg class="app-icon workspace-block-icon" aria-hidden="true"><use href="#icon-blocks" /></svg>
                     <span>Block Workspace</span>
-                  </div>
+                  </h2>
                   <div id="loaded-file-label" class="loaded-file-label" aria-live="polite"></div>
                 </div>
               </div>
@@ -238,7 +238,7 @@
 
           <aside id="code-column" class="code-column panel-card" data-ide-region="inspector" aria-label="MiniJava inspector">
             <div class="column-header panel-header code-header">
-              <div class="column-title"><svg class="app-icon icon icon-code" aria-hidden="true"><use href="#icon-code" /></svg><span>MiniJava Inspector</span></div>
+              <h2 class="column-title"><svg class="app-icon icon icon-code" aria-hidden="true"><use href="#icon-code" /></svg><span>MiniJava Inspector</span></h2>
               <div class="code-actions">
                 <button id="copy-code" class="icon-button" type="button" title="Copy MiniJava code" aria-label="Copy MiniJava code"><svg class="app-icon icon icon-copy" aria-hidden="true"><use href="#icon-copy" /></svg></button>
                 <button id="print-typing" class="icon-button" type="button" title="Print typing derivation" aria-label="Print typing derivation" hidden><svg class="app-icon" aria-hidden="true"><use href="#icon-print" /></svg></button>

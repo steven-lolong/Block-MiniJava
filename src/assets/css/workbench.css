@@ -399,6 +399,7 @@ select:focus-visible,
 }
 
 .brand-name {
+  margin: 0;
   font-size: var(--font-size-lg);
   letter-spacing: 0.01em;
 }
@@ -995,6 +996,7 @@ body.toolbox-hidden.code-hidden .ide-layout {
   font-weight: var(--font-weight-bold);
   letter-spacing: 0.01em;
   white-space: nowrap;
+  margin: 0;
 }
 
 .panel-collapse-glyph,
@@ -2018,7 +2020,7 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   .code-column {
     right: 0;
     width: min(var(--panel-inspector-width), calc(100% - 48px));
-    box-shadow: -var(--shadow-drawer-start);
+    box-shadow: var(--shadow-drawer-end);
   }
 
   body:not(.mobile-sidebar-open) .toolbox-column,
@@ -2042,7 +2044,9 @@ body.bottom-maximized .viz-dock[data-open="true"] {
     display: block;
   }
 
-  body.mobile-code-open .code-scrim { z-index: var(--layer-drawer-top); }
+  /* The inspector must remain above its own scrim so its tabs and editor stay
+     usable; the scrim still covers a concurrently-open left drawer. */
+  body.mobile-code-open .code-scrim { z-index: var(--layer-drawer); }
   body.mobile-code-open .code-column { z-index: var(--layer-drawer-top); }
 
   body.code-maximized .code-column {
@@ -2074,6 +2078,7 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   .hamburger,
   .menu-toggle-button {
     display: inline-flex;
+    min-height: 44px;
     width: auto;
     padding: 0 7px;
   }
@@ -2106,7 +2111,8 @@ body.bottom-maximized .viz-dock[data-open="true"] {
 
   .main-menu .menu-button,
   .main-menu .theme-switch {
-    height: 34px;
+    min-height: 44px;
+    height: 44px;
     justify-content: flex-start;
     padding: 0 9px;
   }
@@ -2142,6 +2148,7 @@ body.bottom-maximized .viz-dock[data-open="true"] {
 @media (max-width: 700px) {
   :root {
     --ide-activity-bar-width: 46px;
+    --panel-toolbar-height: 48px;
   }
 
   .app-shell,
@@ -2155,8 +2162,8 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   }
 
   .workspace-header {
-    height: 38px;
-    min-height: 38px;
+    height: 48px;
+    min-height: 48px;
     align-items: center;
     flex-direction: row;
     padding: 0 var(--space-2) 0 7px;
@@ -2186,14 +2193,14 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   }
 
   .workspace-tools .icon-button {
-    width: 30px;
-    min-width: 30px;
-    height: 30px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
   }
 
   .workspace-run-button {
-    min-width: 56px;
-    height: 30px;
+    min-width: 68px;
+    height: 44px;
   }
 
   .column-title {
@@ -2228,6 +2235,8 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   }
 
   .viz-tab {
+    min-height: 40px;
+    height: 40px;
     padding: 0 var(--space-4);
   }
 
@@ -2256,6 +2265,10 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   }
 
   .workspace-title-row .column-title span:last-child {
+    display: none;
+  }
+
+  .workspace-tools .toolbar-separator {
     display: none;
   }
 

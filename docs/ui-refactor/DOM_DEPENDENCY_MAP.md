@@ -23,11 +23,11 @@ All literal IDs below are queried by `getElementById`/`byId`, observed, or suppl
 | Header/global | `main-menu`, `menu-toggle`, `theme-toggle`, `about-button`, `about-modal` | May move but must retain identity | Compact menu state, theme state, and About dialog. |
 | Examples | `examples-button`, `examples-panel`, `example-load-modal`, `example-load-name` | May move but must retain identity | Menu construction/dismissal and replace/merge dialog. |
 | Command palette | `command-palette-trigger`, `command-palette-overlay`, `command-palette-input`, `command-palette-list` | Must preserve exactly | Palette focus trap-like behavior, filter/results, overlay dismissal, global shortcut, and focus restoration. |
-| Sidebar/activity content | `toolbox-content`, `toolbox-search`, `sidebar-title`, `sidebar-title-icon`, `toggle-toolbox`, `show-toolbox-button`, `sidebar-scrim` | Must preserve exactly | Blocks-only toolbox, desktop visibility, and responsive drawer close. |
+| Sidebar/activity content | `toolbox-content`, `toolbox-search`, `sidebar-title`, `sidebar-title-icon`, `toggle-toolbox`, `show-toolbox-button`, `sidebar-scrim` | Must preserve exactly | Blocks-only toolbox, persisted desktop visibility, and a transient responsive drawer close with focus return. |
 | View preferences | `autosave-interval`, `autosave-interval-label` | Must preserve exactly | Moved from the removed Settings sidebar into View; retains timer restart and persistence behavior. |
-| Resizers | `sidebar-resizer`, `code-resizer`, `viz-resizer` | Must preserve exactly | Pointer and keyboard resize roots; responsive CSS also targets them. |
+| Resizers | `sidebar-resizer`, `code-resizer`, `viz-resizer` | Must preserve exactly | Pointer and keyboard resize roots; side handles become untabbable in drawers and the bottom handle becomes untabbable while maximized. |
 | Workspace toolbar | `workspace-undo`, `workspace-redo`, `workspace-zoom-out`, `workspace-zoom-in`, `workspace-fit`, `run-program` | Must preserve exactly | The quiet toolbar's complete command set; all controls call the existing Blockly/run handlers. |
-| Inspector controls | `copy-code`, `print-typing`, `toggle-code-maximize`, `toggle-code-column`, `code-scrim` | May move but must retain identity | Direct handlers, tab-dependent visibility, maximization, and drawer close. |
+| Inspector controls | `copy-code`, `print-typing`, `toggle-code-maximize`, `toggle-code-column`, `code-scrim` | May move but must retain identity | Direct handlers, tab-dependent visibility, maximization, and a scrim that sits beneath the active inspector drawer. |
 | Inspector content | `panel-code`, `generated-code`, `panel-typing`, `panel-outline`, `typing-method-select`, `typing-gamma`, `typing-tree`, `typing-print-title`, `typing-print-meta`, `program-outline` | Must preserve exactly | Editor installation, code generation fallback, typing render/print, and dynamic outline render. |
 | Status | `status-block-count`, `status-problems-button`, `status-problems-count`, `autosave-status` | Must preserve exactly | Live workspace metrics and diagnostics status. |
 | Bottom shell/actions | `top-toggle-bottom-panel`, `bottom-tab-semantics`, `bottom-panel-semantics`, `viz-dock-info`, `viz-rerun`, `viz-arrange`, `viz-maximize`, `viz-collapse`, `viz-empty` | May move but must retain identity | Bottom state/action binding, three-region navigation, semantic parent state, and active-tool description. |
@@ -147,12 +147,12 @@ Roving keyboard focus is implemented independently for inspector tabs, the three
 
 | Dependency | Current behavior | Classification |
 |---|---|---|
-| `#sidebar-resizer` | Pointer drag sets `--ide-primary-sidebar-width`; keyboard arrows change 24 px; persists sidebar width; toggles `is-resizing-sidebar` | Must preserve exactly |
-| `#code-resizer` | Pointer drag/keys set `--ide-code-panel-width` using `.ide-layout`/column geometry; persists width; toggles `is-resizing-code` | Must preserve exactly |
-| `#viz-resizer` | Pointer drag/keys set `--ide-bottom-panel-height`, clamped to 160 px–70vh; persists height | Must preserve exactly |
+| `#sidebar-resizer` | Pointer drag sets `--ide-primary-sidebar-width`; keyboard arrows change 24 px; persists sidebar width; toggles `is-resizing-sidebar`; is `aria-hidden`/untabbable in drawer or maximized layouts | Must preserve exactly |
+| `#code-resizer` | Pointer drag/keys set `--ide-code-panel-width` using `.ide-layout`/column geometry; persists width; toggles `is-resizing-code`; is `aria-hidden`/untabbable in drawer or maximized layouts | Must preserve exactly |
+| `#viz-resizer` | Pointer drag/keys set `--ide-bottom-panel-height`, clamped to 160 px–70vh; persists height; is untabbable while the bottom panel is closed or maximized | Must preserve exactly |
 | Compact threshold | JS `matchMedia('(max-width: 1100px)')` matches workbench drawer breakpoint | Must preserve exactly |
-| Sidebar drawer | `toolbox-hidden` plus `mobile-sidebar-open`; closed by `#sidebar-scrim`, activity re-click, problem-location event, perspective application, and transition into compact layout | Must preserve exactly |
-| Inspector drawer | `code-hidden` plus `mobile-code-open`; closed by `#code-scrim`, perspective application, and transition into compact layout | Must preserve exactly |
+| Sidebar drawer | `toolbox-hidden` plus `mobile-sidebar-open`; Escape/scrim/activity close only the transient open class and return focus to the activity/reveal trigger; problem-location and perspective handling close it without persisting a visibility change | Must preserve exactly |
+| Inspector drawer | `code-hidden` plus `mobile-code-open`; Escape/scrim close only the transient open class and return focus to View or the hamburger trigger; the inspector must remain above its scrim | Must preserve exactly |
 | Narrow menu | CSS at 900 px; JS closes `.menu-open` at `min-width: 901px` | Must preserve exactly |
 | Phone bottom panel | CSS changes bottom tools at 700 px; Blockly initial fit also checks `max-width: 700px` | Must preserve exactly |
 

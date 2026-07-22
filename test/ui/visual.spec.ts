@@ -37,6 +37,20 @@ test('dark Edit at 1440 × 900', async ({ page }) => {
   expectNoUncaughtErrors(errors);
 });
 
+test('dark Edit at 1920 × 1080', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const errors = await openFreshApp(page);
+  await capture(page, 'dark-edit-1920x1080.png');
+  expectNoUncaughtErrors(errors);
+});
+
+test('dark Edit at 1280 × 800', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const errors = await openFreshApp(page);
+  await capture(page, 'dark-edit-1280x800.png');
+  expectNoUncaughtErrors(errors);
+});
+
 test('dark Debug at 1440 × 900', async ({ page }) => {
   const errors = await openFreshApp(page);
   await selectPerspective(page, 'debug');

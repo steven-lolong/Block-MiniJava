@@ -66,6 +66,13 @@ function dock(): HTMLElement {
   return byId<HTMLElement>('viz-dock');
 }
 
+function syncBottomResizerAvailability(): void {
+  const resizer = byId<HTMLDivElement>('viz-resizer');
+  const enabled = isVizOpen() && !document.body.classList.contains('bottom-maximized');
+  resizer.tabIndex = enabled ? 0 : -1;
+  resizer.setAttribute('aria-hidden', String(!enabled));
+}
+
 function hostOf(kind: VizKind): HTMLElement {
   const host = document.querySelector<HTMLElement>(`.viz-host[data-kind="${kind}"]`);
   if (!host) throw new Error(`Missing visualization host ${kind}`);
@@ -186,6 +193,7 @@ export function setVizOpen(open: boolean): void {
     if (maximize) maximize.title = 'Maximize bottom tools';
   }
   localStorage.setItem(BOTTOM_OPEN_KEY, String(open));
+  syncBottomResizerAvailability();
   onLayoutChange();
   if (!open) window.requestAnimationFrame(onLayoutChange);
   if (open) resizeActive(40);
@@ -335,6 +343,7 @@ export function initVisualizationPanel(layoutChange: () => void): void {
     button.setAttribute('aria-pressed', String(maximized));
     button.setAttribute('aria-label', maximized ? 'Restore bottom tools' : 'Maximize bottom tools');
     button.title = maximized ? 'Restore bottom tools' : 'Maximize bottom tools';
+    syncBottomResizerAvailability();
     onLayoutChange();
     resizeActive(40);
   });

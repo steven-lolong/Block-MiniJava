@@ -138,9 +138,10 @@ The layout classes are behavioral state, not styling conveniences. Do not rename
 
 - Keep `command-palette-trigger[aria-controls="command-palette-overlay"]`, the palette's `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, listbox/option roles, selected state, focus-on-open, focus restoration, Escape behavior, and keyboard navigation.
 - Keep `examples-button[aria-controls="examples-panel"]`, `aria-haspopup`, `aria-expanded`, the menu role, menu-item roles, outside-click close, and Escape close.
+- Keep File, More, and Examples as menus. Keep View as a labelled non-modal settings dialog with `aria-haspopup="dialog"`; it contains controls that are not valid menu items.
 - Keep the inspector `tablist`; each tab's `aria-controls="panel-*"`; each panel's `aria-labelledby="tab-*"`; roving `tabindex`; `aria-selected`; and Left/Right/Home/End navigation.
 - Keep two independent bottom tablists: the primary Problems/Output/Semantics list and the nested Call-by-Structure/Call-by-Value/CESK/A vs B/Rewrite list. Preserve every `bottom-tab-*`/`bottom-panel-*` relationship, roving `tabindex`, `aria-selected`, `aria-hidden`, and Left/Right/Home/End navigation within its own list.
-- Keep resizers focusable with `role="separator"`, the correct `aria-orientation`, and arrow-key resizing.
+- Keep resizers focusable with `role="separator"`, the correct `aria-orientation`, and arrow-key resizing while usable. A side resizer must be `aria-hidden` and untabbable in a drawer/maximized layout; the bottom resizer must be untabbable while closed or maximized.
 - Keep `aria-pressed` synchronized for activity buttons, panel toggles, and maximizers.
 - Keep dialogs associated with their title IDs and preserve native dialog close/return-value behavior.
 - Keep live regions for file identity, autosave, diagnostics, code-editor status, output, stepper statuses, and rewrite correspondence.
@@ -223,10 +224,10 @@ The stylesheet chain is now separated by responsibility: `tokens.css`, `workbenc
 - Above 1260 px: sidebar, workspace, and inspector are docked with pointer and keyboard resizers.
 - At 1480 px and below: header labels compact to avoid collision.
 - At 1260 px and below: docked sidebar/inspector widths are capped and the workspace icon is hidden.
-- At 1100 px and below: the left sidebar and right inspector become absolute-positioned drawers over the workspace. Side resizers are disabled. `mobile-sidebar-open` and `mobile-code-open` control drawer display; `sidebar-scrim` and `code-scrim` close them. Persistent visibility (`toolbox-hidden`/`code-hidden`) remains distinct from transient drawer-open state.
+- At 1100 px and below: the left sidebar and right inspector become absolute-positioned drawers over the workspace. Side resizers are disabled and removed from keyboard navigation. `mobile-sidebar-open` and `mobile-code-open` control drawer display; `sidebar-scrim`, `code-scrim`, and Escape close only those transient states and restore focus to the opener. Persistent visibility (`toolbox-hidden`/`code-hidden`) remains distinct from transient drawer-open state. The inspector drawer must remain above its own scrim.
 - When a Problem is located at drawer widths, the sidebar closes so the selected block is visible.
 - At 900 px and below: the perspective picker and project context are hidden, the command center becomes icon-only, and header actions move into the `main-menu.menu-open` hamburger surface.
-- At 700 px and below: workspace controls compact, the bottom panel becomes a fixed drawer above the status bar, both bottom tab rows retain their visible domain labels and scroll horizontally when needed, status content reduces, and the initial workspace zooms to fit after startup.
+- At 700 px and below: workspace controls compact into 44 px minimum touch targets, the bottom panel becomes a fixed drawer above the status bar, both bottom tab rows retain their visible domain labels and scroll horizontally when needed, status content reduces, and the initial workspace zooms to fit after startup.
 - At 480 px and below: header/status/zoom controls compact further and the menu becomes one column.
 - At 920 px and below, stepper and comparison columns stack to one column.
 - `prefers-reduced-motion: reduce` nearly eliminates transitions/animations and disables smooth scrolling.
@@ -241,7 +242,7 @@ Do not rewrite breakpoints, drawer classes, scrim behavior, z-index ordering, po
 - Sidebar width is clamped to 220 px through `min(420 px, 45% of viewport)` and persisted after pointer or keyboard resizing.
 - Inspector width is clamped to 300 px through `min(900 px, 68% of viewport)` and persisted.
 - Bottom height is clamped to 160 px through 70% of viewport height and persisted.
-- Side resizers use Pointer Events and pointer capture, add/remove `is-resizing-*`, and force a final synchronized layout resize.
+- Side resizers use Pointer Events and pointer capture, add/remove `is-resizing-*`, and force a final synchronized layout resize; their keyboard handlers no-op while drawers or maximized inspector layout are active.
 - Bottom resizing temporarily disables text selection and resizes the active Blockly visualization.
 
 ### Persistence keys and restoration
@@ -257,6 +258,7 @@ Do not rewrite breakpoints, drawer classes, scrim behavior, z-index ordering, po
 | `block-minijava.layout.sidebar.visible` | Boolean string. |
 | `block-minijava.layout.activity` | `blocks` or `search`; legacy `run`/`settings` values restore as `blocks`. |
 | `block-minijava.layout.perspective` | `edit`, `debug`, `types`, `presentation`, or `custom`. |
+| `block-minijava.layout.inspector.panel` | `code`, `typing`, or `outline`; invalid/legacy values restore as `code`. |
 | `block-minijava.layout.bottom.open` | Boolean string. |
 | `block-minijava.layout.bottom.height` | Bottom-panel height in pixels. |
 | `block-minijava.layout.bottom.tab` | Active leaf kind: `problems`, `output`, `structure`, `value`, `machine`, `compare`, or `subst`. Never persist the conceptual `semantics` parent. |
@@ -267,7 +269,7 @@ Restoration order matters: stored theme/interval/widths/activity/visibility/pers
 
 Autosave runs on the configured repeating interval and also after New, workspace/example loads, and successful code imports. Loading an autosave restores the serialized workspace, enforces required blocks, updates the file identity, code, zoom/status, and diagnostics. Preserve the `block-minijava.autosave.v2` data format unless a versioned migration is implemented.
 
-Inspector maximization, bottom maximization, transient drawer-open state, active inspector tab, stepper execution history, and collapsed toolbox categories are not currently persisted. Do not accidentally start persisting transient state without a deliberate product decision.
+Inspector maximization, bottom maximization, transient drawer-open state, stepper execution history, and collapsed toolbox categories are not persisted. The active inspector tab is deliberately persisted through `block-minijava.layout.inspector.panel`; invalid values restore safely to Code.
 
 ### Perspective behavior
 
@@ -340,7 +342,7 @@ The completed refactor is accepted only when all of the following are true.
 ### Responsive and persistence regression gates
 
 - Before changing the current drawer or resize implementation, add browser-level regression tests for at least wide desktop, <=1100 px drawer layout, <=900 px header menu, <=700 px phone bottom drawer, and <=480 px compact controls.
-- Tests cover opening/closing both responsive drawers, scrims, persistent hidden state versus transient open state, pointer and keyboard resizers, bottom/inspector maximization, window resize, and panel content resize.
+- Tests cover 1920×1080, 1440×900, 1280×800, 1024×768, 768×1024, and 390×844; opening/closing both responsive drawers, scrims, Escape focus return, persistent hidden state versus transient open state, pointer and keyboard resizers, bottom/inspector maximization, and tablet code editing.
 - Tests cover every persistence key above, valid restoration, invalid-value clamping/fallbacks, perspective presets/Custom identity, autosave restoration, and theme restoration.
 - The refactor does not introduce horizontal page scrolling, unreachable controls, overlapping drawers, hidden focused elements, or unmeasurable Blockly workspaces at supported breakpoints.
 
@@ -362,5 +364,5 @@ The completed refactor is accepted only when all of the following are true.
 - Type diagnostics and derivations come from the same checker walk. Their shared block-location behavior must remain synchronized.
 - The bottom panel is both passive output/diagnostics and active semantics/runtime tooling; treating every tab as equivalent static content will break component lifecycle and resize needs.
 - Responsive shell rules now have one owner in `workbench.css`; the 1100, 900/901, and 700 px CSS/TypeScript thresholds remain coupled and must change together.
-- UI regression tests now cover the shell, responsive drawers, resizers, command palette, perspectives, layout persistence, themes, and visual baselines. Print layout and the full editable-code scroll/import interaction remain higher-risk browser surfaces.
+- UI regression tests now cover the shell, responsive drawers, resizers, command palette, keyboard-only flows, lightweight accessibility contracts, perspectives, layout persistence, themes, and visual baselines. Print layout and the full editable-code scroll/import interaction remain higher-risk browser surfaces.
 - Webpack's clean configuration preserves `docs/ui-refactor/`; future output changes must keep that protection.

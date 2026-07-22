@@ -10,10 +10,8 @@ import {
   initVisualizationPanel,
   isVizOpen,
   openBottomTool,
-  openVisualization,
   resizeVisualizationPanel,
-  setVizOpen,
-  type VizKind
+  setVizOpen
 } from './visualizationPanel';
 import { initExamplesMenu } from './examplesMenu';
 import type { MiniJavaExample } from '../examples';
@@ -68,17 +66,11 @@ const BLOCK_WORKSPACE_MUTATION_EVENTS = new Set<string>([
   Blockly.Events.BLOCK_MOVE
 ]);
 type InspectorPanel = 'code' | 'typing' | 'outline';
-type ActivityKind = 'blocks' | 'search' | 'run' | 'settings';
+type ActivityKind = 'blocks' | 'search';
 type Perspective = 'edit' | 'debug' | 'types' | 'presentation' | 'custom';
 
-const ACTIVITY_KINDS: ActivityKind[] = ['blocks', 'search', 'run', 'settings'];
+const ACTIVITY_KINDS: ActivityKind[] = ['blocks', 'search'];
 const PERSPECTIVES: Perspective[] = ['edit', 'debug', 'types', 'presentation', 'custom'];
-const ACTIVITY_META: Record<ActivityKind, { title: string; icon: string }> = {
-  blocks: { title: 'Blocks', icon: 'blocks' },
-  search: { title: 'Search Blocks', icon: 'search' },
-  run: { title: 'Run and Analysis', icon: 'run' },
-  settings: { title: 'Settings and Layout', icon: 'settings' }
-};
 
 const CATEGORY_ICON: Record<string, string> = {
   program: 'blocks',
@@ -222,8 +214,8 @@ function createBlockInWorkspace(type: string, position: { x: number; y: number }
 }
 
 function updateZoomIndicator(): void {
-  const label = byId<HTMLSpanElement>('zoom-size');
-  label.textContent = `${Math.round(currentScale() * 100)}%`;
+  const label = document.getElementById('zoom-size');
+  if (label) label.textContent = `${Math.round(currentScale() * 100)}%`;
 }
 
 function updateCode(): void {
@@ -460,17 +452,6 @@ function setActiveActivity(activity: ActivityKind, ensureVisible = true, focusSe
   localStorage.setItem(ACTIVE_ACTIVITY_KEY, activity);
   updateActivityButtons();
 
-  const meta = ACTIVITY_META[activity];
-  byId<HTMLSpanElement>('sidebar-title').textContent = meta.title;
-  const titleIcon = byId<HTMLElement>('sidebar-title-icon');
-  titleIcon.setAttribute('class', `app-icon icon icon-${meta.icon}`);
-  setIconUse(titleIcon, meta.icon);
-  for (const view of Array.from(document.querySelectorAll<HTMLElement>('.sidebar-view[data-activity-view]'))) {
-    const visible = (view.dataset.activityView ?? '').split(/\s+/).includes(activity);
-    view.classList.toggle('is-active', visible);
-    view.setAttribute('aria-hidden', String(!visible));
-  }
-
   if (ensureVisible) setToolboxHidden(false);
   if (focusSearch) window.requestAnimationFrame(() => byId<HTMLInputElement>('toolbox-search').focus());
 }
@@ -483,13 +464,6 @@ function setPerspectiveIdentity(perspective: Perspective, persist = true): void 
   const customOption = select.querySelector<HTMLOptionElement>('option[value="custom"]');
   if (customOption) customOption.hidden = perspective !== 'custom';
   select.value = perspective;
-  const label = perspective === 'types'
-    ? 'Type Analysis'
-    : perspective.charAt(0).toLocaleUpperCase() + perspective.slice(1);
-  byId<HTMLSpanElement>('status-perspective-label').textContent = label;
-  for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.perspective-option'))) {
-    button.classList.toggle('is-active', button.dataset.perspective === perspective);
-  }
   if (persist) localStorage.setItem(PERSPECTIVE_KEY, perspective);
 }
 
@@ -514,7 +488,7 @@ function applyPerspective(perspective: Perspective): void {
       selectInspectorPanel('code');
       setVizOpen(false);
     } else if (perspective === 'debug') {
-      setActiveActivity('run', false, false);
+      setActiveActivity('blocks', false, false);
       setToolboxHidden(false);
       setCodeHidden(false);
       setCodeMaximized(false);
@@ -541,22 +515,6 @@ function applyPerspective(perspective: Perspective): void {
     }
     requestLayoutResize();
   }
-}
-
-function openAnalysisTool(kind: VizKind): void {
-  if (kind !== 'structure' && kind !== 'value') {
-    openBottomTool(kind);
-    return;
-  }
-  if (!workspace) return;
-  const selected = Blockly.common.getSelected() as Blockly.BlockSvg | null;
-  const selectedBlock = selected && workspace.getBlockById(selected.id) ? selected : null;
-  const block = selectedBlock ?? workspace.getTopBlocks(true)[0];
-  if (!block) {
-    scheduleAutosaveStatus('Add or select a block to visualize');
-    return;
-  }
-  openVisualization(kind, block as Blockly.BlockSvg);
 }
 
 function scheduleAutosaveStatus(message: string): void {
@@ -649,19 +607,24 @@ function setCodeHidden(next: boolean): void {
   localStorage.setItem(CODE_VISIBLE_KEY, String(!codeHidden));
 
   const column = byId<HTMLButtonElement>('toggle-code-column');
-  const showButton = byId<HTMLButtonElement>('show-code-button');
 
   column.title = codeHidden ? 'Show inspector' : 'Hide inspector';
   column.setAttribute('aria-label', codeHidden ? 'Show inspector' : 'Hide inspector');
-  showButton.title = 'Show MiniJava inspector';
-  showButton.setAttribute('aria-label', 'Show MiniJava inspector');
-  byId<HTMLButtonElement>('settings-toggle-code').setAttribute('aria-pressed', String(!codeHidden));
   const viewToggle = byId<HTMLButtonElement>('view-toggle-inspector');
   viewToggle.setAttribute('aria-checked', String(!codeHidden));
   const viewState = viewToggle.querySelector<HTMLElement>('.menu-state');
   if (viewState) viewState.textContent = codeHidden ? 'Hidden' : 'Shown';
 
   requestLayoutResize();
+}
+
+function toggleInspector(): void {
+  const compact = window.matchMedia('(max-width: 1100px)').matches;
+  const drawerOpen = document.body.classList.contains('mobile-code-open');
+  // In compact layouts an inspector can be visible by preference while its
+  // drawer is closed. The first invocation must reveal that drawer.
+  setCodeHidden(compact && !drawerOpen ? false : !codeHidden);
+  markPerspectiveCustom();
 }
 
 
@@ -1110,7 +1073,7 @@ function initBlockly(): void {
     grid: {
       spacing: 24,
       length: 3,
-      colour: currentTheme === 'dark' ? '#3d465b' : '#cdd6e3',
+      colour: currentTheme === 'dark' ? '#29313e' : '#dfe5ec',
       snap: true
     },
     zoom: {
@@ -1326,7 +1289,7 @@ function initCommandPalette(): void {
     { id: 'view.blocks', category: 'View', label: 'Show Blocks Sidebar', run: () => setActiveActivity('blocks') },
     { id: 'view.search', category: 'View', label: 'Search Blocks', shortcut: 'Ctrl Shift F', run: () => setActiveActivity('search') },
     { id: 'view.problems', category: 'View', label: 'Show Problems', run: showProblems },
-    { id: 'view.inspector', category: 'View', label: 'Toggle MiniJava Inspector', run: () => { setCodeHidden(!codeHidden); markPerspectiveCustom(); } },
+    { id: 'view.inspector', category: 'View', label: 'Toggle MiniJava Inspector', run: toggleInspector },
     { id: 'view.bottom', category: 'View', label: 'Toggle Bottom Tools', shortcut: 'Ctrl J', run: () => { setVizOpen(!isVizOpen()); markPerspectiveCustom(); } },
     { id: 'workspace.undo', category: 'Workspace', label: 'Undo Block Change', run: () => workspace?.undo(false) },
     { id: 'workspace.redo', category: 'Workspace', label: 'Redo Block Change', run: () => workspace?.undo(true) },
@@ -1380,10 +1343,6 @@ function wireEvents(): void {
     setToolboxHidden(!toolboxHidden);
     markPerspectiveCustom();
   });
-  byId<HTMLButtonElement>('show-code-button').addEventListener('click', () => {
-    setCodeHidden(false);
-    markPerspectiveCustom();
-  });
   byId<HTMLButtonElement>('show-toolbox-button').addEventListener('click', () => {
     setToolboxHidden(false);
     markPerspectiveCustom();
@@ -1398,27 +1357,12 @@ function wireEvents(): void {
     runProgram();
     closeCompactHeaderMenu();
   });
-  byId<HTMLButtonElement>('sidebar-run-program').addEventListener('click', runProgram);
-  byId<HTMLButtonElement>('sidebar-open-cesk').addEventListener('click', () => openAnalysisTool('machine'));
-  byId<HTMLButtonElement>('sidebar-open-compare').addEventListener('click', () => openAnalysisTool('compare'));
-  byId<HTMLButtonElement>('sidebar-open-rewrite').addEventListener('click', () => openAnalysisTool('subst'));
-  byId<HTMLButtonElement>('sidebar-open-structure').addEventListener('click', () => openAnalysisTool('structure'));
-  byId<HTMLButtonElement>('sidebar-open-value').addEventListener('click', () => openAnalysisTool('value'));
-  byId<HTMLButtonElement>('settings-toggle-code').addEventListener('click', () => {
-    setCodeHidden(!codeHidden);
-    markPerspectiveCustom();
-  });
-  byId<HTMLButtonElement>('settings-toggle-bottom').addEventListener('click', () => {
-    setVizOpen(!isVizOpen());
-    markPerspectiveCustom();
-  });
   byId<HTMLButtonElement>('view-toggle-sidebar').addEventListener('click', () => {
     setToolboxHidden(!toolboxHidden);
     markPerspectiveCustom();
   });
   byId<HTMLButtonElement>('view-toggle-inspector').addEventListener('click', () => {
-    setCodeHidden(!codeHidden);
-    markPerspectiveCustom();
+    toggleInspector();
   });
   byId<HTMLButtonElement>('workspace-undo').addEventListener('click', () => workspace?.undo(false));
   byId<HTMLButtonElement>('workspace-redo').addEventListener('click', () => workspace?.undo(true));
@@ -1442,13 +1386,9 @@ function wireEvents(): void {
       }
     });
   }
-  for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.perspective-option[data-perspective]'))) {
-    button.addEventListener('click', () => applyPerspective(button.dataset.perspective as Perspective));
-  }
   byId<HTMLSelectElement>('perspective-select').addEventListener('change', (event) => {
     applyPerspective((event.currentTarget as HTMLSelectElement).value as Perspective);
   });
-  byId<HTMLButtonElement>('status-perspective').addEventListener('click', () => setActiveActivity('settings'));
   byId<HTMLButtonElement>('status-problems-button').addEventListener('click', showProblems);
   for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('.inspector-tab'))) {
     tab.addEventListener('click', () => selectInspectorPanel((tab.dataset.panel ?? 'code') as InspectorPanel));
@@ -1468,12 +1408,6 @@ function wireEvents(): void {
     const menu = byId<HTMLElement>('main-menu');
     const isOpen = menu.classList.toggle('menu-open');
     updateMenuToggle(isOpen);
-  });
-  byId<HTMLButtonElement>('zoom-indicator').addEventListener('click', () => {
-    if (!workspace) return;
-    workspace.setScale(1);
-    workspace.scrollCenter();
-    updateZoomIndicator();
   });
   document.addEventListener('keydown', (event) => {
     const modifier = event.ctrlKey || event.metaKey;

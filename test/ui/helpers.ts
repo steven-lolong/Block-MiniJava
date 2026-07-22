@@ -34,7 +34,10 @@ export async function openPersistedApp(page: Page): Promise<string[]> {
 
 export async function openBottomPanel(page: Page): Promise<void> {
   const dock = page.locator('#viz-dock');
-  if (await dock.getAttribute('data-open') !== 'true') await page.locator('#toggle-viz-dock').click();
+  if (await dock.getAttribute('data-open') !== 'true') {
+    await openHeaderMenu(page, 'view');
+    await page.locator('#top-toggle-bottom-panel').click();
+  }
   await expect(dock).toHaveAttribute('data-open', 'true');
 }
 

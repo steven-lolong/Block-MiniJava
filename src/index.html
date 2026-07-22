@@ -132,9 +132,13 @@
                   <input id="theme-toggle" type="checkbox" checked aria-label="Dark theme on" />
                   <span class="switch-track"><span class="switch-thumb"></span></span>
                 </label>
-                <button id="status-perspective" class="global-menu-item" type="button" role="menuitem" title="Open settings and layout">
-                  <svg class="app-icon" aria-hidden="true"><use href="#icon-settings" /></svg><span>Settings and layout…</span><span id="status-perspective-label" class="menu-state">Edit</span>
-                </button>
+                <label class="global-menu-field autosave-menu-field" for="autosave-interval">
+                  <span>Autosave interval</span>
+                  <span class="autosave-menu-control">
+                    <input id="autosave-interval" type="range" min="2" max="20" step="1" value="2" aria-label="Autosave interval" />
+                    <span id="autosave-interval-label">2 minutes</span>
+                  </span>
+                </label>
               </div>
             </div>
 
@@ -169,14 +173,6 @@
             <button id="activity-search" class="activity-item" type="button" data-activity="search" aria-label="Search blocks" title="Search blocks" aria-pressed="false">
               <svg class="app-icon" aria-hidden="true"><use href="#icon-search" /></svg>
             </button>
-            <button id="activity-run" class="activity-item" type="button" data-activity="run" aria-label="Run and analysis" title="Run and analysis" aria-pressed="false">
-              <svg class="app-icon" aria-hidden="true"><use href="#icon-run" /></svg>
-            </button>
-          </div>
-          <div class="activity-group activity-group-bottom">
-            <button id="activity-settings" class="activity-item" type="button" data-activity="settings" aria-label="Settings and layout" title="Settings and layout" aria-pressed="false">
-              <svg class="app-icon" aria-hidden="true"><use href="#icon-settings" /></svg>
-            </button>
           </div>
         </nav>
 
@@ -195,47 +191,6 @@
                   <svg class="app-icon icon icon-search" aria-hidden="true"><use href="#icon-search" /></svg>
                 </label>
                 <div id="toolbox-content" class="toolbox-content"></div>
-              </section>
-
-              <section class="sidebar-view" data-activity-view="run" aria-label="Run and analysis tools">
-                <div class="sidebar-section">
-                  <h2>Program</h2>
-                  <button id="sidebar-run-program" class="sidebar-command is-primary" type="button"><svg class="app-icon icon icon-run" aria-hidden="true"><use href="#icon-run" /></svg><span>Run Program</span><kbd>Ctrl F5</kbd></button>
-                </div>
-                <div class="sidebar-section">
-                  <h2>Semantic Analysis</h2>
-                  <button id="sidebar-open-cesk" class="sidebar-command" type="button"><svg class="app-icon sidebar-command-icon" aria-hidden="true"><use href="#icon-machine" /></svg><span>CESK Machine</span></button>
-                  <button id="sidebar-open-compare" class="sidebar-command" type="button"><svg class="app-icon sidebar-command-icon" aria-hidden="true"><use href="#icon-compare" /></svg><span>Compare Models</span></button>
-                  <button id="sidebar-open-rewrite" class="sidebar-command" type="button"><svg class="app-icon sidebar-command-icon" aria-hidden="true"><use href="#icon-rewrite" /></svg><span>Rewrite Semantics</span></button>
-                  <button id="sidebar-open-structure" class="sidebar-command" type="button"><svg class="app-icon sidebar-command-icon" aria-hidden="true"><use href="#icon-structure" /></svg><span>Call-by-Structure</span></button>
-                  <button id="sidebar-open-value" class="sidebar-command" type="button"><svg class="app-icon sidebar-command-icon" aria-hidden="true"><use href="#icon-value" /></svg><span>Call-by-Value</span></button>
-                </div>
-              </section>
-
-              <section class="sidebar-view" data-activity-view="settings" aria-label="Settings and layout">
-                <div class="sidebar-section">
-                  <h2>Perspectives</h2>
-                  <div class="perspective-list" role="list">
-                    <button class="perspective-option is-active" type="button" data-perspective="edit"><span>Edit</span><small>Blocks, code, focused workspace</small></button>
-                    <button class="perspective-option" type="button" data-perspective="debug"><span>Debug</span><small>Machine and execution tools</small></button>
-                    <button class="perspective-option" type="button" data-perspective="types"><span>Type Analysis</span><small>Diagnostics and constraints</small></button>
-                    <button class="perspective-option" type="button" data-perspective="presentation"><span>Presentation</span><small>Maximized block workspace</small></button>
-                  </div>
-                </div>
-                <div class="sidebar-section">
-                  <h2>Layout</h2>
-                  <button id="settings-toggle-code" class="sidebar-command" type="button"><svg class="app-icon icon icon-code" aria-hidden="true"><use href="#icon-code" /></svg><span>Toggle Inspector</span></button>
-                  <button id="settings-toggle-bottom" class="sidebar-command" type="button"><svg class="app-icon icon icon-viz" aria-hidden="true"><use href="#icon-bottom" /></svg><span>Toggle Bottom Tools</span></button>
-                </div>
-                <div class="sidebar-section autosave-settings">
-                  <h2>Autosave Interval</h2>
-                  <div class="autosave-control">
-                    <svg class="app-icon icon icon-clock" aria-hidden="true"><use href="#icon-clock" /></svg>
-                    <label class="visually-hidden" for="autosave-interval">Autosave interval</label>
-                    <input id="autosave-interval" type="range" min="2" max="20" step="1" value="2" />
-                    <span id="autosave-interval-label">2 minutes</span>
-                  </div>
-                </div>
               </section>
             </div>
           </aside>
@@ -265,18 +220,14 @@
                 <div class="toolbar-separator" aria-hidden="true"></div>
                 <div class="toolbar-group" aria-label="Workspace zoom">
                   <button id="workspace-zoom-out" class="icon-button" type="button" title="Zoom out" aria-label="Zoom out"><svg class="app-icon toolbar-glyph" aria-hidden="true"><use href="#icon-zoom-out" /></svg></button>
-                  <button id="zoom-indicator" class="zoom-pill" type="button" title="Reset Blockly zoom to 100%" aria-label="Current Blockly zoom level"><span id="zoom-size">100%</span></button>
                   <button id="workspace-zoom-in" class="icon-button" type="button" title="Zoom in" aria-label="Zoom in"><svg class="app-icon toolbar-glyph" aria-hidden="true"><use href="#icon-zoom-in" /></svg></button>
                   <button id="workspace-fit" class="icon-button" type="button" title="Fit blocks in workspace" aria-label="Fit blocks in workspace"><svg class="app-icon toolbar-glyph toolbar-fit" aria-hidden="true"><use href="#icon-fit" /></svg></button>
                 </div>
                 <div class="toolbar-separator" aria-hidden="true"></div>
-                <button id="run-program" class="icon-button run-button" type="button" title="Run the program and show its output" aria-label="Run the program"><svg class="app-icon icon icon-run" aria-hidden="true"><use href="#icon-run" /></svg></button>
-                <button id="toggle-viz-dock" class="icon-button" type="button" aria-label="Toggle bottom tools" title="Toggle bottom tools" aria-pressed="false"><svg class="app-icon icon icon-viz" aria-hidden="true"><use href="#icon-bottom" /></svg></button>
-                <button id="show-code-button" class="icon-button visibility-toggle workspace-reveal-button" type="button" aria-label="Show MiniJava inspector" title="Show MiniJava inspector"><svg class="app-icon panel-collapse-glyph" aria-hidden="true"><use href="#icon-chevron-left" /></svg></button>
+                <button id="run-program" class="workspace-run-button" type="button" title="Run the program and show its output (Ctrl+F5)" aria-label="Run the program"><svg class="app-icon icon icon-run" aria-hidden="true"><use href="#icon-run" /></svg><span>Run</span></button>
               </div>
             </div>
             <div id="blockly-area" class="blockly-area">
-              <div class="workspace-watermark" aria-hidden="true">B-MJ</div>
               <div id="blockly-div" class="blockly-div"></div>
             </div>
           </section>

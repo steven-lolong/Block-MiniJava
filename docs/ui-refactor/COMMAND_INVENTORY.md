@@ -30,10 +30,8 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 
 | Command name | Purpose | Current visible locations | Current element IDs | Keyboard shortcut | Command-palette entry | Primary future location | Secondary permitted location | Duplicated | Migration risk |
 |---|---|---|---|---|---|---|---|---|---|
-| Show Blocks activity | Select categorized toolbox sidebar | Activity bar | `activity-blocks` | — | Yes (`view.blocks`) | Left panel | Command palette | Yes | High: activity, drawer visibility, focus, persistence |
-| Search blocks | Select/focus toolbox search | Activity bar; search field | `activity-search`, `toolbox-search` | Ctrl/Cmd+Shift+F | Yes (`view.search`) | Left-panel search | Command palette | Yes | High: activity also opens responsive drawer |
-| Show Run and Analysis activity | Show Run and semantic tool launchers | Activity bar | `activity-run` | — | No | Left-panel/activity navigation if retained | Command palette | No | Medium |
-| Show Settings activity | Show perspectives, layout, theme interval controls | Activity bar; View menu | `activity-settings`, `status-perspective` | — | No | Settings | View menu | Yes | Medium |
+| Show Blocks activity | Reveal the categorized toolbox sidebar | Activity bar | `activity-blocks` | — | Yes (`view.blocks`) | Left panel | Command palette | Yes | High: drawer visibility and persisted state |
+| Search blocks | Focus toolbox search and reveal its drawer when needed | Activity bar; search field | `activity-search`, `toolbox-search` | Ctrl/Cmd+Shift+F | Yes (`view.search`) | Left-panel search | Command palette | Yes | High: activity also opens responsive drawer |
 | Hide/show sidebar | Change primary sidebar visibility | View menu; sidebar collapse; workspace reveal; activity-item toggle-on-repeat | `view-toggle-sidebar`, `toggle-toolbox`, `show-toolbox-button`; activity buttons | — | Only “Show Blocks Sidebar” (`view.blocks`), not a true toggle | View menu | Contextual panel controls | Yes | High: `toolbox-hidden` and mobile drawer states differ |
 | Close responsive sidebar | Close sidebar drawer via scrim | Responsive scrim | `sidebar-scrim` | — | No | Responsive drawer | — | No | Critical: drawer implementation is frozen pending tests |
 | Resize sidebar | Change persisted sidebar width | Divider between sidebar/workspace | `sidebar-resizer` | ArrowLeft/ArrowRight (24 px) | No | Layout control | Drag handle | Yes | Critical: pointer capture via window and persisted CSS variable |
@@ -41,20 +39,19 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 | Expand/collapse toolbox category | Show/hide category’s block list | Dynamic category headers | Dynamic `.toolbox-category-header`; generated list IDs | Enter/Space via button semantics | No | Categorized toolbox | — | No | Medium: dynamic `aria-expanded`/`aria-controls` |
 | Add block from toolbox | Instantiate block in main workspace | Dynamic toolbox block button | Dynamic `.toolbox-block`, `data-block-type` | Enter/Space via button semantics | No | Categorized toolbox | — | No | Critical: required blocks, placement, grammar, autosave |
 | Drag block from toolbox | Place a new block at drop coordinates | Toolbox to workspace drag/drop | `blockly-area`; dynamic toolbox button; custom MIME type | — | No | Categorized toolbox | — | No | Critical: behaviorally significant drag data and drop target |
-| Run program | Execute Model A and show output | Header; workspace toolbar; Run sidebar | `header-run-program`, `run-program`, `sidebar-run-program` | Ctrl/Cmd+F5 | Yes (`run.program`) | Header Run | Workspace toolbar and command palette | Yes | Critical: all routes converge on `runProgram` |
-| Open CESK machine | Open Machine bottom tab | Run sidebar; bottom Machine tab | `sidebar-open-cesk`; dynamic `bottom-tab-machine` | Bottom tab arrow navigation | Yes (`analysis.machine`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
-| Compare models | Open Model A/B comparison | Run sidebar; bottom Compare tab | `sidebar-open-compare`; dynamic `bottom-tab-compare` | Bottom tab arrow navigation | Yes (`analysis.compare`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
-| Open rewrite semantics | Open substitution/rewrite tool | Run sidebar; bottom Rewrite tab | `sidebar-open-rewrite`; dynamic `bottom-tab-subst` | Bottom tab arrow navigation | Yes (`analysis.rewrite`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
-| Visualize call-by-structure | Visualize selected or first block | Run sidebar; bottom tab; eligible block context menu | `sidebar-open-structure`; dynamic `bottom-tab-structure` | Bottom tab arrow navigation | No | Bottom Semantics/runtime tools | Block context menu | Yes | Critical: selected-block semantics and Blockly rendering |
-| Visualize call-by-value | Visualize selected or first block | Run sidebar; bottom tab; eligible block context menu | `sidebar-open-value`; dynamic `bottom-tab-value` | Bottom tab arrow navigation | No | Bottom Semantics/runtime tools | Block context menu | Yes | Critical: selected-block semantics and Blockly rendering |
-| Toggle inspector | Show/hide right inspector | View menu; Settings sidebar | `view-toggle-inspector`, `settings-toggle-code` | — | Yes (`view.inspector`) | View menu | Settings/layout and palette | Yes | High |
-| Toggle bottom tools | Show/hide bottom panel | View menu; Settings sidebar | `top-toggle-bottom-panel`, `settings-toggle-bottom` | Ctrl/Cmd+J | Yes (`view.bottom`) | View menu | Settings/layout and palette | Yes | High |
-| Set autosave interval | Persist interval from 2–20 minutes | Settings sidebar | `autosave-interval`, `autosave-interval-label` | Range-input keys | No | Settings | — | No | High: timer restart and persistence |
-| Switch Edit perspective | Apply editing-oriented saved layout | View menu; Settings cards | `perspective-select`; `.perspective-option[data-perspective="edit"]` | — | Yes (`perspective.edit`) | Settings/Perspectives | View menu or palette | Yes | Critical: coordinated multi-panel state |
-| Switch Debug perspective | Open Run activity, Outline, Machine | View menu; Settings cards | `perspective-select`; debug perspective option | — | Yes (`perspective.debug`) | Settings/Perspectives | View menu or palette | Yes | Critical |
-| Switch Type Analysis perspective | Open Outline and Problems and refresh diagnostics | View menu; Settings cards | `perspective-select`; types perspective option | — | Yes (`perspective.types`) | Settings/Perspectives | View menu or palette | Yes | Critical |
-| Switch Presentation perspective | Hide sidebar, inspector, and bottom panel | View menu; Settings cards | `perspective-select`; presentation perspective option | — | Yes (`perspective.presentation`) | Settings/Perspectives | View menu or palette | Yes | Critical |
-| Open perspective settings | Navigate to Settings activity | View menu | `status-perspective` | — | No | View menu | Settings activity | Yes | Medium |
+| Run program | Execute Model A and show output | Header; workspace toolbar | `header-run-program`, `run-program` | Ctrl/Cmd+F5 | Yes (`run.program`) | Header Run | Workspace toolbar and command palette | Yes | Critical: all routes converge on `runProgram` |
+| Open CESK machine | Open Machine bottom tab | Bottom Machine tab | Dynamic `bottom-tab-machine` | Bottom tab arrow navigation | Yes (`analysis.machine`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
+| Compare models | Open Model A/B comparison | Bottom Compare tab | Dynamic `bottom-tab-compare` | Bottom tab arrow navigation | Yes (`analysis.compare`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
+| Open rewrite semantics | Open substitution/rewrite tool | Bottom Rewrite tab | Dynamic `bottom-tab-subst` | Bottom tab arrow navigation | Yes (`analysis.rewrite`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
+| Visualize call-by-structure | Visualize selected or first block | Bottom tab; eligible block context menu | Dynamic `bottom-tab-structure` | Bottom tab arrow navigation | No | Bottom Semantics/runtime tools | Block context menu | Yes | Critical: selected-block semantics and Blockly rendering |
+| Visualize call-by-value | Visualize selected or first block | Bottom tab; eligible block context menu | Dynamic `bottom-tab-value` | Bottom tab arrow navigation | No | Bottom Semantics/runtime tools | Block context menu | Yes | Critical: selected-block semantics and Blockly rendering |
+| Toggle inspector | Show/hide right inspector | View menu; inspector header | `view-toggle-inspector`, `toggle-code-column` | — | Yes (`view.inspector`) | View menu | Inspector-local close and palette | Yes | High |
+| Toggle bottom tools | Show/hide bottom panel | View menu; bottom-panel close | `top-toggle-bottom-panel`, `viz-collapse` | Ctrl/Cmd+J | Yes (`view.bottom`) | View menu | Bottom panel and palette | Yes | High |
+| Set autosave interval | Persist interval from 2–20 minutes | View menu | `autosave-interval`, `autosave-interval-label` | Range-input keys | No | View menu | — | No | High: timer restart and persistence |
+| Switch Edit perspective | Apply editing-oriented saved layout | View menu | `perspective-select` | — | Yes (`perspective.edit`) | View menu | Command palette | Yes | Critical: coordinated multi-panel state |
+| Switch Debug perspective | Open Outline and Machine | View menu | `perspective-select` | — | Yes (`perspective.debug`) | View menu | Command palette | Yes | Critical |
+| Switch Type Analysis perspective | Open Outline and Problems and refresh diagnostics | View menu | `perspective-select` | — | Yes (`perspective.types`) | View menu | Command palette | Yes | Critical |
+| Switch Presentation perspective | Hide sidebar, inspector, and bottom panel | View menu | `perspective-select` | — | Yes (`perspective.presentation`) | View menu | Command palette | Yes | Critical |
 
 ## Workspace and inspector commands
 
@@ -64,9 +61,7 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 | Redo block change | Blockly redo | Workspace toolbar | `workspace-redo` | Title advertises Ctrl+Y; Blockly/browser handling | Yes (`workspace.redo`) | Workspace toolbar | Command palette | Yes | High |
 | Zoom out | Decrease Blockly scale around center | Workspace toolbar; Blockly-injected controls/wheel | `workspace-zoom-out` | Ctrl+wheel/pinch through Blockly | No | Workspace toolbar | Blockly native controls | Yes | High: renderer/workspace API |
 | Zoom in | Increase Blockly scale around center | Workspace toolbar; Blockly-injected controls/wheel | `workspace-zoom-in` | Ctrl+wheel/pinch through Blockly | No | Workspace toolbar | Blockly native controls | Yes | High |
-| Reset zoom | Set scale to 100% and center | Workspace toolbar zoom indicator | `zoom-indicator`, `zoom-size` | — | No | Workspace toolbar | Command palette | No | Medium |
-| Fit workspace | Fit blocks in viewport | Workspace toolbar; Blockly-injected zoom controls | `workspace-fit` | — | Yes (`workspace.fit`) | Workspace toolbar | Command palette | Yes | High: must update zoom readout |
-| Show inspector | Reveal hidden right inspector | Workspace reveal button | `show-code-button` | — | Palette toggle (`view.inspector`) | View menu | Workspace reveal affordance | Yes | High |
+| Fit workspace | Fit blocks in viewport | Workspace toolbar; Blockly-injected zoom controls | `workspace-fit` | — | Yes (`workspace.fit`) | Workspace toolbar | Command palette | Yes | High |
 | Hide inspector | Hide right inspector | Inspector header | `toggle-code-column` | — | Palette toggle (`view.inspector`) | View menu | Inspector-local close | Yes | High |
 | Close responsive inspector | Close inspector drawer via scrim | Responsive scrim | `code-scrim` | — | No | Responsive drawer | — | No | Critical: drawer implementation is frozen pending tests |
 | Resize inspector | Change persisted inspector width | Divider between workspace/inspector | `code-resizer` | ArrowLeft/ArrowRight (24 px) | No | Layout control | Drag handle | Yes | Critical: layout geometry reverses pointer direction |
@@ -86,7 +81,7 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 
 | Command name | Purpose | Current visible locations | Current element IDs | Keyboard shortcut | Command-palette entry | Primary future location | Secondary permitted location | Duplicated | Migration risk |
 |---|---|---|---|---|---|---|---|---|---|
-| Toggle bottom panel | Open/close bottom tools | Header menu; workspace toolbar; Settings | `top-toggle-bottom-panel`, `toggle-viz-dock`, `settings-toggle-bottom`, `viz-dock` | Ctrl/Cmd+J | Yes (`view.bottom`) | View menu | Workspace toolbar or palette | Yes | Critical: four routes, persisted state, maximization reset |
+| Toggle bottom panel | Open/close bottom tools | Header menu; bottom-panel close | `top-toggle-bottom-panel`, `viz-collapse`, `viz-dock` | Ctrl/Cmd+J | Yes (`view.bottom`) | View menu | Bottom panel or palette | Yes | Critical: persisted state and maximization reset |
 | Select Problems | Show/refresh type diagnostics | Bottom tab; status bar | dynamic `bottom-tab-problems`, `status-problems-button` | Bottom tab Left/Right/Home/End | Yes (`view.problems`) | Bottom panel / Problems | Status bar and palette | Yes | High |
 | Select Output | Show latest run/semantic output | Bottom tab; Run opens it implicitly | dynamic `bottom-tab-output`, `bottom-program-output` | Bottom tab navigation | No | Bottom panel / Output | Run result may focus it | Yes | Medium |
 | Select semantic/runtime tab | Switch among Structure, Value, Machine, Compare, Rewrite | Bottom tab strip | dynamic `bottom-tab-{structure,value,machine,compare,subst}` | Left/Right/Home/End | Machine/Compare/Rewrite only | Bottom panel / Semantics and runtime | Command palette | Yes | High: IDs and ARIA are generated at initialization |
@@ -131,16 +126,15 @@ retaining every prior shortcut and contextual route:
 |---|---|---|
 | File | New, Open, Save, Export MiniJava, Restore autosave | `file.*` palette entries; Ctrl/Cmd+N, O, S; dialogs and hidden file input |
 | Examples | Open example list, replace, merge, cancel | Native dialog cancellation and Escape dismissal |
-| Run | Run program | Workspace Run, Run sidebar, `run.program`, Ctrl/Cmd+F5 |
-| View | Sidebar, inspector, bottom tools, perspective, theme, Settings/layout | Contextual show/hide controls, Settings activity, `view.*`, `perspective.*`, `theme.toggle`, Ctrl/Cmd+J |
+| Run | Run program | Header Run, workspace Run, `run.program`, Ctrl/Cmd+F5 |
+| View | Sidebar, inspector, bottom tools, perspective, theme, autosave interval | Contextual panel controls, `view.*`, `perspective.*`, `theme.toggle`, Ctrl/Cmd+J |
 | More | Command palette, About | Ctrl/Cmd+Shift+P and F1 for the palette |
 | Status | Show Problems | Problems bottom tab and `view.problems` |
 | Workspace/inspector/bottom panels | Undo, Redo, zoom/reset/Fit, Copy, Print, panel maximize/close, semantic and runtime controls | Existing palette entries, shortcuts, tabs, and Blockly context menus recorded above |
 
 The renderer name and internal implementation details are no longer present in
-normal status chrome. `status-perspective` and `status-perspective-label` retain
-their identities in View, so the existing state updater and Settings launcher
-remain connected without duplicating perspective state in the status bar.
+normal status chrome. Perspective selection and the autosave interval live in
+View; the Blocks sidebar contains only block-location tools.
 
 All File, View, More, and Examples menus support Arrow Up/Down, Home/End, and
 Escape with focus restoration. The responsive `menu-toggle`/`main-menu`
@@ -150,12 +144,11 @@ relationship remains the mobile container for the same commands.
 
 The following duplication can be reduced later without deleting reachability, after handlers are centralized and regression coverage exists:
 
-- Keep Header Run as the primary action and `run-program` in the workspace toolbar as its explicit secondary route; the Run-sidebar copy can be removed once its activity still exposes analysis tools and the palette retains `run.program`.
-- Keep one View-menu bottom-panel toggle plus `Ctrl/Cmd+J`; the View `top-toggle-bottom-panel`, workspace `toggle-viz-dock`, and Settings `settings-toggle-bottom` do not all need to remain visible.
-- Keep one View-menu inspector toggle plus inspector-local hide/show affordances needed for recovery; the Settings duplicate can later be removed.
-- Keep perspectives in Settings and the command palette, with the View selector as the compact secondary route; no perspective control needs to return to the status bar.
-- Machine, Compare, and Rewrite should remain primary bottom-panel tabs with palette entries; sidebar launch buttons are redundant once the bottom tab strip is reachable when closed.
-- Structure and Value should remain bottom tools and method-call context actions; generic sidebar copies are optional.
-- Fit, zoom, and undo/redo currently overlap with Blockly-owned controls/keyboard behavior. Remove only a visibly duplicated control, never the underlying Blockly capability.
+- Header Run is primary and the labeled workspace `run-program` button is its explicit secondary route; the palette retains `run.program`.
+- View owns the bottom-panel toggle and `Ctrl/Cmd+J`; the workspace toolbar contains no output control.
+- View owns inspector recovery; the workspace toolbar contains no inspector control.
+- Perspectives and the autosave interval remain in View and the command palette retains perspective/theme commands.
+- Machine, Compare, Rewrite, Structure, and Value remain reachable through bottom tabs, context menus where applicable, and the command palette.
+- Fit, zoom, undo, and redo keep their Blockly-backed behavior while the toolbar removes the nonessential zoom-reset readout.
 
 No duplicate is authorized for removal by this inventory. Any future removal must first prove keyboard, responsive, and command-palette reachability.

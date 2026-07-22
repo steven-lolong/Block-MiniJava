@@ -23,13 +23,13 @@ All literal IDs below are queried by `getElementById`/`byId`, observed, or suppl
 | Header/global | `main-menu`, `menu-toggle`, `theme-toggle`, `about-button`, `about-modal` | May move but must retain identity | Compact menu state, theme state, and About dialog. |
 | Examples | `examples-button`, `examples-panel`, `example-load-modal`, `example-load-name` | May move but must retain identity | Menu construction/dismissal and replace/merge dialog. |
 | Command palette | `command-palette-trigger`, `command-palette-overlay`, `command-palette-input`, `command-palette-list` | Must preserve exactly | Palette focus trap-like behavior, filter/results, overlay dismissal, global shortcut, and focus restoration. |
-| Sidebar/activity content | `toolbox-content`, `toolbox-search`, `sidebar-title`, `sidebar-title-icon`, `toggle-toolbox`, `show-toolbox-button`, `sidebar-scrim` | May move but must retain identity | Dynamic toolbox, activity title, desktop visibility, and responsive close. |
-| Sidebar run/settings commands | `sidebar-run-program`, `sidebar-open-cesk`, `sidebar-open-compare`, `sidebar-open-rewrite`, `sidebar-open-structure`, `sidebar-open-value`, `settings-toggle-code`, `settings-toggle-bottom`, `autosave-interval`, `autosave-interval-label` | May move but must retain identity | Direct handlers. An ID can be retired only in a later atomic command migration after its binding moves. |
+| Sidebar/activity content | `toolbox-content`, `toolbox-search`, `sidebar-title`, `sidebar-title-icon`, `toggle-toolbox`, `show-toolbox-button`, `sidebar-scrim` | Must preserve exactly | Blocks-only toolbox, desktop visibility, and responsive drawer close. |
+| View preferences | `autosave-interval`, `autosave-interval-label` | Must preserve exactly | Moved from the removed Settings sidebar into View; retains timer restart and persistence behavior. |
 | Resizers | `sidebar-resizer`, `code-resizer`, `viz-resizer` | Must preserve exactly | Pointer and keyboard resize roots; responsive CSS also targets them. |
-| Workspace toolbar | `workspace-undo`, `workspace-redo`, `workspace-zoom-out`, `workspace-zoom-in`, `workspace-fit`, `zoom-indicator`, `zoom-size`, `toggle-viz-dock`, `show-code-button` | May move but must retain identity | Direct handlers and zoom status. |
+| Workspace toolbar | `workspace-undo`, `workspace-redo`, `workspace-zoom-out`, `workspace-zoom-in`, `workspace-fit`, `run-program` | Must preserve exactly | The quiet toolbar's complete command set; all controls call the existing Blockly/run handlers. |
 | Inspector controls | `copy-code`, `print-typing`, `toggle-code-maximize`, `toggle-code-column`, `code-scrim` | May move but must retain identity | Direct handlers, tab-dependent visibility, maximization, and drawer close. |
 | Inspector content | `panel-code`, `generated-code`, `panel-typing`, `typing-method-select`, `typing-gamma`, `typing-tree`, `typing-print-title`, `typing-print-meta`, `program-outline` | Must preserve exactly | Editor installation, code generation fallback, typing render/print, and dynamic outline render. |
-| Status | `status-perspective`, `status-perspective-label`, `status-block-count`, `status-problems-button`, `status-problems-count`, `autosave-status` | May move but must retain identity | Direct handlers and live status updates. |
+| Status | `status-block-count`, `status-problems-button`, `status-problems-count`, `autosave-status` | Must preserve exactly | Live workspace metrics and diagnostics status. |
 | Bottom shell/actions | `top-toggle-bottom-panel`, `viz-dock-info`, `viz-rerun`, `viz-arrange`, `viz-maximize`, `viz-collapse`, `viz-empty` | May move but must retain identity | Bottom state/action binding and active-tool description. |
 | Problems/output | `bottom-problems-count`, `bottom-problems-list`, `bottom-program-output` | Must preserve exactly | Diagnostics counters/list and program/stepper console mirroring. These are queried through both literal and array-driven helper calls. |
 | Machine controls/content | `stepper-load`, `stepper-back`, `stepper-step`, `stepper-play`, `stepper-gc`, `stepper-gc-auto-enabled`, `stepper-gc-threshold`, `stepper-status`, `stepper-arrows`, `stepper-control`, `stepper-frames`, `stepper-heap`, `stepper-kont`, `stepper-output` | Must preserve exactly | Direct semantic-control bindings and dynamic visualization roots. |
@@ -38,7 +38,7 @@ All literal IDs below are queried by `getElementById`/`byId`, observed, or suppl
 | Dynamically assigned bottom IDs | `bottom-tab-{problems,output,structure,value,machine,compare,subst}` and `bottom-panel-{problems,output,structure,value,machine,compare,subst}` | Must preserve exactly | `initVisualizationPanel` assigns these IDs and wires their reciprocal ARIA relationships. |
 | Editor-generated IDs | `generated-code-editor`, `code-editor-status` | May rename after updating references and tests | Created by `codeEditor.ts`; coupled primarily to labels/styles and editor tests rather than static HTML. Preserve during the current refactor. |
 
-Static IDs such as `activity-blocks`, `activity-search`, `activity-run`, `activity-settings`, `tab-code`, `tab-typing`, and `tab-outline` are not looked up by their ID in TypeScript, but they are ARIA targets, stable automation hooks, or explicitly part of the current DOM contract. Classify them as **May move but must retain identity**, not presentation-only.
+Static IDs such as `activity-blocks`, `activity-search`, `tab-code`, `tab-typing`, and `tab-outline` are not looked up by their ID in TypeScript, but they are ARIA targets, stable automation hooks, or explicitly part of the current DOM contract. Classify them as **May move but must retain identity**, not presentation-only.
 
 ## Classes queried or mutated by TypeScript
 
@@ -71,8 +71,7 @@ Static IDs such as `activity-blocks`, `activity-search`, `activity-run`, `activi
 | Selector/class | Use | Classification |
 |---|---|---|
 | `.activity-item[data-activity]` | Bind/select activity controls | Must preserve exactly |
-| `.sidebar-view[data-activity-view]` | Select activity content and set `aria-hidden` | Must preserve exactly |
-| `.perspective-option[data-perspective]`, `.perspective-option` | Bind and update perspective controls | Must preserve exactly |
+| `.sidebar-view[data-activity-view]` | Blocks/search toolbox host | Must preserve exactly |
 | `.inspector-tab`, `.inspector-panel` | Bind tabs, manage roving focus, activate panel | Must preserve exactly |
 | `.ide-layout` | Measure available layout during inspector resize | Must preserve exactly |
 | `.project-name` | Mirror loaded filename into header identity | May move but must retain identity |
@@ -93,8 +92,8 @@ Classes not read or mutated by TypeScript and used only to apply appearance—su
 
 | HTML attribute | Values/owner | Classification | Dependency |
 |---|---|---|---|
-| `data-activity` | `blocks`, `search`, `run`, `settings` on activity buttons | Must preserve exactly | Selection and click routing. |
-| `data-activity-view` | Space-separated activity membership on sidebar views | Must preserve exactly | Controls shared Blocks/Search view and exclusive Run/Settings views. |
+| `data-activity` | `blocks`, `search` on activity buttons | Must preserve exactly | Selection, drawer visibility, and search-focus routing. |
+| `data-activity-view` | `blocks search` on the toolbox host | Must preserve exactly | Documents the sole Blocks/Search sidebar view. |
 | `data-perspective` | `edit`, `debug`, `types`, `presentation` | Must preserve exactly | Perspective click routing and selected styling. |
 | `data-panel` | `code`, `typing`, `outline` | Must preserve exactly | Inspector tab-to-panel mapping. |
 | `data-kind` | Bottom kinds on `.viz-tab`/`.viz-host`; runtime control kind on generated nodes | Must preserve exactly | Bottom resolution and semantic rendering. |
@@ -163,12 +162,12 @@ The responsive drawer and resize implementations are explicitly frozen until reg
 | Perspective | Activity/sidebar | Inspector | Bottom | Classification |
 |---|---|---|---|---|
 | `edit` | Blocks, visible | Visible, Code, not maximized | Closed | Must preserve exactly |
-| `debug` | Run, visible | Visible, Outline, not maximized | Open on Machine | Must preserve exactly |
+| `debug` | Blocks, visible | Visible, Outline, not maximized | Open on Machine | Must preserve exactly |
 | `types` | Blocks, visible | Visible, Outline, not maximized | Open on Problems; diagnostics refreshed | Must preserve exactly |
 | `presentation` | Sidebar hidden | Hidden, maximization cleared | Closed | Must preserve exactly |
 | `custom` | Records manual visibility/layout divergence | Existing current arrangement | Existing current arrangement | Must preserve exactly |
 
-Perspective identity is reflected by `body[data-perspective]`, `body.presentation-mode`, `#perspective-select`, `.perspective-option.is-active`, the status label, and local storage. Manual inspector/sidebar/bottom visibility changes mark `custom`; raw resizing currently does not.
+Perspective identity is reflected by `body[data-perspective]`, `body.presentation-mode`, `#perspective-select`, and local storage. Manual inspector/sidebar/bottom visibility changes mark `custom`; raw resizing currently does not.
 
 ## Persisted UI-state keys
 
@@ -181,7 +180,7 @@ Perspective identity is reflected by `body[data-perspective]`, `body.presentatio
 | `block-minijava.layout.code.visible` | Boolean string | `app.ts` | Must preserve exactly |
 | `block-minijava.layout.sidebar.width` | Sidebar width in px | `app.ts` | Must preserve exactly |
 | `block-minijava.layout.sidebar.visible` | Boolean string | `app.ts` | Must preserve exactly |
-| `block-minijava.layout.activity` | `blocks`, `search`, `run`, or `settings` | `app.ts` | Must preserve exactly |
+| `block-minijava.layout.activity` | `blocks` or `search` | `app.ts` | Must preserve exactly; legacy `run`/`settings` values restore as `blocks`. |
 | `block-minijava.layout.perspective` | Named perspective or `custom` | `app.ts` | Must preserve exactly |
 | `block-minijava.layout.bottom.open` | Boolean string | `visualizationPanel.ts` | Must preserve exactly |
 | `block-minijava.layout.bottom.height` | Bottom height in px | `visualizationPanel.ts` | Must preserve exactly |
@@ -199,7 +198,7 @@ Removal or weakening of these selector families changes behavior, not merely app
 | `body.code-maximized ...`, `body.bottom-maximized ...`, `body.presentation-mode ...` | Replaces major grid regions and hides competing surfaces | Must preserve exactly |
 | `body.mobile-sidebar-open ...`, `body.mobile-code-open ...`, `.panel-scrim` rules under 1100 px | Responsive drawers and scrims | Must preserve exactly |
 | `#viz-dock[data-open="true"]`, `.viz-host[data-active="true"]`, `.viz-tab[aria-selected="true"]` | Opens panel and displays/selects one tool | Must preserve exactly |
-| `.sidebar-view.is-active`, `.inspector-panel.is-active`, `.inspector-tab.is-active`, `.activity-item.is-active`, `.perspective-option.is-active` | Shows current activity/panel and communicates selection | Must preserve exactly |
+| `.sidebar-view.is-active`, `.inspector-panel.is-active`, `.inspector-tab.is-active`, `.activity-item.is-active` | Shows the blocks/search activity and inspector selection | Must preserve exactly |
 | `.command-palette-overlay[hidden]`, `body.command-palette-open`, `.command-palette-option.is-selected` | Palette visibility, page scroll/state, selected result | Must preserve exactly |
 | `.examples-panel.examples-open`, `.main-menu.menu-open` | Menu visibility at their responsive contexts | Must preserve exactly |
 | `.toolbox-category.collapsed ...`, `.typ-row.is-open ...` | Dynamic disclosure content | Must preserve exactly |

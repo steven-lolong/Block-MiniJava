@@ -156,7 +156,7 @@ export function isVizOpen(): boolean {
 
 export function setVizOpen(open: boolean): void {
   dock().dataset.open = String(open);
-  for (const id of ['toggle-viz-dock', 'top-toggle-bottom-panel']) {
+  for (const id of ['top-toggle-bottom-panel']) {
     document.getElementById(id)?.setAttribute('aria-pressed', String(open));
   }
   const viewToggle = document.getElementById('top-toggle-bottom-panel');
@@ -293,7 +293,6 @@ export function initVisualizationPanel(layoutChange: () => void): void {
     Blockly.svgResize(view.workspace);
   });
   byId<HTMLButtonElement>('viz-collapse').addEventListener('click', () => setVizOpen(false));
-  byId<HTMLButtonElement>('toggle-viz-dock').addEventListener('click', () => setVizOpen(!isVizOpen()));
   byId<HTMLButtonElement>('top-toggle-bottom-panel').addEventListener('click', () => setVizOpen(!isVizOpen()));
   byId<HTMLButtonElement>('viz-maximize').addEventListener('click', (event) => {
     const button = event.currentTarget as HTMLButtonElement;

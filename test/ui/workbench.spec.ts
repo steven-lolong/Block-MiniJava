@@ -48,7 +48,7 @@ test('header menus and compact status preserve global command reachability', asy
   await page.keyboard.press('Escape');
 
   await openHeaderMenu(page, 'view');
-  for (const id of ['view-toggle-sidebar', 'view-toggle-inspector', 'top-toggle-bottom-panel', 'perspective-select', 'theme-toggle', 'status-perspective']) {
+  for (const id of ['view-toggle-sidebar', 'view-toggle-inspector', 'top-toggle-bottom-panel', 'perspective-select', 'theme-toggle', 'autosave-interval']) {
     await expect(page.locator(`#${id}`)).toBeVisible();
   }
   await page.keyboard.press('Escape');
@@ -75,8 +75,63 @@ test('desktop sidebar and inspector can be hidden and restored', async ({ page }
 
   await page.locator('#toggle-code-column').click();
   await expect(page.locator('body')).toHaveClass(/code-hidden/);
-  await page.locator('#show-code-button').click();
+  await openHeaderMenu(page, 'view');
+  await page.locator('#view-toggle-inspector').click();
   await expect(page.locator('body')).not.toHaveClass(/code-hidden/);
+  expectNoUncaughtErrors(errors);
+});
+
+test('blocks-only sidebar and quiet workspace toolbar preserve editing workflows', async ({ page }) => {
+  const errors = await openFreshApp(page);
+  await expect(page.locator('#sidebar-title')).toHaveText('Blocks');
+  await expect(page.locator('.sidebar-view')).toHaveCount(1);
+  await expect(page.locator('#toolbox-search')).toBeVisible();
+  await expect(page.locator('#toolbox-content .toolbox-category')).toHaveCount(6);
+
+  const toolbarIds = await page.locator('.workspace-tools button').evaluateAll((buttons) =>
+    buttons.map((button) => button.id)
+  );
+  expect(toolbarIds).toEqual([
+    'workspace-undo',
+    'workspace-redo',
+    'workspace-zoom-out',
+    'workspace-zoom-in',
+    'workspace-fit',
+    'run-program'
+  ]);
+  await expect(page.locator('#run-program')).toContainText('Run');
+
+  await page.locator('#toolbox-search').fill('integer');
+  await expect(page.locator('#toolbox-content [data-block-type="mj_expr_integer"]')).toBeVisible();
+  await expect(page.locator('#toolbox-content .toolbox-category')).toHaveCount(1);
+  await page.locator('#toolbox-search').fill('');
+
+  const expressions = page.locator('[data-category="expressions"] .toolbox-category-header');
+  await expressions.click();
+  await expect(expressions).toHaveAttribute('aria-expanded', 'false');
+  await expressions.click();
+  await expect(expressions).toHaveAttribute('aria-expanded', 'true');
+
+  const beforeAdd = await page.locator('#status-block-count').textContent();
+  const integer = page.locator('#toolbox-content [data-block-type="mj_expr_integer"]');
+  await integer.click();
+  await expect(page.locator('#status-block-count')).not.toHaveText(beforeAdd || '');
+  await page.locator('#workspace-undo').click();
+  await expect(page.locator('#status-block-count')).toHaveText(beforeAdd || '');
+  await page.locator('#workspace-redo').click();
+  await expect(page.locator('#status-block-count')).not.toHaveText(beforeAdd || '');
+
+  const scaleBefore = await page.evaluate(() => (window as any).Blockly.getMainWorkspace().getScale());
+  await page.locator('#workspace-zoom-in').click();
+  await expect.poll(() => page.evaluate(() => (window as any).Blockly.getMainWorkspace().getScale())).toBeGreaterThan(scaleBefore);
+  await page.locator('#workspace-zoom-out').click();
+  await page.locator('#workspace-fit').click();
+
+  const beforeDrag = await page.locator('#status-block-count').textContent();
+  await integer.dragTo(page.locator('#blockly-area'));
+  await expect(page.locator('#status-block-count')).not.toHaveText(beforeDrag || '');
+  await page.locator('#run-program').click();
+  await expect(page.locator('#bottom-tab-output')).toHaveAttribute('aria-selected', 'true');
   expectNoUncaughtErrors(errors);
 });
 
@@ -178,7 +233,7 @@ test('theme and autosave interval remain configurable and restore after reload',
   const errors = await openFreshApp(page);
   await toggleTheme(page);
   await expect(page.locator('body')).toHaveAttribute('data-theme', 'light');
-  await page.locator('#activity-settings').click();
+  await openHeaderMenu(page, 'view');
   const interval = page.locator('#autosave-interval');
   await interval.focus();
   await interval.press('ArrowRight');
@@ -240,7 +295,9 @@ test('mobile sidebar and inspector drawers open and close with their scrims', as
   await page.mouse.click(380, 420);
   await expect(page.locator('body')).not.toHaveClass(/mobile-sidebar-open/);
 
-  await page.locator('#show-code-button').click();
+  await page.locator('#menu-toggle').click();
+  await page.locator('#view-menu-button').click();
+  await page.locator('#view-toggle-inspector').click();
   await expect(page.locator('body')).toHaveClass(/mobile-code-open/);
   await page.locator('#code-scrim').dispatchEvent('click');
   await expect(page.locator('body')).not.toHaveClass(/mobile-code-open/);
@@ -251,7 +308,7 @@ test('persisted state can be loaded in a fresh browser page', async ({ browser }
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   const errors = await openFreshApp(page);
-  await page.locator('#toggle-viz-dock').click();
+  await openBottomPanel(page);
   await selectPerspective(page, 'debug');
   const restored = await context.newPage();
   const restoredErrors = await openPersistedApp(restored);

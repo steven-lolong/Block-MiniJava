@@ -28,6 +28,7 @@ function matches(command: IdeCommand, query: string): boolean {
 
 /** Installs the keyboard-first command surface without owning application commands. */
 export function installCommandPalette(commands: IdeCommand[]): CommandPaletteController {
+  const app = byId<HTMLElement>('app');
   const overlay = byId<HTMLDivElement>('command-palette-overlay');
   const input = byId<HTMLInputElement>('command-palette-input');
   const list = byId<HTMLDivElement>('command-palette-list');
@@ -38,14 +39,20 @@ export function installCommandPalette(commands: IdeCommand[]): CommandPaletteCon
   let restoreFocus: HTMLElement | null = null;
 
   const selectIndex = (next: number): void => {
-    if (visible.length === 0) return;
+    if (visible.length === 0) {
+      input.removeAttribute('aria-activedescendant');
+      return;
+    }
     selectedIndex = (next + visible.length) % visible.length;
     const options = Array.from(list.querySelectorAll<HTMLButtonElement>('.command-palette-option'));
     options.forEach((option, index) => {
       const selected = index === selectedIndex;
       option.classList.toggle('is-selected', selected);
       option.setAttribute('aria-selected', String(selected));
-      if (selected) option.scrollIntoView({ block: 'nearest' });
+      if (selected) {
+        input.setAttribute('aria-activedescendant', option.id);
+        option.scrollIntoView({ block: 'nearest' });
+      }
     });
   };
 
@@ -61,6 +68,7 @@ export function installCommandPalette(commands: IdeCommand[]): CommandPaletteCon
     list.replaceChildren();
 
     if (visible.length === 0) {
+      input.removeAttribute('aria-activedescendant');
       const empty = document.createElement('div');
       empty.className = 'command-palette-empty';
       empty.textContent = 'No matching commands';
@@ -74,6 +82,8 @@ export function installCommandPalette(commands: IdeCommand[]): CommandPaletteCon
       option.className = 'command-palette-option';
       option.setAttribute('role', 'option');
       option.setAttribute('aria-selected', String(index === selectedIndex));
+      option.id = `command-option-${command.id.replace(/[^a-z0-9_-]/gi, '-')}`;
+      option.tabIndex = -1;
       option.dataset.commandId = command.id;
 
       const text = document.createElement('span');
@@ -98,13 +108,16 @@ export function installCommandPalette(commands: IdeCommand[]): CommandPaletteCon
       option.classList.toggle('is-selected', index === selectedIndex);
       list.appendChild(option);
     });
+    selectIndex(selectedIndex);
   };
 
   const controller: CommandPaletteController = {
     open: (query = '') => {
       restoreFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       overlay.hidden = false;
+      app.inert = true;
       document.body.classList.add('command-palette-open');
+      input.setAttribute('aria-expanded', 'true');
       input.value = query;
       selectedIndex = 0;
       render();
@@ -113,7 +126,10 @@ export function installCommandPalette(commands: IdeCommand[]): CommandPaletteCon
     close: () => {
       if (overlay.hidden) return;
       overlay.hidden = true;
+      app.inert = false;
       document.body.classList.remove('command-palette-open');
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
       restoreFocus?.focus();
       restoreFocus = null;
     }
@@ -142,6 +158,11 @@ export function installCommandPalette(commands: IdeCommand[]): CommandPaletteCon
   });
   overlay.addEventListener('pointerdown', (event) => {
     if (event.target === overlay) controller.close();
+  });
+  overlay.addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab') return;
+    event.preventDefault();
+    input.focus();
   });
   document.addEventListener('keydown', (event) => {
     const paletteShortcut = (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLocaleLowerCase() === 'p';

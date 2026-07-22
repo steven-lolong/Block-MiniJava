@@ -10,10 +10,8 @@ import {
   initVisualizationPanel,
   isVizOpen,
   openBottomTool,
-  openVisualization,
   resizeVisualizationPanel,
-  setVizOpen,
-  type VizKind
+  setVizOpen
 } from './visualizationPanel';
 import { initExamplesMenu } from './examplesMenu';
 import type { MiniJavaExample } from '../examples';
@@ -26,6 +24,7 @@ import { initSubstPanel } from './substPanel';
 import { appendConsoleLog, mirrorProgramOutput } from './programConsole';
 import { injectMachine, run } from '../semantics/minijavaMachine';
 import { installCommandPalette, type IdeCommand } from './commandPalette';
+import { downloadScreenshot } from './screenshot';
 
 const AUTOSAVE_KEY = 'block-minijava.autosave.v2';
 const THEME_KEY = 'block-minijava.theme';
@@ -36,6 +35,7 @@ const SIDEBAR_WIDTH_KEY = 'block-minijava.layout.sidebar.width';
 const SIDEBAR_VISIBLE_KEY = 'block-minijava.layout.sidebar.visible';
 const ACTIVE_ACTIVITY_KEY = 'block-minijava.layout.activity';
 const PERSPECTIVE_KEY = 'block-minijava.layout.perspective';
+const INSPECTOR_PANEL_KEY = 'block-minijava.layout.inspector.panel';
 
 let workspace: Blockly.WorkspaceSvg | null = null;
 let codeEditor: EditableMiniJavaCodeEditor | null = null;
@@ -57,6 +57,10 @@ let compactPanelLayout = window.matchMedia('(max-width: 1100px)').matches;
 let layoutResizeFrame: number | null = null;
 let layoutResizeTimers: number[] = [];
 let layoutResizeObserver: ResizeObserver | null = null;
+const drawerFocusReturn: Record<'sidebar' | 'code', HTMLElement | null> = {
+  sidebar: null,
+  code: null
+};
 
 const TOOLBOX_BLOCK_MIME = 'application/x-block-minijava-block';
 const [GOAL_BLOCK_TYPE, MAIN_BLOCK_TYPE] = MINI_JAVA_REQUIRED_BLOCK_TYPES;
@@ -68,17 +72,28 @@ const BLOCK_WORKSPACE_MUTATION_EVENTS = new Set<string>([
   Blockly.Events.BLOCK_MOVE
 ]);
 type InspectorPanel = 'code' | 'typing' | 'outline';
-type ActivityKind = 'blocks' | 'search' | 'run' | 'settings';
+type ActivityKind = 'blocks' | 'search';
 type Perspective = 'edit' | 'debug' | 'types' | 'presentation' | 'custom';
 
-const ACTIVITY_KINDS: ActivityKind[] = ['blocks', 'search', 'run', 'settings'];
+const ACTIVITY_KINDS: ActivityKind[] = ['blocks', 'search'];
 const PERSPECTIVES: Perspective[] = ['edit', 'debug', 'types', 'presentation', 'custom'];
-const ACTIVITY_META: Record<ActivityKind, { title: string; icon: string }> = {
-  blocks: { title: 'Blocks', icon: 'icon-blocks' },
-  search: { title: 'Search Blocks', icon: 'icon-search' },
-  run: { title: 'Run and Analysis', icon: 'icon-run' },
-  settings: { title: 'Settings and Layout', icon: 'icon-settings' }
+
+const CATEGORY_ICON: Record<string, string> = {
+  program: 'blocks',
+  declarations: 'structure',
+  types: 'code',
+  statements: 'structure',
+  expressions: 'rewrite',
+  values: 'value'
 };
+
+function iconMarkup(icon: string, className = ''): string {
+  return `<svg class="app-icon ${className}" aria-hidden="true"><use href="#icon-${icon}"></use></svg>`;
+}
+
+function setIconUse(icon: Element, name: string): void {
+  icon.querySelector('use')?.setAttribute('href', `#icon-${name}`);
+}
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
@@ -113,6 +128,62 @@ function requestLayoutResize(settle = true): void {
   ];
 }
 
+function isCompactPanelLayout(): boolean {
+  return window.matchMedia('(max-width: 1100px)').matches;
+}
+
+/**
+ * Compact drawers are a transient representation of a visible panel. Closing
+ * one must not overwrite the user's persisted panel-visibility preference.
+ */
+function rememberDrawerFocusReturn(kind: 'sidebar' | 'code', trigger?: HTMLElement): void {
+  if (!isCompactPanelLayout() || !trigger) return;
+  drawerFocusReturn[kind] = window.matchMedia('(max-width: 900px)').matches
+    && trigger.closest('#main-menu')
+    ? byId<HTMLButtonElement>('menu-toggle')
+    : trigger;
+}
+
+function closeCompactDrawer(kind: 'sidebar' | 'code', restoreFocus = true): boolean {
+  if (!isCompactPanelLayout()) return false;
+  const className = kind === 'sidebar' ? 'mobile-sidebar-open' : 'mobile-code-open';
+  if (!document.body.classList.contains(className)) return false;
+  document.body.classList.remove(className);
+  document.body.classList.remove(kind === 'sidebar' ? 'is-resizing-sidebar' : 'is-resizing-code');
+  updateActivityButtons();
+  syncResponsivePanelControls();
+  requestLayoutResize();
+  if (restoreFocus) {
+    const fallback = kind === 'sidebar'
+      ? byId<HTMLButtonElement>(`activity-${activeActivity}`)
+      : byId<HTMLButtonElement>('menu-toggle');
+    const target = drawerFocusReturn[kind] ?? fallback;
+    window.requestAnimationFrame(() => target.focus());
+  }
+  return true;
+}
+
+function syncResponsivePanelControls(): void {
+  const compact = isCompactPanelLayout();
+  const sidebarVisible = !toolboxHidden
+    && (!compact || document.body.classList.contains('mobile-sidebar-open'));
+  const inspectorVisible = !codeHidden
+    && (!compact || document.body.classList.contains('mobile-code-open'));
+  byId<HTMLButtonElement>('show-toolbox-button').hidden = sidebarVisible;
+  byId<HTMLButtonElement>('show-inspector-button').hidden = inspectorVisible;
+  const sidebarResizable = !compact && !toolboxHidden && !codeMaximized;
+  const codeResizable = !compact && !codeHidden && !codeMaximized;
+  for (const [id, enabled] of [
+    ['sidebar-resizer', sidebarResizable],
+    ['code-resizer', codeResizable]
+  ] as const) {
+    const resizer = byId<HTMLDivElement>(id);
+    resizer.tabIndex = enabled ? 0 : -1;
+    resizer.setAttribute('aria-hidden', String(!enabled));
+  }
+  if (compact) document.body.classList.remove('is-resizing-sidebar', 'is-resizing-code');
+}
+
 function initLayoutResizeCoordinator(): void {
   if ('ResizeObserver' in window) {
     layoutResizeObserver = new ResizeObserver(() => requestLayoutResize(false));
@@ -131,8 +202,11 @@ function storedBoolean(key: string, fallback: boolean): boolean {
 
 function updateProjectIdentity(): void {
   const fileLabel = byId<HTMLDivElement>('loaded-file-label').textContent?.trim();
-  const projectName = document.querySelector<HTMLElement>('.project-name');
-  if (projectName) projectName.textContent = fileLabel || 'Project.java';
+  const projectName = fileLabel || 'Project.java';
+  const statusFileName = byId<HTMLElement>('status-file-name');
+  statusFileName.textContent = projectName;
+  statusFileName.title = projectName;
+  statusFileName.setAttribute('aria-label', `Current file: ${projectName}`);
 }
 
 function workspaceFileDisplayName(): string {
@@ -202,11 +276,6 @@ function createBlockInWorkspace(type: string, position: { x: number; y: number }
   }
   updateCode();
   saveAutosave();
-}
-
-function updateZoomIndicator(): void {
-  const label = byId<HTMLSpanElement>('zoom-size');
-  label.textContent = `${Math.round(currentScale() * 100)}%`;
 }
 
 function updateCode(): void {
@@ -340,17 +409,17 @@ function runProgram(): void {
   openBottomTool('output');
   const initial = injectMachine(workspace, 'A');
   if ('injectError' in initial) {
-    mirrorProgramOutput('Run', [], `⨯ ${initial.injectError}`);
+    mirrorProgramOutput('Run', [], `Error: ${initial.injectError}`);
     return;
   }
   const final = run(initial);
   const note = final.status === 'done'
     ? `— program finished in ${final.stepCount} step(s) —`
-    : `⨯ ${final.error}`;
+    : `Error: ${final.error}`;
   mirrorProgramOutput('Run', final.output, note);
 }
 
-function selectInspectorPanel(panel: InspectorPanel): void {
+function selectInspectorPanel(panel: InspectorPanel, persist = true): void {
   for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('.inspector-tab'))) {
     const isActive = tab.dataset.panel === panel;
     tab.classList.toggle('is-active', isActive);
@@ -363,6 +432,7 @@ function selectInspectorPanel(panel: InspectorPanel): void {
   if (panel === 'outline') scheduleOutlineRender();
   if (panel === 'typing') scheduleTypingRender();
   byId<HTMLButtonElement>('print-typing').hidden = panel !== 'typing';
+  if (persist) localStorage.setItem(INSPECTOR_PANEL_KEY, panel);
   requestLayoutResize(false);
 }
 
@@ -400,7 +470,7 @@ function renderOutline(): void {
 
     const disclosure = document.createElement('span');
     disclosure.className = 'outline-disclosure';
-    disclosure.textContent = children.length > 0 ? '⌄' : '·';
+    if (children.length > 0) disclosure.innerHTML = iconMarkup('chevron-down');
     disclosure.setAttribute('aria-hidden', 'true');
 
     const label = document.createElement('span');
@@ -443,15 +513,6 @@ function setActiveActivity(activity: ActivityKind, ensureVisible = true, focusSe
   localStorage.setItem(ACTIVE_ACTIVITY_KEY, activity);
   updateActivityButtons();
 
-  const meta = ACTIVITY_META[activity];
-  byId<HTMLSpanElement>('sidebar-title').textContent = meta.title;
-  byId<HTMLSpanElement>('sidebar-title-icon').className = `icon ${meta.icon}`;
-  for (const view of Array.from(document.querySelectorAll<HTMLElement>('.sidebar-view[data-activity-view]'))) {
-    const visible = (view.dataset.activityView ?? '').split(/\s+/).includes(activity);
-    view.classList.toggle('is-active', visible);
-    view.setAttribute('aria-hidden', String(!visible));
-  }
-
   if (ensureVisible) setToolboxHidden(false);
   if (focusSearch) window.requestAnimationFrame(() => byId<HTMLInputElement>('toolbox-search').focus());
 }
@@ -464,13 +525,6 @@ function setPerspectiveIdentity(perspective: Perspective, persist = true): void 
   const customOption = select.querySelector<HTMLOptionElement>('option[value="custom"]');
   if (customOption) customOption.hidden = perspective !== 'custom';
   select.value = perspective;
-  const label = perspective === 'types'
-    ? 'Type Analysis'
-    : perspective.charAt(0).toLocaleUpperCase() + perspective.slice(1);
-  byId<HTMLSpanElement>('status-perspective-label').textContent = label;
-  for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.perspective-option'))) {
-    button.classList.toggle('is-active', button.dataset.perspective === perspective);
-  }
   if (persist) localStorage.setItem(PERSPECTIVE_KEY, perspective);
 }
 
@@ -481,6 +535,37 @@ function markPerspectiveCustom(): void {
 function showProblems(): void {
   openBottomTool('problems');
   if (workspace) refreshTypeDiagnostics(workspace);
+}
+
+function openInspectorView(panel: InspectorPanel): void {
+  const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+  setCodeHidden(false, trigger);
+  selectInspectorPanel(panel);
+}
+
+function resetWorkspaceZoom(): void {
+  if (!workspace) return;
+  workspace.setScale(1);
+  workspace.scrollCenter();
+}
+
+function toggleBottomMaximized(): void {
+  if (!isVizOpen()) setVizOpen(true);
+  byId<HTMLButtonElement>('viz-maximize').click();
+}
+
+function openAboutDialog(): void {
+  const modal = byId<HTMLDialogElement>('about-modal');
+  if (typeof modal.showModal === 'function') modal.showModal();
+  else modal.setAttribute('open', 'open');
+}
+
+function openExamplesPicker(): void {
+  if (window.matchMedia('(max-width: 900px)').matches) {
+    byId<HTMLElement>('main-menu').classList.add('menu-open');
+    updateMenuToggle(true);
+  }
+  byId<HTMLButtonElement>('examples-button').click();
 }
 
 function applyPerspective(perspective: Perspective): void {
@@ -495,7 +580,7 @@ function applyPerspective(perspective: Perspective): void {
       selectInspectorPanel('code');
       setVizOpen(false);
     } else if (perspective === 'debug') {
-      setActiveActivity('run', false, false);
+      setActiveActivity('blocks', false, false);
       setToolboxHidden(false);
       setCodeHidden(false);
       setCodeMaximized(false);
@@ -519,25 +604,10 @@ function applyPerspective(perspective: Perspective): void {
     applyingPerspective = false;
     if (window.matchMedia('(max-width: 1100px)').matches) {
       document.body.classList.remove('mobile-sidebar-open', 'mobile-code-open');
+      syncResponsivePanelControls();
     }
     requestLayoutResize();
   }
-}
-
-function openAnalysisTool(kind: VizKind): void {
-  if (kind !== 'structure' && kind !== 'value') {
-    openBottomTool(kind);
-    return;
-  }
-  if (!workspace) return;
-  const selected = Blockly.common.getSelected() as Blockly.BlockSvg | null;
-  const selectedBlock = selected && workspace.getBlockById(selected.id) ? selected : null;
-  const block = selectedBlock ?? workspace.getTopBlocks(true)[0];
-  if (!block) {
-    scheduleAutosaveStatus('Add or select a block to visualize');
-    return;
-  }
-  openVisualization(kind, block as Blockly.BlockSvg);
 }
 
 function scheduleAutosaveStatus(message: string): void {
@@ -585,7 +655,6 @@ function loadAutosave(): void {
       ? `Autosave · ${new Date(payload.savedAt).toLocaleString()}`
       : 'Autosave loaded';
     updateCode();
-    updateZoomIndicator();
     scheduleAutosaveStatus('Autosave loaded');
   } catch (error) {
     console.error(error);
@@ -613,16 +682,18 @@ function setCodeMaximized(next: boolean): void {
   button.setAttribute('aria-pressed', String(next));
   button.setAttribute('aria-label', next ? 'Restore inspector' : 'Maximize inspector');
   button.title = next ? 'Restore inspector' : 'Maximize inspector';
-  const glyph = button.querySelector<HTMLElement>('.toolbar-glyph');
-  if (glyph) glyph.textContent = next ? '◱' : '□';
+  const glyph = button.querySelector<SVGElement>('.toolbar-glyph');
+  if (glyph) setIconUse(glyph, next ? 'collapse' : 'expand');
+  syncResponsivePanelControls();
   requestLayoutResize();
 }
 
-function setCodeHidden(next: boolean): void {
+function setCodeHidden(next: boolean, trigger?: HTMLElement): void {
   codeHidden = next;
   if (next && codeMaximized) setCodeMaximized(false);
   document.body.classList.toggle('code-hidden', codeHidden);
-  if (window.matchMedia('(max-width: 1100px)').matches) {
+  if (isCompactPanelLayout()) {
+    if (!next) rememberDrawerFocusReturn('code', trigger);
     document.body.classList.toggle('mobile-code-open', !codeHidden);
   } else if (codeHidden) {
     document.body.classList.remove('mobile-code-open');
@@ -630,22 +701,40 @@ function setCodeHidden(next: boolean): void {
   localStorage.setItem(CODE_VISIBLE_KEY, String(!codeHidden));
 
   const column = byId<HTMLButtonElement>('toggle-code-column');
-  const showButton = byId<HTMLButtonElement>('show-code-button');
 
   column.title = codeHidden ? 'Show inspector' : 'Hide inspector';
   column.setAttribute('aria-label', codeHidden ? 'Show inspector' : 'Hide inspector');
-  showButton.title = 'Show MiniJava inspector';
-  showButton.setAttribute('aria-label', 'Show MiniJava inspector');
-  byId<HTMLButtonElement>('settings-toggle-code').setAttribute('aria-pressed', String(!codeHidden));
+  const viewToggle = byId<HTMLButtonElement>('view-toggle-inspector');
+  viewToggle.setAttribute('aria-pressed', String(!codeHidden));
+  const viewState = viewToggle.querySelector<HTMLElement>('.menu-state');
+  if (viewState) viewState.textContent = codeHidden ? 'Hidden' : 'Shown';
 
+  syncResponsivePanelControls();
   requestLayoutResize();
 }
 
+function toggleInspector(trigger?: HTMLElement): void {
+  const compact = isCompactPanelLayout();
+  const drawerOpen = document.body.classList.contains('mobile-code-open');
+  // In compact layouts an inspector can be visible by preference while its
+  // drawer is closed. The first invocation must reveal that drawer.
+  setCodeHidden(compact && !drawerOpen ? false : !codeHidden, trigger);
+  markPerspectiveCustom();
+}
 
-function setToolboxHidden(next: boolean): void {
+
+function toggleToolbox(trigger?: HTMLElement): void {
+  const compact = isCompactPanelLayout();
+  const drawerOpen = document.body.classList.contains('mobile-sidebar-open');
+  setToolboxHidden(compact && !drawerOpen ? false : !toolboxHidden, trigger);
+  markPerspectiveCustom();
+}
+
+function setToolboxHidden(next: boolean, trigger?: HTMLElement): void {
   toolboxHidden = next;
   document.body.classList.toggle('toolbox-hidden', toolboxHidden);
-  if (window.matchMedia('(max-width: 1100px)').matches) {
+  if (isCompactPanelLayout()) {
+    if (!next) rememberDrawerFocusReturn('sidebar', trigger);
     document.body.classList.toggle('mobile-sidebar-open', !toolboxHidden);
   } else if (toolboxHidden) {
     document.body.classList.remove('mobile-sidebar-open');
@@ -653,14 +742,15 @@ function setToolboxHidden(next: boolean): void {
   localStorage.setItem(SIDEBAR_VISIBLE_KEY, String(!toolboxHidden));
 
   const button = byId<HTMLButtonElement>('toggle-toolbox');
-  const showButton = byId<HTMLButtonElement>('show-toolbox-button');
-
   button.title = toolboxHidden ? 'Show sidebar' : 'Hide sidebar';
   button.setAttribute('aria-label', toolboxHidden ? 'Show sidebar' : 'Hide sidebar');
-  showButton.title = 'Show sidebar';
-  showButton.setAttribute('aria-label', 'Show sidebar');
+  const viewToggle = byId<HTMLButtonElement>('view-toggle-sidebar');
+  viewToggle.setAttribute('aria-pressed', String(!toolboxHidden));
+  const viewState = viewToggle.querySelector<HTMLElement>('.menu-state');
+  if (viewState) viewState.textContent = toolboxHidden ? 'Hidden' : 'Shown';
   updateActivityButtons();
 
+  syncResponsivePanelControls();
   requestLayoutResize();
 }
 
@@ -824,7 +914,6 @@ function onExampleLoaded(example: MiniJavaExample): void {
   byId<HTMLDivElement>('loaded-file-label').textContent = `${example.label}.bml`;
   scheduleAutosaveStatus(`Loaded ${example.label}`);
   updateCode();
-  updateZoomIndicator();
   saveAutosave();
 }
 
@@ -852,7 +941,7 @@ function renderToolbox(query = ''): void {
     header.type = 'button';
     header.className = 'toolbox-category-header';
     header.setAttribute('aria-expanded', 'true');
-    header.innerHTML = `<span class="category-left"><span class="category-icon" aria-hidden="true">${category.icon}</span><span>${category.label}</span></span><span class="category-caret" aria-hidden="true">⌄</span>`;
+    header.innerHTML = `<span class="category-left">${iconMarkup(CATEGORY_ICON[category.id] ?? 'blocks', 'category-icon')}<span>${category.label}</span></span>${iconMarkup('chevron-down', 'category-caret')}`;
     header.addEventListener('click', () => {
       const collapsed = group.classList.toggle('collapsed');
       header.setAttribute('aria-expanded', String(!collapsed));
@@ -869,7 +958,7 @@ function renderToolbox(query = ''): void {
       button.title = `Add ${block.label}`;
       button.draggable = true;
       button.dataset.blockType = block.type;
-      button.innerHTML = `<span class="block-icon" aria-hidden="true">${block.icon}</span><span class="block-label">${block.label}</span>`;
+      button.innerHTML = `${iconMarkup('blocks', 'block-icon')}<span class="block-label">${block.label}</span>`;
       button.addEventListener('click', () => addBlockToWorkspace(block.type));
       button.addEventListener('dragstart', (event) => {
         button.classList.add('is-dragging');
@@ -979,7 +1068,7 @@ function initSidebarResizer(): void {
     window.addEventListener('pointerup', stopResize);
   });
   resizer.addEventListener('keydown', (event) => {
-    if (toolboxHidden) return;
+    if (toolboxHidden || isCompactPanelLayout() || codeMaximized) return;
     const step = event.key === 'ArrowLeft' ? -24 : event.key === 'ArrowRight' ? 24 : 0;
     if (!step) return;
     event.preventDefault();
@@ -1033,7 +1122,7 @@ function initCodeResizer(): void {
   });
 
   resizer.addEventListener('keydown', (event) => {
-    if (codeHidden) return;
+    if (codeHidden || isCompactPanelLayout() || codeMaximized) return;
     const current = readCodeWidth();
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
@@ -1083,7 +1172,7 @@ function initBlockly(): void {
     grid: {
       spacing: 24,
       length: 3,
-      colour: currentTheme === 'dark' ? '#3d465b' : '#cdd6e3',
+      colour: currentTheme === 'dark' ? '#29313e' : '#dfe5ec',
       snap: true
     },
     zoom: {
@@ -1114,7 +1203,6 @@ function initBlockly(): void {
       return;
     }
     if (event.type === Blockly.Events.VIEWPORT_CHANGE) {
-      updateZoomIndicator();
       return;
     }
     if (!isBlockWorkspaceMutation(event)) return;
@@ -1125,12 +1213,10 @@ function initBlockly(): void {
 
   updateCode();
   scheduleOutlineRender();
-  updateZoomIndicator();
   requestLayoutResize();
   if (window.matchMedia('(max-width: 700px)').matches) {
     window.setTimeout(() => {
       workspace?.zoomToFit();
-      updateZoomIndicator();
     }, 100);
   }
 }
@@ -1145,7 +1231,6 @@ function installCodeEditor(): void {
       ensureRequiredBlocks(workspace);
       byId<HTMLDivElement>('loaded-file-label').textContent = label;
       updateCode();
-      updateZoomIndicator();
       saveAutosave();
       scheduleAutosaveStatus('Code imported to blocks');
     },
@@ -1163,12 +1248,126 @@ function updateMenuToggle(open: boolean): void {
   if (icon) {
     icon.classList.toggle('icon-close', open);
     icon.classList.toggle('icon-menu', !open);
+    setIconUse(icon, open ? 'close' : 'menu');
   }
   if (label) label.textContent = open ? 'Close' : 'Menu';
   button.title = open ? 'Close menu' : 'Menu';
   button.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
   button.setAttribute('aria-expanded', String(open));
   requestLayoutResize();
+}
+
+function closeCompactHeaderMenu(): void {
+  if (!window.matchMedia('(max-width: 900px)').matches) return;
+  byId<HTMLElement>('main-menu').classList.remove('menu-open');
+  updateMenuToggle(false);
+}
+
+function initHeaderMenus(): void {
+  const menuPairs = [
+    ['file-menu-button', 'file-menu'],
+    ['view-menu-button', 'view-menu'],
+    ['more-menu-button', 'more-menu']
+  ] as const;
+
+  const closeExamples = (): void => {
+    byId<HTMLElement>('examples-panel').classList.remove('examples-open');
+    byId<HTMLButtonElement>('examples-button').setAttribute('aria-expanded', 'false');
+  };
+
+  const closeAll = (exceptPanelId?: string): void => {
+    for (const [buttonId, panelId] of menuPairs) {
+      if (panelId === exceptPanelId) continue;
+      byId<HTMLElement>(panelId).hidden = true;
+      byId<HTMLButtonElement>(buttonId).setAttribute('aria-expanded', 'false');
+    }
+    if (exceptPanelId !== 'examples-panel') closeExamples();
+  };
+
+  const focusableItems = (panel: HTMLElement): HTMLElement[] =>
+    Array.from(panel.querySelectorAll<HTMLElement>('button:not([disabled]), select:not([disabled]), input:not([type="hidden"]):not([disabled])'))
+      .filter((item) => !item.hasAttribute('disabled'));
+
+  for (const [buttonId, panelId] of menuPairs) {
+    const button = byId<HTMLButtonElement>(buttonId);
+    const panel = byId<HTMLElement>(panelId);
+    const open = (focus: 'first' | 'last' | null = null): void => {
+      closeAll(panelId);
+      panel.hidden = false;
+      button.setAttribute('aria-expanded', 'true');
+      if (focus) {
+        const items = focusableItems(panel);
+        items[focus === 'first' ? 0 : items.length - 1]?.focus();
+      }
+    };
+    const close = (restoreFocus = false): void => {
+      panel.hidden = true;
+      button.setAttribute('aria-expanded', 'false');
+      if (restoreFocus) button.focus();
+    };
+
+    button.addEventListener('click', () => {
+      if (panel.hidden) open();
+      else close();
+    });
+    button.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        open(event.key === 'ArrowDown' ? 'first' : 'last');
+      } else if (event.key === 'Escape' && !panel.hidden) {
+        event.preventDefault();
+        close(true);
+      }
+    });
+    panel.addEventListener('keydown', (event) => {
+      const items = focusableItems(panel);
+      const current = items.indexOf(document.activeElement as HTMLElement);
+      const offset = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+      if (offset || event.key === 'Home' || event.key === 'End') {
+        event.preventDefault();
+        const target = event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? items.length - 1
+            : (current + offset + items.length) % items.length;
+        items[target]?.focus();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        close(true);
+      }
+    });
+    panel.addEventListener('click', (event) => {
+      if (!(event.target as Element).closest('.global-menu-item')) return;
+      close(true);
+      closeCompactHeaderMenu();
+    }, { capture: true });
+  }
+
+  window.addEventListener('bmj:examples-menu-opened', () => closeAll('examples-panel'));
+  window.addEventListener('bmj:header-menu-action', closeCompactHeaderMenu);
+  document.addEventListener('pointerdown', (event) => {
+    const target = event.target as Node;
+    const inExamples = byId('examples-button').contains(target) || byId('examples-panel').contains(target);
+    if (inExamples || menuPairs.some(([buttonId, panelId]) => byId(buttonId).contains(target) || byId(panelId).contains(target))) return;
+    closeAll();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    const openPair = menuPairs.find(([, panelId]) => !byId<HTMLElement>(panelId).hidden);
+    if (openPair) {
+      event.preventDefault();
+      byId<HTMLElement>(openPair[1]).hidden = true;
+      byId<HTMLButtonElement>(openPair[0]).setAttribute('aria-expanded', 'false');
+      byId<HTMLButtonElement>(openPair[0]).focus();
+      return;
+    }
+    if (byId<HTMLElement>('main-menu').classList.contains('menu-open')) {
+      event.preventDefault();
+      byId<HTMLElement>('main-menu').classList.remove('menu-open');
+      updateMenuToggle(false);
+      byId<HTMLButtonElement>('menu-toggle').focus();
+    }
+  });
 }
 
 function initCommandPalette(): void {
@@ -1179,23 +1378,45 @@ function initCommandPalette(): void {
     { id: 'file.save', category: 'File', label: 'Save Workspace', shortcut: 'Ctrl S', run: downloadWorkspace },
     { id: 'file.export', category: 'File', label: 'Export MiniJava Source', run: exportGeneratedCode },
     { id: 'file.autosave', category: 'File', label: 'Restore Autosave', run: loadAutosave },
+    { id: 'file.examples', category: 'File', label: 'Choose Example Program', run: openExamplesPicker },
     { id: 'run.program', category: 'Run', label: 'Run Program', shortcut: 'Ctrl F5', keywords: ['output', 'execute'], run: runProgram },
+    { id: 'analysis.structure', category: 'Analysis', label: 'Open Call-by-Structure', run: () => openBottomTool('structure') },
+    { id: 'analysis.value', category: 'Analysis', label: 'Open Call-by-Value', run: () => openBottomTool('value') },
     { id: 'analysis.machine', category: 'Analysis', label: 'Open CESK Machine', run: () => openBottomTool('machine') },
     { id: 'analysis.compare', category: 'Analysis', label: 'Compare Model A and Model B', run: () => openBottomTool('compare') },
     { id: 'analysis.rewrite', category: 'Analysis', label: 'Open Rewrite Semantics', run: () => openBottomTool('subst') },
     { id: 'view.blocks', category: 'View', label: 'Show Blocks Sidebar', run: () => setActiveActivity('blocks') },
     { id: 'view.search', category: 'View', label: 'Search Blocks', shortcut: 'Ctrl Shift F', run: () => setActiveActivity('search') },
     { id: 'view.problems', category: 'View', label: 'Show Problems', run: showProblems },
-    { id: 'view.inspector', category: 'View', label: 'Toggle MiniJava Inspector', run: () => { setCodeHidden(!codeHidden); markPerspectiveCustom(); } },
+    { id: 'view.output', category: 'View', label: 'Show Output', run: () => openBottomTool('output') },
+    { id: 'view.semantics', category: 'View', label: 'Show Semantics', run: () => { setVizOpen(true); click('bottom-tab-semantics'); } },
+    { id: 'view.code', category: 'View', label: 'Open Code Inspector', run: () => openInspectorView('code') },
+    { id: 'view.types', category: 'View', label: 'Open Types Inspector', run: () => openInspectorView('typing') },
+    { id: 'view.outline', category: 'View', label: 'Open Outline Inspector', run: () => openInspectorView('outline') },
+    { id: 'view.inspector', category: 'View', label: 'Toggle MiniJava Inspector', run: toggleInspector },
     { id: 'view.bottom', category: 'View', label: 'Toggle Bottom Tools', shortcut: 'Ctrl J', run: () => { setVizOpen(!isVizOpen()); markPerspectiveCustom(); } },
+    { id: 'view.inspectorMaximize', category: 'View', label: 'Maximize or Restore Inspector', run: () => setCodeMaximized(!codeMaximized) },
+    { id: 'view.bottomMaximize', category: 'View', label: 'Maximize or Restore Bottom Tools', run: toggleBottomMaximized },
+    { id: 'editor.copy', category: 'Code', label: 'Copy MiniJava Code', run: copyCode },
+    { id: 'types.print', category: 'Types', label: 'Print Typing Derivation', run: () => {
+      openInspectorView('typing');
+      window.requestAnimationFrame(printTyping);
+    } },
     { id: 'workspace.undo', category: 'Workspace', label: 'Undo Block Change', run: () => workspace?.undo(false) },
     { id: 'workspace.redo', category: 'Workspace', label: 'Redo Block Change', run: () => workspace?.undo(true) },
+    { id: 'workspace.zoomOut', category: 'Workspace', label: 'Zoom Out', run: () => workspace?.zoomCenter(-1) },
+    { id: 'workspace.zoomIn', category: 'Workspace', label: 'Zoom In', run: () => workspace?.zoomCenter(1) },
+    { id: 'workspace.zoomReset', category: 'Workspace', label: 'Reset Zoom to 100%', run: resetWorkspaceZoom },
     { id: 'workspace.fit', category: 'Workspace', label: 'Fit Blocks in View', run: () => workspace?.zoomToFit() },
+    { id: 'workspace.screenshot', category: 'Workspace', label: 'Download Workspace Screenshot', run: () => {
+      if (workspace) downloadScreenshot(workspace);
+    } },
     { id: 'perspective.edit', category: 'Perspective', label: 'Switch to Edit Perspective', run: () => applyPerspective('edit') },
     { id: 'perspective.debug', category: 'Perspective', label: 'Switch to Debug Perspective', run: () => applyPerspective('debug') },
     { id: 'perspective.types', category: 'Perspective', label: 'Switch to Type Analysis Perspective', run: () => applyPerspective('types') },
     { id: 'perspective.presentation', category: 'Perspective', label: 'Switch to Presentation Perspective', run: () => applyPerspective('presentation') },
-    { id: 'theme.toggle', category: 'Preferences', label: 'Toggle Color Theme', run: () => applyTheme(currentTheme === 'dark' ? 'light' : 'dark') }
+    { id: 'theme.toggle', category: 'Preferences', label: 'Toggle Color Theme', run: () => applyTheme(currentTheme === 'dark' ? 'light' : 'dark') },
+    { id: 'help.about', category: 'Help', label: 'About Block-MiniJava', run: openAboutDialog }
   ];
   installCommandPalette(commands);
 }
@@ -1240,33 +1461,24 @@ function wireEvents(): void {
     setToolboxHidden(!toolboxHidden);
     markPerspectiveCustom();
   });
-  byId<HTMLButtonElement>('show-code-button').addEventListener('click', () => {
-    setCodeHidden(false);
+  byId<HTMLButtonElement>('show-toolbox-button').addEventListener('click', (event) => {
+    setToolboxHidden(false, event.currentTarget as HTMLButtonElement);
     markPerspectiveCustom();
   });
-  byId<HTMLButtonElement>('show-toolbox-button').addEventListener('click', () => {
-    setToolboxHidden(false);
-    markPerspectiveCustom();
+  byId<HTMLButtonElement>('show-inspector-button').addEventListener('click', (event) => {
+    toggleInspector(event.currentTarget as HTMLButtonElement);
   });
   byId<HTMLButtonElement>('toggle-code-maximize').addEventListener('click', () => setCodeMaximized(!codeMaximized));
-  byId<HTMLButtonElement>('sidebar-scrim').addEventListener('click', () => setToolboxHidden(true));
-  byId<HTMLButtonElement>('code-scrim').addEventListener('click', () => setCodeHidden(true));
+  byId<HTMLButtonElement>('sidebar-scrim').addEventListener('click', () => closeCompactDrawer('sidebar'));
+  byId<HTMLButtonElement>('code-scrim').addEventListener('click', () => closeCompactDrawer('code'));
   byId<HTMLButtonElement>('copy-code').addEventListener('click', copyCode);
   byId<HTMLButtonElement>('print-typing').addEventListener('click', printTyping);
   byId<HTMLButtonElement>('run-program').addEventListener('click', runProgram);
-  byId<HTMLButtonElement>('sidebar-run-program').addEventListener('click', runProgram);
-  byId<HTMLButtonElement>('sidebar-open-cesk').addEventListener('click', () => openAnalysisTool('machine'));
-  byId<HTMLButtonElement>('sidebar-open-compare').addEventListener('click', () => openAnalysisTool('compare'));
-  byId<HTMLButtonElement>('sidebar-open-rewrite').addEventListener('click', () => openAnalysisTool('subst'));
-  byId<HTMLButtonElement>('sidebar-open-structure').addEventListener('click', () => openAnalysisTool('structure'));
-  byId<HTMLButtonElement>('sidebar-open-value').addEventListener('click', () => openAnalysisTool('value'));
-  byId<HTMLButtonElement>('settings-toggle-code').addEventListener('click', () => {
-    setCodeHidden(!codeHidden);
-    markPerspectiveCustom();
+  byId<HTMLButtonElement>('view-toggle-sidebar').addEventListener('click', (event) => {
+    toggleToolbox(event.currentTarget as HTMLButtonElement);
   });
-  byId<HTMLButtonElement>('settings-toggle-bottom').addEventListener('click', () => {
-    setVizOpen(!isVizOpen());
-    markPerspectiveCustom();
+  byId<HTMLButtonElement>('view-toggle-inspector').addEventListener('click', (event) => {
+    toggleInspector(event.currentTarget as HTMLButtonElement);
   });
   byId<HTMLButtonElement>('workspace-undo').addEventListener('click', () => workspace?.undo(false));
   byId<HTMLButtonElement>('workspace-redo').addEventListener('click', () => workspace?.undo(true));
@@ -1274,7 +1486,6 @@ function wireEvents(): void {
   byId<HTMLButtonElement>('workspace-zoom-in').addEventListener('click', () => workspace?.zoomCenter(1));
   byId<HTMLButtonElement>('workspace-fit').addEventListener('click', () => {
     workspace?.zoomToFit();
-    updateZoomIndicator();
   });
 
   for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.activity-item[data-activity]'))) {
@@ -1283,20 +1494,20 @@ function wireEvents(): void {
       const compact = window.matchMedia('(max-width: 1100px)').matches;
       const sidebarOpen = !toolboxHidden && (!compact || document.body.classList.contains('mobile-sidebar-open'));
       if (activity === activeActivity && sidebarOpen) {
-        setToolboxHidden(true);
-        markPerspectiveCustom();
+        if (compact) closeCompactDrawer('sidebar');
+        else {
+          setToolboxHidden(true);
+          markPerspectiveCustom();
+        }
       } else {
         setActiveActivity(activity);
+        rememberDrawerFocusReturn('sidebar', button);
       }
     });
-  }
-  for (const button of Array.from(document.querySelectorAll<HTMLButtonElement>('.perspective-option[data-perspective]'))) {
-    button.addEventListener('click', () => applyPerspective(button.dataset.perspective as Perspective));
   }
   byId<HTMLSelectElement>('perspective-select').addEventListener('change', (event) => {
     applyPerspective((event.currentTarget as HTMLSelectElement).value as Perspective);
   });
-  byId<HTMLButtonElement>('status-perspective').addEventListener('click', () => setActiveActivity('settings'));
   byId<HTMLButtonElement>('status-problems-button').addEventListener('click', showProblems);
   for (const tab of Array.from(document.querySelectorAll<HTMLButtonElement>('.inspector-tab'))) {
     tab.addEventListener('click', () => selectInspectorPanel((tab.dataset.panel ?? 'code') as InspectorPanel));
@@ -1306,24 +1517,20 @@ function wireEvents(): void {
     const isDark = (event.currentTarget as HTMLInputElement).checked;
     applyTheme(isDark ? 'dark' : 'light');
   });
-  byId<HTMLButtonElement>('about-button').addEventListener('click', () => {
-    const modal = byId<HTMLDialogElement>('about-modal');
-    if (typeof modal.showModal === 'function') modal.showModal();
-    else modal.setAttribute('open', 'open');
-  });
+  byId<HTMLButtonElement>('about-button').addEventListener('click', openAboutDialog);
   byId<HTMLInputElement>('autosave-interval').addEventListener('input', updateAutosaveIntervalLabel);
   byId<HTMLButtonElement>('menu-toggle').addEventListener('click', () => {
     const menu = byId<HTMLElement>('main-menu');
     const isOpen = menu.classList.toggle('menu-open');
     updateMenuToggle(isOpen);
   });
-  byId<HTMLButtonElement>('zoom-indicator').addEventListener('click', () => {
-    if (!workspace) return;
-    workspace.setScale(1);
-    workspace.scrollCenter();
-    updateZoomIndicator();
-  });
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !event.defaultPrevented) {
+      if (closeCompactDrawer('code') || closeCompactDrawer('sidebar')) {
+        event.preventDefault();
+        return;
+      }
+    }
     const modifier = event.ctrlKey || event.metaKey;
     const key = event.key.toLocaleLowerCase();
     if (modifier && !event.shiftKey && key === 's') {
@@ -1353,7 +1560,7 @@ function wireEvents(): void {
     subtree: true
   });
   window.addEventListener('bmj:problem-located', () => {
-    if (window.matchMedia('(max-width: 1100px)').matches) setToolboxHidden(true);
+    if (isCompactPanelLayout()) closeCompactDrawer('sidebar', false);
   });
   document.addEventListener('fullscreenchange', () => requestLayoutResize());
   window.addEventListener('resize', () => {
@@ -1363,6 +1570,7 @@ function wireEvents(): void {
     }
     compactPanelLayout = compact;
     updateActivityButtons();
+    syncResponsivePanelControls();
     if (window.matchMedia('(min-width: 901px)').matches) {
       byId<HTMLElement>('main-menu').classList.remove('menu-open');
       updateMenuToggle(false);
@@ -1376,8 +1584,11 @@ function restorePreferences(): void {
   currentTheme = savedTheme === 'light' ? 'light' : 'dark';
   const savedInterval = localStorage.getItem(AUTOSAVE_INTERVAL_KEY);
   if (savedInterval) {
-    const value = Math.min(20, Math.max(2, Number(savedInterval)));
-    if (!Number.isNaN(value)) byId<HTMLInputElement>('autosave-interval').value = String(value);
+    const parsed = Number(savedInterval);
+    if (Number.isFinite(parsed)) {
+      const value = Math.min(20, Math.max(2, parsed));
+      byId<HTMLInputElement>('autosave-interval').value = String(value);
+    }
   }
   const savedCodeWidth = Number(localStorage.getItem(CODE_WIDTH_KEY));
   if (Number.isFinite(savedCodeWidth) && savedCodeWidth > 0) setCodeWidth(savedCodeWidth);
@@ -1391,12 +1602,17 @@ function restorePreferences(): void {
 
   const savedPerspective = localStorage.getItem(PERSPECTIVE_KEY) as Perspective | null;
   setPerspectiveIdentity(savedPerspective && PERSPECTIVES.includes(savedPerspective) ? savedPerspective : 'edit', false);
+  const savedInspectorPanel = localStorage.getItem(INSPECTOR_PANEL_KEY) as InspectorPanel | null;
+  selectInspectorPanel(savedInspectorPanel && ['code', 'typing', 'outline'].includes(savedInspectorPanel)
+    ? savedInspectorPanel
+    : 'code', false);
   if (compactPanelLayout) {
     document.body.classList.remove('mobile-sidebar-open', 'mobile-code-open');
     updateActivityButtons();
   }
   applyTheme(currentTheme);
   updateAutosaveIntervalLabel();
+  syncResponsivePanelControls();
 }
 
 export function startBlockMiniJava(): void {
@@ -1422,5 +1638,6 @@ export function startBlockMiniJava(): void {
     () => workspace,
     onExampleLoaded
   );
+  initHeaderMenus();
   restartAutosaveTimer();
 }

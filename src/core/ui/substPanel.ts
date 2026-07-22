@@ -84,7 +84,7 @@ function stopPlay(): void {
     window.clearInterval(playTimer);
     playTimer = null;
   }
-  byId<HTMLButtonElement>('subst-play').textContent = '⏵ Play';
+  byId<HTMLButtonElement>('subst-play').textContent = 'Play';
 }
 
 function markStale(): void {
@@ -136,19 +136,19 @@ function renderStatus(): void {
   status.removeAttribute('data-state');
   corr.textContent = '';
   if (!current) {
-    status.textContent = 'Press ⟲ Load to rewrite the println expression step by step.';
+    status.textContent = 'Press Load to rewrite the println expression step by step.';
     return;
   }
   if (stale) {
-    status.textContent = 'Program changed — press ⟲ Load to restart.';
+    status.textContent = 'Program changed — press Load to restart.';
     status.dataset.state = 'stale';
     return;
   }
   if (current.status === 'error') {
-    status.textContent = `⨯ stuck after ${current.stepCount} rewrite(s): ${current.error}`;
+    status.textContent = `Stuck after ${current.stepCount} rewrite(s): ${current.error}`;
     status.dataset.state = 'error';
   } else if (current.status === 'done') {
-    status.textContent = `✓ value after ${current.stepCount} rewrite(s): ${formatTree(current.tree)}`;
+    status.textContent = `Value after ${current.stepCount} rewrite(s): ${formatTree(current.tree)}`;
     status.dataset.state = 'done';
   } else {
     status.textContent = `rewrite ${current.stepCount}${current.lastRule ? ` · ${current.lastRule}` : ''}`;
@@ -189,7 +189,7 @@ function renderAll(): void {
     if (current.status === 'done') {
       mirrorProgramOutput('Rewrite · substitution', [formatTree(current.tree)], '— program finished —');
     } else if (current.status === 'error') {
-      mirrorProgramOutput('Rewrite · substitution', [], `⨯ ${current.error}`);
+      mirrorProgramOutput('Rewrite · substitution', [], `Error: ${current.error}`);
     } else {
       mirrorProgramOutput('Rewrite · substitution', []);
     }
@@ -231,7 +231,7 @@ function updateAgreement(rule: string | null): void {
   agreement =
     expected === rule
       ? `machine agrees: ${salientCount}/${machineSalient.length} salient rules`
-      : `⚠ diverged from the machine at rule ${salientCount} (machine: ${expected ?? 'none'}, rewrite: ${rule})`;
+      : `Warning: diverged from the machine at rule ${salientCount} (machine: ${expected ?? 'none'}, rewrite: ${rule})`;
 }
 
 function stepOnce(): void {
@@ -265,7 +265,7 @@ function togglePlay(): void {
     return;
   }
   if (!current || stale || current.status !== 'running') return;
-  byId<HTMLButtonElement>('subst-play').textContent = '⏸ Pause';
+  byId<HTMLButtonElement>('subst-play').textContent = 'Pause';
   playTimer = window.setInterval(stepOnce, PLAY_INTERVAL_MS);
 }
 

@@ -1,0 +1,918 @@
+/* Grammar, typing, and runtime visualization styles.
+ * Application-shell and editor chrome deliberately live elsewhere. */
+
+/* ---------------------------------------- Typing tab (derivation viewer) */
+
+.inspector-panel.typing-panel.is-active {
+  display: flex;
+  flex-direction: column;
+}
+
+.typing-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-7);
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-emphasis);
+  font-size: var(--font-size-md);
+}
+
+.typing-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.typing-toolbar select {
+  background: var(--surface-control);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  font: var(--font-size-md)/var(--line-height-default) var(--font-family-code);
+  padding: var(--space-2) var(--space-4);
+}
+
+.typing-gamma {
+  padding: var(--space-4) var(--space-7);
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font: var(--font-size-sm)/var(--line-height-relaxed) var(--font-family-code);
+  overflow-wrap: anywhere;
+}
+
+/* Print-only masthead (see `printTyping()` in typingPanel.ts): the on-screen
+   dropdown picker becomes this title block on paper. Hidden here; shown
+   under `.printing-typing` in the print stylesheet below. */
+
+.typ-print-header {
+  display: none;
+}
+
+.typ-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* One collapsible row per statement judgement of the selected method. */
+
+.typ-row {
+  border-bottom: 1px solid var(--border-default);
+}
+
+.typ-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+}
+
+.typ-row-toggle {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.typ-row-toggle .app-icon {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  transition: transform var(--motion-fast);
+}
+
+.typ-row.is-open .typ-row-toggle .app-icon {
+  transform: rotate(90deg);
+}
+
+.typ-row-rule {
+  flex: none;
+  color: var(--accent-primary);
+  font: var(--font-size-xs)/var(--line-height-compact) var(--font-family-code);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.typ-row-judgement {
+  text-align: left;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.typ-row-tree {
+  display: none;
+  overflow-x: auto;
+  padding: var(--space-6) var(--space-7) var(--space-8) 36px;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.typ-row.is-open .typ-row-tree {
+  display: block;
+}
+
+/* Classic proof tree: premises above the inference bar, conclusion below. */
+
+.typ-node {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0 var(--space-4);
+  vertical-align: bottom;
+}
+
+.typ-premises {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+/* The inference line is a flex-growing pseudo-element, and the rule name is
+   an ordinary (non-absolute) trailing flex child, NOT position:absolute +
+   translateX(100%) hanging past the node's own box: that earlier design let
+   a long rule name (e.g. WF-ArrAssign, T-CharAt) overlap the *next* sibling
+   premise's rule name, since nothing accounted for its width when sizing
+   this node. Keeping it in normal flow means a long rule name instead grows
+   this node's own reserved width, which the parent's flex layout already
+   handles correctly for every sibling. */
+
+.typ-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 24px;
+  gap: var(--space-3);
+}
+
+.typ-bar::before {
+  content: '';
+  flex: 1 1 auto;
+  min-width: 10px;
+  align-self: center;
+  border-top: 1px solid var(--border-strong);
+}
+
+.typ-rule {
+  flex: none;
+  color: var(--accent-primary);
+  font: var(--font-size-xs)/var(--line-height-compact) var(--font-family-code);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.typ-judgement {
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+  font: var(--font-size-md)/var(--line-height-relaxed) var(--font-family-code);
+  padding: 1px var(--space-2);
+  border-radius: 3px;
+}
+
+.typ-judgement:hover {
+  background: var(--surface-hover);
+}
+
+.typ-empty {
+  padding: var(--space-7);
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+}
+
+/* Print the Typing tab's derivation tree (ported from Block-based-MNL's
+   Typing tab print feature). Only the chrome needs hiding: every row's tree
+   is plain <div>s, so it paginates fine as-is once `.typ-row-tree` is forced
+   open — the row-level collapse is the only thing hiding a derivation here
+   (unlike MNL, there is no separate per-node collapse to force open too). */
+
+@media print {
+  /* Landscape gives a nowrap proof tree more usable width by default; users
+     can still override it from the print dialog. */
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  html.printing-typing,
+  body.printing-typing,
+  body.printing-typing #app {
+    width: auto;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    background: #fff;
+  }
+
+  /* This print layer is imported after the shell stylesheet and is scoped by
+     printing-typing, so it wins without escalating selector importance. */
+  body.printing-typing .app-shell,
+  body.printing-typing .ide-workbench,
+  body.printing-typing .ide-layout,
+  body.printing-typing .code-column,
+  body.printing-typing .inspector-body {
+    display: block;
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+  }
+
+  body.printing-typing .typing-panel {
+    display: block;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    color: #000;
+    background: #fff;
+  }
+
+  /* The masthead that replaces the on-screen dropdown picker: a small caps
+     kicker, the method name as the actual title, a muted timestamp — the
+     conventional three-line header of a printed technical document, not a
+     screenshot of a toolbar. */
+  body.printing-typing .typ-print-header {
+    display: block;
+    padding: 0 var(--space-7) var(--space-5);
+    border-bottom: 2px solid #000;
+    margin-bottom: var(--space-5);
+  }
+
+  body.printing-typing .typ-print-kicker {
+    font: var(--font-weight-bold) 9.5px/1.4 var(--font-family-ui);
+    letter-spacing: 0.09em;
+    color: #555;
+  }
+
+  body.printing-typing .typ-print-title {
+    font: var(--font-weight-bold) 20px/1.3 var(--font-family-ui);
+    color: #000;
+  }
+
+  body.printing-typing .typ-print-meta {
+    font: var(--font-weight-regular) 9.5px/1.4 var(--font-family-ui);
+    color: #666;
+  }
+
+  /* The interactive picker itself has nothing to say on paper — the
+     masthead above stands in for it. */
+  body.printing-typing .typing-toolbar {
+    display: none;
+  }
+
+  /* Γ as a labelled context card rather than a bare muted line: a light,
+     bordered box reads as "here is the fixed context" the way a boxed
+     hypothesis list would in a typeset proof. */
+  body.printing-typing .typing-gamma {
+    margin: 0 var(--space-7) var(--space-7);
+    padding: var(--space-4) var(--space-6);
+    border: 1px solid #bbb;
+    border-radius: 4px;
+    background: #f7f7f7;
+    font-size: 11px;
+  }
+
+  body.printing-typing .typ-tree {
+    overflow: visible;
+    color: #000;
+    padding: 0 var(--space-7) var(--space-7);
+  }
+
+  /* overflow-x: visible, NOT just display: block: `.typ-row-tree`'s own
+     overflow-x: auto (the domain base rule) clips its content to its own
+     *pre-transform* layout box — transform is a paint-time operation on the
+     ancestor `#typing-tree` (typingPanel.ts's shrink-to-fit), so it scales
+     whatever already survived this element's own overflow clip, not the
+     original content. A wide row silently lost everything past its
+     unscaled width this way, no matter how aggressively the ancestor was
+     scaled down afterward. */
+  body.printing-typing .typ-row-tree {
+    display: block;
+    overflow-x: visible;
+  }
+
+  body.printing-typing .typ-row-toggle {
+    display: none;
+  }
+
+  /* One statement per visual block, clearly separated and — where it fits
+     within a single page — kept whole rather than split across a page
+     break mid-tree. */
+  body.printing-typing .typ-row {
+    border-bottom: 1px solid #ccc;
+    padding: var(--space-2) 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.printing-typing .typ-row:last-child {
+    border-bottom: 0;
+  }
+
+  body.printing-typing .typ-row-head {
+    padding: var(--space-3) var(--space-2);
+  }
+
+  body.printing-typing .typ-bar::before {
+    border-top-color: #000;
+  }
+
+  /* Print resolution makes the screen-sized 9.5px/12px type look cramped;
+     bump both up a step. The shrink-to-fit transform (typingPanel.ts) still
+     applies on top of this when a derivation is too wide for the page, so
+     large trees end up correctly sized rather than needlessly tiny. */
+  body.printing-typing .typ-rule,
+  body.printing-typing .typ-row-rule {
+    font-size: 11px;
+    color: #000;
+  }
+
+  body.printing-typing .typ-judgement,
+  body.printing-typing .typ-row-judgement {
+    font-size: 13.5px;
+    color: #000;
+  }
+
+  body.printing-typing .app-header,
+  body.printing-typing .activity-bar,
+  body.printing-typing .toolbox-column,
+  body.printing-typing .sidebar-resizer,
+  body.printing-typing .sidebar-scrim,
+  body.printing-typing .workspace-column,
+  body.printing-typing .code-resizer,
+  body.printing-typing .code-scrim,
+  body.printing-typing .code-header,
+  body.printing-typing .inspector-tabs,
+  body.printing-typing #panel-code,
+  body.printing-typing #panel-outline,
+  body.printing-typing .viz-dock {
+    display: none;
+  }
+
+  /* .workspace-footer isn't listed here: it's removed from the DOM outright
+     for the print pass instead (see `printTyping()` in typingPanel.ts) —
+     CSS-hiding it alongside .workspace-column reproducibly blanks the
+     entire printed page in Chromium's print pipeline. */
+}
+
+/* -- Model A stepper ------------------------------------------------------ */
+
+.viz-host-machine[data-active="true"] {
+  display: flex;
+}
+
+.stepper-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+}
+
+.stepper-controls {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 5px 7px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-recessed);
+}
+
+.stepper-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height-compact);
+  padding: var(--control-padding-compact);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.stepper-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.stepper-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.stepper-button.is-primary {
+  border-color: var(--accent-primary);
+}
+
+.stepper-status {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stepper-status[data-state="error"] {
+  color: var(--state-error);
+}
+
+.stepper-status[data-state="stale"] {
+  color: var(--state-warning);
+}
+
+.stepper-status[data-state="done"] {
+  color: var(--accent-primary);
+}
+
+.stepper-status[data-state="gc"] {
+  color: var(--state-execution-strong);
+}
+
+.stepper-gc-auto {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.stepper-gc-auto input[type="number"] {
+  width: 3.6em;
+}
+
+/* One column per CESK machine component, in machine order, over an explicit
+   activation-frame stack:
+   C·ontrol | S·tack + E·nvironment | S·tore | K·ontinuation | output. */
+
+.stepper-panels {
+  position: relative;
+  flex: 1;
+  display: grid;
+  grid-template-columns:
+    minmax(150px, 0.72fr) minmax(220px, 1.05fr) minmax(210px, 1fr)
+    minmax(180px, 0.9fr) minmax(140px, 0.65fr);
+  gap: var(--space-5);
+  padding: var(--space-5);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.csesk-letter {
+  display: inline-block;
+  margin-right: var(--space-3);
+  padding: 1px var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+}
+
+/* -- C · Control ---------------------------------------------------------- */
+
+.stepper-control-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+}
+
+.stepper-control-kind {
+  align-self: flex-start;
+  padding: 1px var(--space-4);
+  border-radius: 999px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.stepper-control-kind[data-kind='value'] { color: var(--accent-primary); border-color: currentColor; }
+
+.stepper-control-kind[data-kind='done'] { color: var(--accent-primary); border-color: currentColor; }
+
+.stepper-control-text {
+  font-family: var(--font-code, monospace);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-default);
+  overflow-wrap: anywhere;
+}
+
+.stepper-control-rule {
+  margin-top: var(--space-4);
+  padding: 3px var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-code, monospace);
+}
+
+/* -- K · Kontinuation ------------------------------------------------------ */
+
+.stepper-kont-frame {
+  margin-bottom: var(--space-5);
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  opacity: 0.72;
+}
+
+.stepper-kont-frame.is-top {
+  opacity: 1;
+  border-color: var(--border-strong);
+  background: var(--surface-control);
+}
+
+.stepper-kont-frame-title {
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.stepper-kont-entry {
+  padding: 3px var(--space-3);
+  border-radius: var(--radius-control);
+  font-family: var(--font-code, monospace);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.stepper-kont-entry.is-next {
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--accent-primary) 40%, transparent);
+}
+
+.stepper-kont-return {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.stepper-kont-empty {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) var(--space-3);
+}
+
+@media (max-width: 1180px) {
+  .stepper-panels {
+    grid-template-columns: 1fr 1fr;
+    overflow: auto;
+  }
+}
+
+.stepper-arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.stepper-arrow {
+  fill: none;
+  stroke: hsl(var(--loc-hue) 60% 52%);
+  stroke-width: 2;
+  opacity: 0.85;
+}
+
+.stepper-arrowhead {
+  fill: hsl(var(--loc-hue) 60% 52%);
+  opacity: 0.9;
+}
+
+body[data-theme="light"] .stepper-arrow {
+  stroke: hsl(var(--loc-hue) 55% 40%);
+}
+
+body[data-theme="light"] .stepper-arrowhead {
+  fill: hsl(var(--loc-hue) 55% 40%);
+}
+
+/* The money animation: arrows NEVER move on a write — they pulse in place
+   while the box contents change, asserting "same object". */
+
+.stepper-arrow.is-pulse {
+  animation: stepper-arrow-pulse 700ms ease-out;
+}
+
+@keyframes stepper-arrow-pulse {
+  0% {
+    stroke-width: 4.5;
+    opacity: 1;
+  }
+  100% {
+    stroke-width: 2;
+    opacity: 0.85;
+  }
+}
+
+.stepper-write-dot {
+  fill: hsl(var(--loc-hue) 72% 58%);
+  stroke: var(--text-on-state);
+  stroke-width: 1;
+  opacity: 0.95;
+}
+
+.stepper-heap-box.is-write-target {
+  animation: stepper-box-glow 700ms ease-out;
+}
+
+@keyframes stepper-box-glow {
+  from {
+    box-shadow: 0 0 0 3px hsl(var(--loc-hue) 60% 52% / 0.55);
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* GC mark phase: a copper ring, deliberately distinct from the gold
+   is-changed flash and the aquamarine is-top frame border — "the collector
+   touched this object," not "the mutator wrote to it." */
+
+.stepper-heap-box.is-gc-marked {
+  animation: stepper-gc-mark-glow 700ms ease-out;
+}
+
+@keyframes stepper-gc-mark-glow {
+  from {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-execution-strong) 65%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* GC sweep: literally greyed out and faded, then the box disappears on the
+   next full render once the swept heap is committed. Duration must match
+   GC_SWEEP_FADE_MS in stepperPanel.ts — that's when the commit actually
+   happens, so a mismatch would either cut the fade short or hold on an
+   already-committed empty state. */
+
+.stepper-heap-box.is-gc-swept {
+  transition: opacity 450ms ease-in, filter 450ms ease-in, transform 450ms ease-in;
+  opacity: 0.15;
+  filter: grayscale(1);
+  transform: scale(0.94);
+}
+
+.stepper-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-none);
+  background: var(--surface-raised);
+  box-shadow: none;
+}
+
+.stepper-panel h3 {
+  flex: none;
+  margin: 0;
+  padding: 7px var(--space-5);
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+}
+
+.stepper-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4);
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.stepper-hint {
+  padding: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-size-md);
+  line-height: 1.45;
+}
+
+.stepper-frame {
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  overflow: hidden;
+}
+
+.stepper-frame.is-top {
+  border-color: var(--accent-primary);
+}
+
+.stepper-frame-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) 9px;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+}
+
+.stepper-frame-self {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.stepper-locals {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--font-size-md)/var(--line-height-relaxed) var(--font-family-code);
+}
+
+.stepper-locals td {
+  padding: 3px 9px;
+  border-top: 1px solid var(--border-default);
+}
+
+.stepper-locals td:last-child {
+  text-align: right;
+}
+
+.stepper-scalar {
+  font-weight: var(--font-weight-bold);
+}
+
+.stepper-null {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.stepper-ref {
+  display: inline-block;
+  padding: 0 var(--space-4);
+  border-radius: 999px;
+  background: hsl(var(--loc-hue) 62% 34%);
+  color: var(--text-on-state);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.stepper-ref:hover {
+  filter: brightness(1.18);
+  box-shadow: 0 0 0 2px hsl(var(--loc-hue) 60% 52% / 0.4);
+}
+
+.stepper-provenance {
+  cursor: pointer;
+}
+
+.stepper-provenance:hover {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+body[data-theme="light"] .stepper-ref {
+  background: hsl(var(--loc-hue) 52% 46%);
+}
+
+.stepper-heap-box {
+  margin-bottom: var(--space-4);
+  border: 1px solid hsl(var(--loc-hue) 55% 45%);
+  border-left-width: 4px;
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  overflow: hidden;
+}
+
+.stepper-heap-title {
+  padding: 5px 9px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.stepper-output-pre {
+  margin: 0;
+  font: var(--font-size-md)/var(--line-height-relaxed) var(--font-family-code);
+  white-space: pre-wrap;
+}
+
+.is-changed {
+  animation: stepper-flash 700ms ease-out;
+}
+
+@keyframes stepper-flash {
+  from {
+    background-color: color-mix(in srgb, var(--state-warning) 45%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+/* -- Rewrite (substitution) view -------------------------------------------- */
+
+.subst-workspace {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.subst-workspace .injectionDiv {
+  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+}
+
+.subst-correspondence {
+  color: var(--accent-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+/* -- A vs B lockstep view -------------------------------------------------- */
+
+.compare-columns {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.compare-subhead {
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+}
+
+.compare-subhead:first-of-type {
+  margin-top: var(--space-3);
+}
+
+.compare-model-status {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.compare-model-status[data-state="error"] {
+  color: var(--state-error);
+}
+
+.compare-model-status[data-state="done"] {
+  color: var(--accent-primary);
+}
+
+.stepper-struct {
+  color: var(--accent-hover);
+  font-weight: var(--font-weight-bold);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 920px) {
+  .stepper-panels,
+  .compare-columns {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .stepper-panel {
+    min-height: 150px;
+    overflow: visible;
+  }
+
+  .stepper-panel-body {
+    overflow: visible;
+  }
+}

@@ -1,0 +1,198 @@
+/*
+ * Authoritative design tokens for the Block-MiniJava workbench.
+ *
+ * Component styles consume the semantic names in this file. The --ide-* size
+ * variables are runtime contracts for the resize and persistence code. A small
+ * set of aliases remains for specialized domain-view styles that still use it.
+ */
+
+:root {
+  color-scheme: dark light;
+
+  /* Typography */
+  --font-family-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family-code: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-size-xs: 11px;
+  --font-size-sm: 12px;
+  --font-size-md: 13px;
+  --font-size-base: 14px;
+  --font-size-lg: 16px;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-compact: 1.2;
+  --line-height-default: 1.45;
+  --line-height-relaxed: 1.55;
+  --line-height-code: 21px;
+
+  /* Spacing */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+  --space-7: 14px;
+  --space-8: 16px;
+  --space-10: 20px;
+
+  /* Controls and icons */
+  --control-height-compact: 28px;
+  --control-height-default: 32px;
+  --control-height-comfortable: 36px;
+  --control-padding-compact: 0 var(--space-3);
+  --control-padding-default: 0 var(--space-4);
+  --icon-size-sm: 12px;
+  --icon-size-md: 16px;
+
+  /* Shape, motion, and elevation */
+  --radius-none: 0;
+  --radius-control: 4px;
+  --shadow-none: none;
+  --shadow-menu: 0 10px 28px rgb(0 0 0 / 24%);
+  --shadow-drawer-start: 8px 0 24px rgb(0 0 0 / 24%);
+  --shadow-drawer-end: -8px 0 24px rgb(0 0 0 / 24%);
+  --shadow-bottom-panel: 0 -10px 28px rgb(0 0 0 / 28%);
+  --shadow-dialog: 0 14px 38px rgb(0 0 0 / 36%);
+  --shadow-responsive-menu: 0 12px 28px rgb(0 0 0 / 30%);
+  --motion-fast: 120ms ease;
+  --text-on-state: #ffffff;
+  --selection: color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  --focus-ring: var(--accent-primary);
+  --focus-outline: 3px solid var(--focus-ring);
+  --focus-offset: 2px;
+  --surface-modal-backdrop: rgb(0 0 0 / 58%);
+  --surface-drawer-scrim: rgb(7 9 13 / 42%);
+
+  /* Runtime-owned layout variables. Do not rename: TypeScript writes these. */
+  --ide-activity-bar-width: 50px;
+  --ide-primary-sidebar-width: 270px;
+  --ide-code-panel-width: 430px;
+  --ide-bottom-panel-height: 276px;
+  --ide-status-bar-height: 24px;
+  --header-height: 46px;
+
+  /* Semantic panel dimensions */
+  --panel-activity-width: var(--ide-activity-bar-width);
+  --panel-sidebar-width: var(--ide-primary-sidebar-width);
+  --panel-inspector-width: var(--ide-code-panel-width);
+  --panel-bottom-height: var(--ide-bottom-panel-height);
+  --panel-status-height: var(--ide-status-bar-height);
+  --panel-header-height: var(--header-height);
+  --panel-toolbar-height: 36px;
+  --panel-tab-height: 32px;
+  /* Layering */
+  --layer-workspace: 1;
+  --layer-interaction: 4;
+  --layer-header: 100;
+  --layer-scrim: 30;
+  --layer-drawer: 35;
+  --layer-drawer-top: 45;
+  --layer-menu: 50;
+  --layer-bottom-panel: 120;
+  --layer-modal: 1000;
+
+}
+
+body[data-theme="dark"] {
+  --surface-app: #111318;
+  --surface-raised: #1d2027;
+  --surface-recessed: #191c22;
+  --surface-workspace: #171a20;
+  --surface-activity: #15181e;
+  --surface-sidebar: #1a1d24;
+  --surface-control: #22262e;
+  --surface-hover: #242832;
+  --surface-code: #14171d;
+  --surface-overlay: rgb(6 8 12 / 48%);
+  --workspace-grid: rgb(174 184 198 / 5.5%);
+
+  --border-default: #303640;
+  --border-strong: #414955;
+  --text-primary: #f1f3f5;
+  --text-secondary: #a9b0bc;
+  --text-muted: #6f7782;
+  --text-emphasis: #d4d8de;
+
+  --accent-primary: #5b8def;
+  --accent-hover: #74a0f5;
+  --state-success: #3fb950;
+  --state-warning: #d9a441;
+  --state-error: #f05d5e;
+  --state-info: #58a6ff;
+  --state-execution-strong: #ee9b6c;
+
+  /* Broad grammar colors shared by the custom toolbox and Blockly theme. */
+  --grammar-structure: #80505a;
+  --grammar-declaration: #685b7a;
+  --grammar-type: #3d6d5a;
+  --grammar-statement: #80602f;
+  --grammar-expression: #455f7f;
+  --grammar-value: #5c713e;
+
+  /* Generated-code syntax is semantic and independent from Blockly colors. */
+  --syntax-keyword: #ff9d76;
+  --syntax-type: #7ee2d2;
+  --syntax-number: #e4bd70;
+  --syntax-string: #b8e08a;
+  --syntax-identifier: #e6e9ee;
+  --syntax-operator: #76b7ff;
+  --syntax-comment: #7d8794;
+  --syntax-builtin: #d7a8f8;
+  --syntax-method: #a7c8ff;
+  --syntax-punctuation: #9aa3ae;
+}
+
+body[data-theme="light"] {
+  --surface-app: #eef1f4;
+  --surface-raised: #ffffff;
+  --surface-recessed: #f3f5f7;
+  --surface-workspace: #f7f8fa;
+  --surface-activity: #e6e9ed;
+  --surface-sidebar: #f3f5f7;
+  --surface-control: #f0f2f5;
+  --surface-hover: #edf0f4;
+  --surface-code: #fbfcfd;
+  --surface-overlay: rgb(6 8 12 / 38%);
+  --workspace-grid: rgb(66 78 96 / 5.5%);
+
+  --border-default: #d8dde4;
+  --border-strong: #b8c0cb;
+  --text-primary: #202631;
+  --text-secondary: #606b79;
+  --text-muted: #7b8490;
+  --text-emphasis: #3d4653;
+
+  --accent-primary: #356dcc;
+  --accent-hover: #245cb9;
+  --state-success: #25843d;
+  --state-warning: #9c6b12;
+  --state-error: #c73f43;
+  --state-info: #256cb7;
+  --state-execution-strong: #934925;
+
+  --grammar-structure: #754650;
+  --grammar-declaration: #5e5074;
+  --grammar-type: #346252;
+  --grammar-statement: #75552a;
+  --grammar-expression: #3a5878;
+  --grammar-value: #526638;
+
+  --syntax-keyword: #a54c2e;
+  --syntax-type: #08766d;
+  --syntax-number: #8b5d0b;
+  --syntax-string: #4d7c0f;
+  --syntax-identifier: #202631;
+  --syntax-operator: #1f67a5;
+  --syntax-comment: #68727f;
+  --syntax-builtin: #7945a5;
+  --syntax-method: #235fa2;
+  --syntax-punctuation: #68727f;
+}
+
+/* Compatibility aliases retained by specialized domain views. */
+body[data-theme] {
+  --font-code: var(--font-family-code);
+  --radius-panel: var(--radius-none);
+}

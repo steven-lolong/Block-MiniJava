@@ -1,3 +1,5 @@
 node_modules
 .DS_Store
 test/dist
+playwright-report
+test-results

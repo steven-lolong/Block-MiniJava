@@ -13,6 +13,7 @@ module.exports = {
     eval: path.resolve(__dirname, 'test/eval.entry.ts'),
     reachability: path.resolve(__dirname, 'test/reachability.entry.ts'),
     gc: path.resolve(__dirname, 'test/gc.entry.ts'),
+    'block-colors': path.resolve(__dirname, 'test/block-colors.entry.ts'),
     smoke: path.resolve(__dirname, 'test/smoke-csesk.entry.ts')
   },
   output: {

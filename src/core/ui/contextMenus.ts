@@ -23,7 +23,7 @@ export function registerMiniJavaContextMenus(): void {
     {
       id: 'miniJavaVizStructure',
       scopeType: ScopeType.BLOCK,
-      displayText: 'Visualize ▸ Call-by-Structure',
+      displayText: 'Visualize: Call-by-Structure',
       weight: 100,
       preconditionFn: (scope: BlockScope) => show(scope.block?.type === 'mj_expr_method_call'),
       callback: (scope: BlockScope) => {
@@ -33,7 +33,7 @@ export function registerMiniJavaContextMenus(): void {
     {
       id: 'miniJavaVizValue',
       scopeType: ScopeType.BLOCK,
-      displayText: 'Visualize ▸ Call-by-Value',
+      displayText: 'Visualize: Call-by-Value',
       weight: 101,
       preconditionFn: (scope: BlockScope) => show(scope.block?.type === 'mj_expr_method_call'),
       callback: (scope: BlockScope) => {
@@ -60,4 +60,3 @@ export function registerMiniJavaContextMenus(): void {
     if (!registry.getItem(item.id)) registry.register(item);
   }
 }
-

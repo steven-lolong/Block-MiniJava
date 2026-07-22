@@ -137,7 +137,7 @@ function stopPlay(): void {
     window.clearInterval(playTimer);
     playTimer = null;
   }
-  byId<HTMLButtonElement>('stepper-play').textContent = '⏵ Play';
+  byId<HTMLButtonElement>('stepper-play').textContent = 'Play';
 }
 
 function markStale(): void {
@@ -176,31 +176,31 @@ function renderStatus(): void {
   const status = byId<HTMLSpanElement>('stepper-status');
   status.removeAttribute('data-state');
   if (!current) {
-    status.textContent = 'Press ⟲ Load to build the machine from the current blocks.';
+    status.textContent = 'Press Load to build the machine from the current blocks.';
     return;
   }
   if (stale) {
-    status.textContent = 'Program changed — press ⟲ Load to restart.';
+    status.textContent = 'Program changed — press Load to restart.';
     status.dataset.state = 'stale';
     return;
   }
   if (gcAnimation) {
-    status.textContent = `☠ marking… (${gcAnimation.markedSoFar} so far)`;
+    status.textContent = `GC marking (${gcAnimation.markedSoFar} so far)`;
     status.dataset.state = 'gc';
     return;
   }
   if (lastTransitionWasGC && gcSummary) {
-    status.textContent = `☠ GC complete — marked ${gcSummary.marked}, swept ${gcSummary.swept} (heap now ${gcSummary.heapAfter})`;
+    status.textContent = `GC complete — marked ${gcSummary.marked}, swept ${gcSummary.swept} (heap now ${gcSummary.heapAfter})`;
     status.dataset.state = 'gc';
     return;
   }
   if (current.status === 'error') {
-    status.textContent = `⨯ stuck after ${current.stepCount} step(s): ${current.error}`;
+    status.textContent = `Stuck after ${current.stepCount} step(s): ${current.error}`;
     status.dataset.state = 'error';
     return;
   }
   if (current.status === 'done') {
-    status.textContent = `✓ finished in ${current.stepCount} step(s)`;
+    status.textContent = `Finished in ${current.stepCount} step(s)`;
     status.dataset.state = 'done';
     return;
   }
@@ -257,7 +257,7 @@ function renderControl(): void {
   } else {
     const done = document.createElement('div');
     done.className = 'stepper-control-text';
-    done.textContent = '✓ program finished';
+    done.textContent = 'Program finished';
     card.appendChild(done);
   }
   host.appendChild(card);
@@ -472,7 +472,7 @@ function renderOutput(): void {
   const note = current.status === 'done'
     ? '— program finished —'
     : current.status === 'error'
-      ? `⨯ ${current.error}`
+      ? `Error: ${current.error}`
       : undefined;
   mirrorProgramOutput(`CESK · Model ${current.model}`, current.output, note);
 }
@@ -834,7 +834,7 @@ function togglePlay(): void {
     return;
   }
   if (!current || stale || current.status !== 'running' || gcAnimation) return;
-  byId<HTMLButtonElement>('stepper-play').textContent = '⏸ Pause';
+  byId<HTMLButtonElement>('stepper-play').textContent = 'Pause';
   playTimer = window.setInterval(stepOnce, PLAY_INTERVAL_MS);
 }
 

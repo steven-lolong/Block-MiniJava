@@ -1641,6 +1641,29 @@ body.code-maximized .code-column {
   background: var(--surface-workspace);
 }
 
+.viz-semantics-region {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 34px minmax(0, 1fr);
+  min-height: 0;
+  background: var(--surface-workspace);
+}
+
+.viz-semantics-tabs {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-recessed);
+}
+
+.viz-semantics-body {
+  position: relative;
+  min-height: 0;
+  background: var(--surface-workspace);
+}
+
 .bottom-passive-host[data-active="true"] {
   display: block;
   overflow: hidden;
@@ -2206,14 +2229,6 @@ body.bottom-maximized .viz-dock[data-open="true"] {
 
   .viz-tab {
     padding: 0 var(--space-4);
-  }
-
-  .viz-tab-label {
-    display: none;
-  }
-
-  .viz-tab[aria-selected="true"] .viz-tab-label {
-    display: inline;
   }
 
   .autosave-status {

@@ -173,11 +173,21 @@ test('perspectives coordinate activity, inspector, and bottom panel', async ({ p
 test('bottom panel opens, closes, maximizes, and reaches every documented view', async ({ page }) => {
   const errors = await openFreshApp(page);
   await openBottomPanel(page);
+  const primaryTabIds = await page.locator('.viz-dock-tabs [role="tab"]').evaluateAll((tabs) =>
+    tabs.map((tab) => tab.id)
+  );
+  expect(primaryTabIds).toEqual(['bottom-tab-problems', 'bottom-tab-output', 'bottom-tab-semantics']);
+  await expect(page.locator('#bottom-panel-semantics')).toHaveAttribute('hidden', '');
   for (const kind of ['problems', 'output', 'structure', 'value', 'machine', 'compare', 'subst']) {
     await selectBottomTab(page, kind);
   }
+  await expect(page.locator('#bottom-tab-semantics')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.viz-semantics-tabs [role="tab"]')).toHaveCount(5);
   await page.locator('#viz-maximize').click();
   await expect(page.locator('body')).toHaveClass(/bottom-maximized/);
+  await page.locator('#viz-maximize').click();
+  await expect(page.locator('body')).not.toHaveClass(/bottom-maximized/);
+  await page.locator('#viz-maximize').click();
   await page.locator('#viz-collapse').click();
   await expect(page.locator('#viz-dock')).toHaveAttribute('data-open', 'false');
   await expect(page.locator('body')).not.toHaveClass(/bottom-maximized/);
@@ -186,6 +196,9 @@ test('bottom panel opens, closes, maximizes, and reaches every documented view',
 
 test('Code, Types, Outline, Problems, Output, and runtime controls remain reachable', async ({ page }) => {
   const errors = await openFreshApp(page);
+  await expect(page.locator('#tab-code')).toHaveText('Code');
+  await expect(page.locator('#tab-typing')).toHaveText('Types');
+  await expect(page.locator('#tab-outline')).toHaveText('Outline');
   for (const panel of ['code', 'typing', 'outline']) {
     await page.locator(`#tab-${panel === 'typing' ? 'typing' : panel}`).click();
     await expect(page.locator(`#panel-${panel}`)).toHaveClass(/is-active/);
@@ -194,11 +207,140 @@ test('Code, Types, Outline, Problems, Output, and runtime controls remain reacha
   await selectBottomTab(page, 'problems');
   await selectBottomTab(page, 'output');
   await selectBottomTab(page, 'machine');
+  await expect(page.locator('#bottom-tab-semantics')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#stepper-load')).toBeVisible();
   await selectBottomTab(page, 'compare');
   await expect(page.locator('#compare-load')).toBeVisible();
   await selectBottomTab(page, 'subst');
   await expect(page.locator('#subst-load')).toBeVisible();
+  expectNoUncaughtErrors(errors);
+});
+
+test('right inspector preserves code editing, code-to-block synchronization, Types, and Outline', async ({ page }) => {
+  const errors = await openFreshApp(page);
+  const editor = page.locator('#generated-code-editor');
+  const source = await editor.inputValue();
+  await editor.fill(source.replace('System.out.println(0);', 'System.out.println(7);'));
+  await expect(page.locator('#code-editor-status')).toHaveText(/Converted MiniJava text/, { timeout: 4000 });
+  await expect.poll(() => page.evaluate(() => {
+    const blockly = (window as any).Blockly;
+    return String(blockly.getMainWorkspace().getBlocksByType('mj_expr_integer')[0]?.getFieldValue('VALUE'));
+  })).toBe('7');
+
+  await page.locator('#tab-typing').click();
+  await expect(page.locator('#typing-gamma')).toContainText('Γ');
+  await expect(page.locator('#typing-tree')).toContainText('WF-Print');
+
+  await page.locator('#tab-outline').click();
+  await expect(page.locator('#program-outline .outline-item')).not.toHaveCount(0);
+  await page.waitForTimeout(1600);
+  await page.evaluate(() => {
+    const blockly = (window as any).Blockly;
+    blockly.getMainWorkspace().getBlocksByType('mj_expr_integer')[0]?.setFieldValue('11', 'VALUE');
+  });
+  await page.locator('#tab-code').click();
+  await expect(editor).toHaveValue(/System\.out\.println\(11\);/);
+  expectNoUncaughtErrors(errors);
+});
+
+test('Problems and Output remain distinct bottom-panel results', async ({ page }) => {
+  const errors = await openFreshApp(page);
+  await page.locator('#status-problems-button').click();
+  await expect(page.locator('#bottom-tab-problems')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#bottom-problems-list')).toContainText('No problems: the program type-checks.');
+
+  await page.locator('#run-program').click();
+  await expect(page.locator('#bottom-tab-output')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#bottom-program-output')).toContainText('[Run]');
+  await expect(page.locator('#bottom-program-output')).toContainText('0');
+  await expect(page.locator('#bottom-panel-semantics')).toHaveAttribute('hidden', '');
+  expectNoUncaughtErrors(errors);
+});
+
+test('Call-by-Structure and Call-by-Value retain their Blockly visualization state inside Semantics', async ({ page }) => {
+  const errors = await openFreshApp(page);
+  await page.locator('#examples-button').click();
+  await page.locator('#examples-panel [role="menuitem"]').filter({ hasText: 'Simple Sum' }).evaluate((item) =>
+    (item as HTMLButtonElement).click()
+  );
+  await expect(page.locator('#example-load-modal')).toHaveAttribute('open', '');
+  await page.locator('#example-load-modal button[value="replace"]').click();
+  await expect(page.locator('#loaded-file-label')).toContainText('Simple Sum.bml');
+  await page.waitForTimeout(700);
+  await page.evaluate(() => {
+    (window as any).__bmjProgramWorkspace = (window as any).Blockly.getMainWorkspace();
+  });
+
+  const openReduction = (kind: 'Structure' | 'Value') => page.evaluate((entry) => {
+    const blockly = (window as any).Blockly;
+    const block = (window as any).__bmjProgramWorkspace.getBlocksByType('mj_expr_method_call')[0];
+    blockly.ContextMenuRegistry.registry.getItem(`miniJavaViz${entry}`).callback({ block });
+  }, kind);
+
+  await openReduction('Structure');
+  await expect(page.locator('#bottom-tab-semantics')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#bottom-tab-structure')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#bottom-panel-structure .blocklySvg')).toBeVisible();
+
+  await openReduction('Value');
+  await expect(page.locator('#bottom-tab-value')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#bottom-panel-value .blocklySvg')).toBeVisible();
+  await selectBottomTab(page, 'structure');
+  await expect(page.locator('#bottom-panel-structure .blocklySvg')).toBeVisible();
+  expectNoUncaughtErrors(errors);
+});
+
+test('CESK, A vs B, and Rewrite retain their controls, history, and shared Output behavior', async ({ page }) => {
+  const errors = await openFreshApp(page);
+  await openBottomPanel(page);
+
+  await selectBottomTab(page, 'machine');
+  await page.locator('#stepper-load').click();
+  await expect(page.locator('#stepper-step')).toBeEnabled();
+  await page.locator('#stepper-step').click();
+  await expect(page.locator('#stepper-back')).toBeEnabled();
+  await page.locator('#stepper-back').click();
+  await expect(page.locator('#stepper-gc-auto-enabled')).toBeVisible();
+  await expect(page.locator('#stepper-gc-threshold')).toBeVisible();
+
+  await selectBottomTab(page, 'compare');
+  await page.locator('#compare-load').click();
+  await expect(page.locator('#compare-step')).toBeEnabled();
+  await page.locator('#compare-step').click();
+  await expect(page.locator('#compare-back')).toBeEnabled();
+  await page.locator('#compare-back').click();
+
+  await selectBottomTab(page, 'subst');
+  await page.locator('#subst-load').click();
+  await expect(page.locator('#subst-step')).toBeEnabled();
+  await page.locator('#subst-step').click();
+  await expect(page.locator('#subst-back')).toBeEnabled();
+  await page.locator('#subst-back').click();
+  await expect(page.locator('#viz-rerun')).toBeVisible();
+  await selectBottomTab(page, 'output');
+  await expect(page.locator('#bottom-program-output')).toContainText('[Rewrite · substitution]');
+  expectNoUncaughtErrors(errors);
+});
+
+test('inspector, primary bottom tabs, and semantic tabs keep independent keyboard navigation', async ({ page }) => {
+  const errors = await openFreshApp(page);
+  await page.locator('#tab-code').focus();
+  await page.locator('#tab-code').press('ArrowRight');
+  await expect(page.locator('#tab-typing')).toBeFocused();
+  await expect(page.locator('#tab-typing')).toHaveAttribute('aria-selected', 'true');
+
+  await openBottomPanel(page);
+  await page.locator('#bottom-tab-problems').focus();
+  await page.locator('#bottom-tab-problems').press('ArrowRight');
+  await expect(page.locator('#bottom-tab-output')).toBeFocused();
+  await page.locator('#bottom-tab-output').press('ArrowRight');
+  await expect(page.locator('#bottom-tab-semantics')).toBeFocused();
+  await expect(page.locator('#bottom-tab-semantics')).toHaveAttribute('aria-selected', 'true');
+
+  await page.locator('#bottom-tab-structure').focus();
+  await page.locator('#bottom-tab-structure').press('ArrowRight');
+  await expect(page.locator('#bottom-tab-value')).toBeFocused();
+  await expect(page.locator('#bottom-tab-value')).toHaveAttribute('aria-selected', 'true');
   expectNoUncaughtErrors(errors);
 });
 
@@ -301,6 +443,15 @@ test('mobile sidebar and inspector drawers open and close with their scrims', as
   await expect(page.locator('body')).toHaveClass(/mobile-code-open/);
   await page.locator('#code-scrim').dispatchEvent('click');
   await expect(page.locator('body')).not.toHaveClass(/mobile-code-open/);
+
+  await page.keyboard.press('Control+J');
+  await selectBottomTab(page, 'machine');
+  await expect(page.locator('#bottom-tab-semantics')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.viz-semantics-tabs')).toBeVisible();
+  await page.locator('#viz-maximize').click();
+  await expect(page.locator('body')).toHaveClass(/bottom-maximized/);
+  await page.locator('#viz-maximize').click();
+  await expect(page.locator('body')).not.toHaveClass(/bottom-maximized/);
   expectNoUncaughtErrors(errors);
 });
 
@@ -314,6 +465,9 @@ test('persisted state can be loaded in a fresh browser page', async ({ browser }
   const restoredErrors = await openPersistedApp(restored);
   await expect(restored.locator('#viz-dock')).toHaveAttribute('data-open', 'true');
   await expect(restored.locator('body')).toHaveAttribute('data-perspective', 'debug');
+  await expect(restored.locator('#bottom-tab-semantics')).toHaveAttribute('aria-selected', 'true');
+  await expect(restored.locator('#bottom-tab-machine')).toHaveAttribute('aria-selected', 'true');
+  await expect(restored.locator('#bottom-panel-semantics')).not.toHaveAttribute('hidden', '');
   expectNoUncaughtErrors(errors);
   expectNoUncaughtErrors(restoredErrors);
   await context.close();

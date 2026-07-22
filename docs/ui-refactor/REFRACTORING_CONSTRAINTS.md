@@ -24,9 +24,9 @@ This is an information-architecture and presentation refactor, not a functionali
 - Left panel: block search and categorized toolbox.
 - Workspace toolbar: Undo, Redo, Zoom, Fit workspace, and the primary Run action.
 - Right inspector: Code, Types, and Outline.
-- Bottom panel: Problems, Output, semantics, and runtime tools.
+- Bottom panel: Problems, Output, and Semantics; existing semantic/runtime tools are leaf views inside Semantics.
 - Status bar: block count, problem count, and autosave state.
-- Settings: theme, autosave interval, perspectives, and layout controls.
+- View menu: theme, autosave interval, perspectives, and layout controls.
 - Command palette: every application command, including less frequently used actions.
 
 The final interface must have one primary product accent. Color is reserved for grammatical category, selection, execution, warning, and error state. Blocks should converge on six or seven coherent semantic color families rather than unrelated colors per block type. Use one SVG icon system; unfamiliar semantic actions need text labels, while icon-only controls are appropriate only for familiar actions such as undo, redo, zoom, close, and search. Normal font weights are 400, 500, 600, and 700. Spacing, borders, and the workspace grid must be restrained.
@@ -61,6 +61,7 @@ The following are non-negotiable.
 - Preserve toolbox click-to-add and drag-to-workspace behavior, including the custom `application/x-block-minijava-block` MIME type and drop-target feedback.
 - Preserve clickable Problems, Typing judgements, Outline entries, and runtime provenance links that center/select the associated block.
 - Preserve Output ownership: the most recent Run or semantic stepper owns the shared Output view.
+- Preserve the bottom view hierarchy: `problems` and `output` are primary leaf views; `structure`, `value`, `machine`, `compare`, and `subst` are leaf views inside the conceptual Semantics region. The conceptual parent must never replace a leaf kind in state or persistence.
 - Preserve exact Back/history behavior for the steppers, Play/Pause behavior, stale-state handling after workspace edits, Model A/B lockstep, rewrite correspondence, and CESK reference/heap visualization.
 - Preserve screenshot download through the Blockly workspace context menu.
 
@@ -69,7 +70,7 @@ The following are non-negotiable.
 - Do not introduce React, Vue, Angular, another UI framework, or a parallel component/runtime abstraction.
 - Do not change the responsive drawer or resize implementation until it is covered by regression tests.
 - Do not perform unrelated code cleanup while implementing the visual refactor.
-- Production HTML, TypeScript, CSS/SCSS, Blockly definitions, and renderer code are outside the scope of this documentation-only step.
+- Production HTML, UI TypeScript, and shell CSS may change only within the active information-architecture phase. Blockly definitions, block colors, renderer geometry, language semantics, and unrelated panels remain out of scope.
 
 ## 3. Stable elements and selectors
 
@@ -80,15 +81,15 @@ The tables below record the current behavioral contract. A later refactor may ad
 | Area | IDs that must remain stable |
 | --- | --- |
 | Shell/header/file | `app`, `command-palette-trigger`, `perspective-select`, `main-menu`, `menu-toggle`, `new-workspace`, `load-workspace`, `load-file-input`, `save-workspace`, `export-code`, `load-autosave`, `examples-button`, `examples-panel`, `about-button`, `theme-toggle`, `loaded-file-label` |
-| Activity/sidebar | `activity-bar`, `activity-blocks`, `activity-search`, `activity-run`, `activity-settings`, `toolbox-column`, `sidebar-title`, `sidebar-title-icon`, `toolbox-search`, `toolbox-content`, `toggle-toolbox`, `show-toolbox-button`, `sidebar-resizer`, `sidebar-scrim` |
-| Sidebar commands/settings | `sidebar-run-program`, `sidebar-open-cesk`, `sidebar-open-compare`, `sidebar-open-rewrite`, `sidebar-open-structure`, `sidebar-open-value`, `settings-toggle-code`, `settings-toggle-bottom`, `autosave-interval`, `autosave-interval-label` |
-| Workspace | `blockly-area`, `blockly-div`, `workspace-undo`, `workspace-redo`, `workspace-zoom-out`, `workspace-zoom-in`, `workspace-fit`, `zoom-indicator`, `zoom-size`, `run-program`, `toggle-viz-dock` |
-| Inspector | `code-column`, `code-resizer`, `code-scrim`, `show-code-button`, `toggle-code-column`, `toggle-code-maximize`, `copy-code`, `print-typing`, `tab-code`, `tab-typing`, `tab-outline`, `panel-code`, `panel-typing`, `panel-outline`, `generated-code`, `typing-method-select`, `typing-gamma`, `typing-tree`, `typing-print-header`, `typing-print-title`, `typing-print-meta`, `program-outline` |
-| Bottom panel shell | `viz-dock`, `viz-resizer`, `top-toggle-bottom-panel`, `viz-dock-info`, `viz-rerun`, `viz-arrange`, `viz-maximize`, `viz-collapse`, `viz-empty`, `bottom-problems-count`, `bottom-problems-list`, `bottom-program-output` |
+| Activity/sidebar | `activity-bar`, `activity-blocks`, `activity-search`, `toolbox-column`, `sidebar-title`, `sidebar-title-icon`, `toolbox-search`, `toolbox-content`, `toggle-toolbox`, `show-toolbox-button`, `sidebar-resizer`, `sidebar-scrim` |
+| View preferences | `autosave-interval`, `autosave-interval-label` |
+| Workspace | `blockly-area`, `blockly-div`, `workspace-undo`, `workspace-redo`, `workspace-zoom-out`, `workspace-zoom-in`, `workspace-fit`, `run-program` |
+| Inspector | `code-column`, `code-resizer`, `code-scrim`, `toggle-code-column`, `toggle-code-maximize`, `copy-code`, `print-typing`, `tab-code`, `tab-typing`, `tab-outline`, `panel-code`, `panel-typing`, `panel-outline`, `generated-code`, `typing-method-select`, `typing-gamma`, `typing-tree`, `typing-print-header`, `typing-print-title`, `typing-print-meta`, `program-outline` |
+| Bottom panel shell | `viz-dock`, `viz-resizer`, `top-toggle-bottom-panel`, `bottom-tab-semantics`, `bottom-panel-semantics`, `viz-dock-info`, `viz-rerun`, `viz-arrange`, `viz-maximize`, `viz-collapse`, `viz-empty`, `bottom-problems-count`, `bottom-problems-list`, `bottom-program-output` |
 | CESK controls/content | `stepper-load`, `stepper-back`, `stepper-step`, `stepper-play`, `stepper-gc`, `stepper-gc-auto-enabled`, `stepper-gc-threshold`, `stepper-status`, `stepper-arrows`, `stepper-control`, `stepper-frames`, `stepper-heap`, `stepper-kont`, `stepper-output` |
 | Model comparison | `compare-load`, `compare-back`, `compare-step`, `compare-play`, `compare-status`, `compare-status-a`, `compare-status-b`, `compare-frames-a`, `compare-frames-b`, `compare-heap-a`, `compare-output-a`, `compare-output-b` |
 | Rewrite semantics | `subst-load`, `subst-back`, `subst-step`, `subst-play`, `subst-status`, `subst-correspondence`, `subst-workspace` |
-| Status | `status-perspective`, `status-perspective-label`, `status-block-count`, `status-problems-button`, `status-problems-count`, `autosave-status` |
+| Status | `status-block-count`, `status-problems-button`, `status-problems-count`, `autosave-status` |
 | Command palette | `command-palette-overlay`, `command-palette-title`, `command-palette-input`, `command-palette-list` |
 | Dialogs | `about-modal`, `about-title`, `save-name-modal`, `save-name-title`, `save-name-input`, `export-name-modal`, `export-name-title`, `export-name-input`, `example-load-modal`, `example-load-title`, `example-load-name` |
 
@@ -99,14 +100,13 @@ The code editor also creates `generated-code-editor` and `code-editor-status` at
 | Selector/attribute | Accepted values and use |
 | --- | --- |
 | `body[data-theme]` | `dark`, `light`; drives shell, code, Blockly, and visualization themes. |
-| `body[data-activity]` | `blocks`, `search`, `run`, `settings`; identifies the active sidebar activity. |
+| `body[data-activity]` | `blocks`, `search`; identifies the active sidebar activity. |
 | `body[data-perspective]` | `edit`, `debug`, `types`, `presentation`, `custom`; records perspective identity. |
 | `[data-ide-region]` | `shell`, `application-header`, `command-toolbar`, `workbench`, `activity-bar`, `editor-area`, `primary-sidebar`, `workspace`, `inspector`, `bottom-tools`, `status-bar`; semantic layout hooks. |
-| `.activity-item[data-activity]` | `blocks`, `search`, `run`, `settings`; event delegation and active-state synchronization. |
-| `.sidebar-view[data-activity-view]` | Space-separated activity membership, currently `blocks search`, `run`, or `settings`. |
-| `.perspective-option[data-perspective]` | `edit`, `debug`, `types`, `presentation`; perspective actions. |
+| `.activity-item[data-activity]` | `blocks`, `search`; event delegation and active-state synchronization. |
+| `.sidebar-view[data-activity-view]` | `blocks search` on the sole toolbox view. |
 | `.inspector-tab[data-panel]` | `code`, `typing`, `outline`; maps tabs to `panel-{value}`. |
-| `.viz-tab[data-kind]`, `.viz-host[data-kind]` | `problems`, `output`, `structure`, `value`, `machine`, `compare`, `subst`; bottom tab/host lookup. |
+| `.viz-tab[data-kind]`, `.viz-host[data-kind]` | Leaf values `problems`, `output`, `structure`, `value`, `machine`, `compare`, `subst`; bottom leaf tab/host lookup. The static Semantics parent has its own IDs and intentionally has no leaf `data-kind`. |
 | `#viz-dock[data-open]` | String `true`/`false`; authoritative bottom-panel open state. |
 | `.viz-host[data-active]` | String `true`/`false`; active bottom host. |
 | `.toolbox-category[data-category]` | Category ID from `MINI_JAVA_CATEGORIES`. |
@@ -136,7 +136,7 @@ The layout classes are behavioral state, not styling conveniences. Do not rename
 - Keep `command-palette-trigger[aria-controls="command-palette-overlay"]`, the palette's `role="dialog"`, `aria-modal="true"`, `aria-labelledby`, listbox/option roles, selected state, focus-on-open, focus restoration, Escape behavior, and keyboard navigation.
 - Keep `examples-button[aria-controls="examples-panel"]`, `aria-haspopup`, `aria-expanded`, the menu role, menu-item roles, outside-click close, and Escape close.
 - Keep the inspector `tablist`; each tab's `aria-controls="panel-*"`; each panel's `aria-labelledby="tab-*"`; roving `tabindex`; `aria-selected`; and Left/Right/Home/End navigation.
-- Keep the bottom `tablist`, runtime-created `bottom-tab-*`/`bottom-panel-*` relationships, roving `tabindex`, `aria-selected`, `aria-hidden`, and Left/Right/Home/End navigation.
+- Keep two independent bottom tablists: the primary Problems/Output/Semantics list and the nested Call-by-Structure/Call-by-Value/CESK/A vs B/Rewrite list. Preserve every `bottom-tab-*`/`bottom-panel-*` relationship, roving `tabindex`, `aria-selected`, `aria-hidden`, and Left/Right/Home/End navigation within its own list.
 - Keep resizers focusable with `role="separator"`, the correct `aria-orientation`, and arrow-key resizing.
 - Keep `aria-pressed` synchronized for activity buttons, panel toggles, and maximizers.
 - Keep dialogs associated with their title IDs and preserve native dialog close/return-value behavior.
@@ -158,20 +158,20 @@ The completed refactor must assign each application command one clear primary lo
 | Export MiniJava `.java` | Header, palette `file.export`, filename dialog | File menu |
 | Restore autosave | Header, palette `file.autosave` | File menu or overflow |
 | Load example, replace/merge/cancel | Examples menu and confirmation dialog | Examples |
-| Run program | Workspace Run, sidebar Run, palette `run.program`, `Ctrl/Cmd+F5`; opens Output | Header Run and workspace primary Run may be the two intentionally retained contextual entries |
+| Run program | Header Run, workspace Run, palette `run.program`, `Ctrl/Cmd+F5`; opens Output | Header Run and workspace primary Run are the two intentionally retained contextual entries |
 | Search blocks | Activity/sidebar and palette `view.search`, `Ctrl/Cmd+Shift+F` | Left panel search |
 | Show blocks/sidebar | Activity/reveal controls and palette `view.blocks` | View menu plus contextual drawer control |
 | Toggle inspector | Inspector/reveal/settings controls and palette `view.inspector` | View menu plus contextual drawer control |
 | Toggle bottom panel | Header/workspace/settings controls and palette `view.bottom`, `Ctrl/Cmd+J` | View menu plus contextual panel control |
 | Show Problems | Status item and palette `view.problems` | Bottom Problems tab/status count |
-| Code, Types, Outline | Inspector tabs with keyboard navigation | Right inspector |
+| Code, Types, Outline | Inspector tabs with keyboard navigation; stable internal `typing` IDs continue to back the visible Types view | Right inspector |
 | Copy MiniJava code | Inspector action | Code inspector and palette |
 | Print typing derivation | Typing inspector action | Types inspector and palette |
 | Undo/Redo block change | Workspace toolbar and palette `workspace.undo`/`workspace.redo`; Blockly shortcuts continue to work | Workspace toolbar |
-| Zoom in/out, reset 100%, fit | Workspace toolbar; Fit is palette `workspace.fit` today | Workspace toolbar and palette |
-| Edit/Debug/Type Analysis/Presentation perspectives | Picker, Settings, palette `perspective.*`; Custom is automatic identity | Settings and palette |
-| Theme toggle | Header/Settings behavior and palette `theme.toggle` | Settings and palette |
-| Autosave interval | Settings range, persisted timer restart | Settings |
+| Zoom in/out, fit | Workspace toolbar; Fit is palette `workspace.fit` today | Workspace toolbar and palette |
+| Edit/Debug/Type Analysis/Presentation perspectives | View picker and palette `perspective.*`; Custom is automatic identity | View and palette |
+| Theme toggle | View behavior and palette `theme.toggle` | View and palette |
+| Autosave interval | View range, persisted timer restart | View |
 | Maximize/restore inspector | Inspector action | Inspector contextual action and palette |
 | Maximize/restore bottom tools | Bottom-panel action | Bottom contextual action and palette |
 | About | Header today | Overflow menu and palette |
@@ -185,7 +185,7 @@ The present palette has 22 commands: `file.new`, `file.open`, `file.save`, `file
 - Open/load/re-run the Model A CESK machine.
 - Open/load/re-run Model A vs Model B comparison.
 - Open/load/re-run Rewrite semantics and correspondence view.
-- Bottom tab selection for Problems, Output, Call-by-Structure, Call-by-Value, CESK, A vs B, and Rewrite.
+- Primary bottom selection for Problems, Output, and Semantics, plus independent nested selection for Call-by-Structure, Call-by-Value, CESK, A vs B, and Rewrite.
 - Visualization Arrange, Re-run, Collapse, Maximize, and Restore.
 - CESK Load, Back, Step, Play/Pause, Run GC, Auto GC enable/disable, and GC threshold.
 - A vs B Load, Back, Step, and Play/Pause.
@@ -205,7 +205,7 @@ Panel-local transport controls must remain near the state they operate on. Seman
 - `Ctrl/Cmd+Shift+P` and `F1`: open command palette.
 - `Escape`: close command palette and Examples menu where applicable.
 - Arrow Up/Down and Enter: navigate/run palette commands.
-- Left/Right/Home/End: inspector and bottom tab navigation.
+- Left/Right/Home/End: inspector tabs, primary bottom tabs, and nested Semantics tabs; each tablist navigates independently.
 - Left/Right: resize side panels in 24 px steps.
 - Up/Down: resize bottom panel in 24 px steps.
 - `Tab` in the editable code view inserts two spaces and schedules import; it is intentionally editor behavior.
@@ -223,7 +223,7 @@ The stylesheet chain is now separated by responsibility: `tokens.css`, `workbenc
 - At 1100 px and below: the left sidebar and right inspector become absolute-positioned drawers over the workspace. Side resizers are disabled. `mobile-sidebar-open` and `mobile-code-open` control drawer display; `sidebar-scrim` and `code-scrim` close them. Persistent visibility (`toolbox-hidden`/`code-hidden`) remains distinct from transient drawer-open state.
 - When a Problem is located at drawer widths, the sidebar closes so the selected block is visible.
 - At 900 px and below: the perspective picker and project context are hidden, the command center becomes icon-only, and header actions move into the `main-menu.menu-open` hamburger surface.
-- At 700 px and below: workspace history/Fit/file-label controls compact, the bottom panel becomes a fixed drawer above the status bar, selected bottom-tab text is retained while other tab labels hide, status content reduces, and the initial workspace zooms to fit after startup.
+- At 700 px and below: workspace controls compact, the bottom panel becomes a fixed drawer above the status bar, both bottom tab rows retain their visible domain labels and scroll horizontally when needed, status content reduces, and the initial workspace zooms to fit after startup.
 - At 480 px and below: header/status/zoom controls compact further and the menu becomes one column.
 - At 920 px and below, stepper and comparison columns stack to one column.
 - `prefers-reduced-motion: reduce` nearly eliminates transitions/animations and disables smooth scrolling.
@@ -252,11 +252,11 @@ Do not rewrite breakpoints, drawer classes, scrim behavior, z-index ordering, po
 | `block-minijava.layout.code.visible` | Boolean string. |
 | `block-minijava.layout.sidebar.width` | Sidebar width in pixels. |
 | `block-minijava.layout.sidebar.visible` | Boolean string. |
-| `block-minijava.layout.activity` | `blocks`, `search`, `run`, or `settings`. |
+| `block-minijava.layout.activity` | `blocks` or `search`; legacy `run`/`settings` values restore as `blocks`. |
 | `block-minijava.layout.perspective` | `edit`, `debug`, `types`, `presentation`, or `custom`. |
 | `block-minijava.layout.bottom.open` | Boolean string. |
 | `block-minijava.layout.bottom.height` | Bottom-panel height in pixels. |
-| `block-minijava.layout.bottom.tab` | Active bottom kind. |
+| `block-minijava.layout.bottom.tab` | Active leaf kind: `problems`, `output`, `structure`, `value`, `machine`, `compare`, or `subst`. Never persist the conceptual `semantics` parent. |
 | `block-minijava.gc.autoEnabled` | Boolean string for automatic GC. |
 | `block-minijava.gc.threshold` | Positive integer heap threshold. |
 
@@ -269,7 +269,7 @@ Inspector maximization, bottom maximization, transient drawer-open state, active
 ### Perspective behavior
 
 - Edit: Blocks activity, sidebar and inspector visible, Code selected, bottom closed.
-- Debug: Run activity, sidebar and inspector visible, Outline selected, CESK opened.
+- Debug: Blocks activity, sidebar and inspector visible, Outline selected, Semantics opened on CESK.
 - Type Analysis: Blocks activity, sidebar and inspector visible, Outline selected, Problems opened and refreshed.
 - Presentation: sidebar, inspector, and bottom hidden so the block workspace is emphasized.
 - Custom: identity used after manual visibility/layout changes rather than falsely claiming a preset.
@@ -307,7 +307,7 @@ The completed refactor is accepted only when all of the following are true.
 
 ### Information architecture and visual design
 
-- The header, left panel, workspace toolbar, right inspector, bottom panel, status bar, Settings, and command palette match the target information architecture.
+- The header, left panel, workspace toolbar, right inspector, bottom panel, status bar, View preferences, and command palette match the target information architecture.
 - Every command has one clear primary location; secondary entries are justified by context or shortcut use.
 - Generic IDE imitation, excess decoration, arbitrary icons/colors, and duplicate prominent controls are removed.
 - Dark and light themes are complete and usable, with a neutral shell, one product accent, and accessible semantic/status colors.
@@ -320,7 +320,7 @@ The completed refactor is accepted only when all of the following are true.
 - New/Open/Save/Export/Restore Autosave/Examples and editable code-to-block import work with the same formats and outcomes.
 - Toolbox search, category collapse, click insertion, drag/drop insertion, required Goal/MainClass enforcement, Blockly editing, undo/redo, zoom/pan/fit, and serialization work unchanged.
 - Run produces the same Output; type checking produces the same Problems and block warnings; Problems, Typing, Outline, and runtime provenance still locate blocks.
-- Code, Types, Outline, Problems, Output, Call-by-Structure, Call-by-Value, CESK, A vs B, and Rewrite remain available and functional.
+- Code, Types, and Outline remain the only inspector views. Problems, Output, and Semantics remain the only primary bottom views; Call-by-Structure, Call-by-Value, CESK, A vs B, and Rewrite remain available and functional as Semantics leaf views.
 - CESK, comparison, rewrite, GC, arrangement, re-run, Back, Step, Play/Pause, stale-state, output mirroring, and panel maximization behaviors are preserved.
 - Screenshot download remains available.
 - `bmj-thrasos`, all block definitions/checks, connector shapes, renderer alignment, parser/generator/type/semantic behavior, and serialized workspace compatibility remain unchanged unless separately approved and tested.
@@ -354,6 +354,7 @@ The completed refactor is accepted only when all of the following are true.
 
 - `src/core/ui/app.ts` owns shell state, commands, workspace lifecycle, activities, perspectives, side resizers, autosave, and most event wiring. Markup changes have a high blast radius because `byId` treats missing elements as fatal.
 - `src/core/ui/visualizationPanel.ts` independently owns bottom-tab state, runtime-generated ARIA IDs, bottom resizing/maximization, and three more persistence keys.
+- `src/core/ui/visualizationPanel.ts` also owns a derived conceptual selection: any semantic/runtime leaf selects the static Semantics parent. Primary and nested roving-focus tablists are separate, and `block-minijava.layout.bottom.tab` continues to store the leaf kind so reopening Semantics restores the exact tool and its in-memory state.
 - The right “Code” panel is not generated code only: `codeEditor.ts` replaces it with an editable, highlighted textarea and runtime-created status DOM. Refactoring it as a passive preview would remove a primary language feature.
 - Type diagnostics and derivations come from the same checker walk. Their shared block-location behavior must remain synchronized.
 - The bottom panel is both passive output/diagnostics and active semantics/runtime tooling; treating every tab as equivalent static content will break component lifecycle and resize needs.

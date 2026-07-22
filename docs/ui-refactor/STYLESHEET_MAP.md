@@ -204,7 +204,7 @@ actions use visible text labels.
 | 1100 px max | `workbench.css` | Sidebar/inspector become fixed drawers; side resizers hide | `matchMedia('(max-width: 1100px)')` in `app.ts` |
 | 920 px max | `domain.css` | Runtime/compare panels stack | None |
 | 900 px max | `workbench.css` | Header menu becomes the hamburger surface | `matchMedia('(min-width: 901px)')` in `app.ts` |
-| 700 px max | `workbench.css` | Mobile status/bottom-panel/workspace compaction | `matchMedia('(max-width: 700px)')` zoom handling in `app.ts` |
+| 700 px max | `workbench.css` | Mobile status/bottom-panel/workspace compaction; both bottom tab rows retain labels and scroll horizontally | `matchMedia('(max-width: 700px)')` zoom handling in `app.ts` |
 | 480 px max | `workbench.css` | Phone label/control reductions | None |
 | reduced motion | `workbench.css` | Effectively disables motion | Accessibility invariant |
 

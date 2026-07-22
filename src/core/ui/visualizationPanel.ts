@@ -13,9 +13,11 @@ import { resetCompareFromDock, setCompareTabVisible } from './comparePanel';
 import { disposeSubstWorkspace, resetSubstFromDock, setSubstTabVisible } from './substPanel';
 
 export type VizKind = ReductionKind | 'machine' | 'compare' | 'subst' | 'problems' | 'output';
+type SemanticKind = Exclude<VizKind, 'problems' | 'output'>;
 
 const KINDS: ReductionKind[] = ['structure', 'value'];
 const ALL_KINDS: VizKind[] = ['problems', 'output', 'structure', 'value', 'machine', 'compare', 'subst'];
+const SEMANTIC_KINDS: SemanticKind[] = ['structure', 'value', 'machine', 'compare', 'subst'];
 const TITLE: Record<VizKind, string> = {
   problems: 'Type-checker diagnostics from the current block program',
   output: 'Output from the most recent program run or semantic stepper',
@@ -34,6 +36,10 @@ function isWorkspaceKind(kind: VizKind): kind is ReductionKind {
   return kind === 'structure' || kind === 'value';
 }
 
+function isSemanticKind(kind: VizKind): kind is SemanticKind {
+  return kind !== 'problems' && kind !== 'output';
+}
+
 interface View {
   workspace: Blockly.WorkspaceSvg | null;
   block: Blockly.BlockSvg | null;
@@ -46,6 +52,7 @@ const views: Record<ReductionKind, View> = {
 };
 
 let active: VizKind = 'problems';
+let lastSemantic: SemanticKind = 'structure';
 let onLayoutChange: () => void = () => {};
 
 
@@ -127,6 +134,8 @@ function updateToolActions(): void {
 
 function setActive(kind: VizKind): void {
   active = kind;
+  const semanticsActive = isSemanticKind(kind);
+  if (semanticsActive) lastSemantic = kind;
   for (const k of ALL_KINDS) {
     const selected = k === kind;
     hostOf(k).dataset.active = String(selected);
@@ -135,6 +144,12 @@ function setActive(kind: VizKind): void {
     tabOf(k).setAttribute('aria-selected', String(k === kind));
     tabOf(k).tabIndex = selected ? 0 : -1;
   }
+  const semanticsTab = byId<HTMLButtonElement>('bottom-tab-semantics');
+  const semanticsPanel = byId<HTMLElement>('bottom-panel-semantics');
+  semanticsTab.setAttribute('aria-selected', String(semanticsActive));
+  semanticsTab.tabIndex = semanticsActive ? 0 : -1;
+  semanticsPanel.hidden = !semanticsActive;
+  semanticsPanel.setAttribute('aria-hidden', String(!semanticsActive));
   byId<HTMLDivElement>('viz-empty').hidden = isWorkspaceKind(kind) ? !!views[kind].block : true;
   setStepperTabVisible(kind === 'machine');
   setCompareTabVisible(kind === 'compare');
@@ -256,7 +271,7 @@ function initResizer(): void {
 
 export function initVisualizationPanel(layoutChange: () => void): void {
   onLayoutChange = layoutChange;
-  ALL_KINDS.forEach((kind, index) => {
+  ALL_KINDS.forEach((kind) => {
     const tab = tabOf(kind);
     const host = hostOf(kind);
     tab.id = `bottom-tab-${kind}`;
@@ -265,16 +280,36 @@ export function initVisualizationPanel(layoutChange: () => void): void {
     host.setAttribute('role', 'tabpanel');
     host.setAttribute('aria-labelledby', tab.id);
     tab.addEventListener('click', () => setActive(kind));
-    tab.addEventListener('keydown', (event) => {
-      const offset = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
-      const targetIndex = event.key === 'Home' ? 0 : event.key === 'End' ? ALL_KINDS.length - 1 : index + offset;
-      if (!offset && event.key !== 'Home' && event.key !== 'End') return;
-      event.preventDefault();
-      const next = ALL_KINDS[(targetIndex + ALL_KINDS.length) % ALL_KINDS.length];
-      tabOf(next).focus();
-      setActive(next);
-    });
   });
+
+  const wireTabKeyboard = (
+    tabs: HTMLButtonElement[],
+    activate: (index: number) => void
+  ): void => {
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('keydown', (event) => {
+        const offset = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+        const targetIndex = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : index + offset;
+        if (!offset && event.key !== 'Home' && event.key !== 'End') return;
+        event.preventDefault();
+        const nextIndex = (targetIndex + tabs.length) % tabs.length;
+        tabs[nextIndex]?.focus();
+        activate(nextIndex);
+      });
+    });
+  };
+
+  const semanticsTab = byId<HTMLButtonElement>('bottom-tab-semantics');
+  semanticsTab.addEventListener('click', () => setActive(lastSemantic));
+  const primaryTabs = [tabOf('problems'), tabOf('output'), semanticsTab] as HTMLButtonElement[];
+  wireTabKeyboard(primaryTabs, (index) => {
+    if (index === 0) setActive('problems');
+    else if (index === 1) setActive('output');
+    else setActive(lastSemantic);
+  });
+
+  const semanticTabs = SEMANTIC_KINDS.map((kind) => tabOf(kind) as HTMLButtonElement);
+  wireTabKeyboard(semanticTabs, (index) => setActive(SEMANTIC_KINDS[index]));
   byId<HTMLButtonElement>('viz-rerun').addEventListener('click', () => {
     if (!isWorkspaceKind(active)) {
       if (active === 'machine') resetStepperFromDock();

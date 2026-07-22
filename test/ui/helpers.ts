@@ -42,6 +42,10 @@ export async function openBottomPanel(page: Page): Promise<void> {
 }
 
 export async function selectBottomTab(page: Page, kind: string): Promise<void> {
+  if (['structure', 'value', 'machine', 'compare', 'subst'].includes(kind)) {
+    const semantics = page.locator('#bottom-tab-semantics');
+    if (await semantics.getAttribute('aria-selected') !== 'true') await semantics.click();
+  }
   await page.locator(`#bottom-tab-${kind}`).click();
   await expect(page.locator(`#bottom-tab-${kind}`)).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator(`#bottom-panel-${kind}`)).not.toHaveAttribute('hidden', '');

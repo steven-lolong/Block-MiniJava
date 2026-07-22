@@ -236,7 +236,7 @@
             <span aria-hidden="true"></span>
           </div>
 
-          <aside id="code-column" class="code-column panel-card" data-ide-region="inspector" aria-label="Generated MiniJava code">
+          <aside id="code-column" class="code-column panel-card" data-ide-region="inspector" aria-label="MiniJava inspector">
             <div class="column-header panel-header code-header">
               <div class="column-title"><svg class="app-icon icon icon-code" aria-hidden="true"><use href="#icon-code" /></svg><span>MiniJava Inspector</span></div>
               <div class="code-actions">
@@ -247,8 +247,8 @@
               </div>
             </div>
             <div class="inspector-tabs" role="tablist" aria-label="Inspector panels">
-              <button id="tab-code" class="inspector-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-code" data-panel="code">Editable Code</button>
-              <button id="tab-typing" class="inspector-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-typing" data-panel="typing">Typing</button>
+              <button id="tab-code" class="inspector-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-code" data-panel="code">Code</button>
+              <button id="tab-typing" class="inspector-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-typing" data-panel="typing">Types</button>
               <button id="tab-outline" class="inspector-tab" type="button" role="tab" aria-selected="false" aria-controls="panel-outline" data-panel="outline">Outline</button>
             </div>
             <div class="inspector-body">
@@ -279,27 +279,15 @@
         <div id="viz-resizer" class="viz-resizer" role="separator" aria-orientation="horizontal" tabindex="0" aria-label="Resize bottom tools" title="Drag to resize bottom tools"></div>
         <div class="viz-dock-panel panel-card">
           <div class="viz-dock-header panel-header">
-            <div class="viz-dock-tabs" role="tablist" aria-label="Bottom tool views">
+            <div class="viz-dock-tabs" role="tablist" aria-label="Bottom panel views">
               <button class="viz-tab" data-kind="problems" role="tab" type="button" aria-selected="false" title="Type problems">
                 <svg class="app-icon viz-tab-icon is-problem" aria-hidden="true"><use href="#icon-problems" /></svg><span class="viz-tab-label">Problems</span><span id="bottom-problems-count" class="problems-count" hidden>0</span>
               </button>
               <button class="viz-tab" data-kind="output" role="tab" type="button" aria-selected="false" title="Program output">
                 <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-output" /></svg><span class="viz-tab-label">Output</span>
               </button>
-              <button class="viz-tab" data-kind="structure" role="tab" type="button" aria-selected="false" title="Call-by-Structure">
-                <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-structure" /></svg><span class="viz-tab-label">Call-by-Structure</span>
-              </button>
-              <button class="viz-tab" data-kind="value" role="tab" type="button" aria-selected="false" title="Call-by-Value">
-                <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-value" /></svg><span class="viz-tab-label">Call-by-Value</span>
-              </button>
-              <button class="viz-tab" data-kind="machine" role="tab" type="button" aria-selected="false" title="Step the program on the Model A CESK machine — Control · Environment · Store · Kontinuation, over an activation-frame stack">
-                <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-machine" /></svg><span class="viz-tab-label">CESK</span>
-              </button>
-              <button class="viz-tab" data-kind="compare" role="tab" type="button" aria-selected="false" title="Step the same program under Model A and Model B in lockstep">
-                <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-compare" /></svg><span class="viz-tab-label">A vs B</span>
-              </button>
-              <button class="viz-tab" data-kind="subst" role="tab" type="button" aria-selected="false" title="Rewrite the println expression step by step (substitution semantics)">
-                <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-rewrite" /></svg><span class="viz-tab-label">Rewrite</span>
+              <button id="bottom-tab-semantics" class="viz-tab" role="tab" type="button" aria-selected="false" aria-controls="bottom-panel-semantics" title="Semantic and runtime views">
+                <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-structure" /></svg><span class="viz-tab-label">Semantics</span>
               </button>
             </div>
             <div id="viz-dock-info" class="viz-dock-info" aria-live="polite"></div>
@@ -317,9 +305,28 @@
             <div class="viz-host bottom-passive-host" data-kind="output">
               <pre id="bottom-program-output" class="console-view" aria-live="polite">No run yet.</pre>
             </div>
-            <div class="viz-host" data-kind="structure"></div>
-            <div class="viz-host" data-kind="value"></div>
-            <div class="viz-host viz-host-machine" data-kind="machine">
+            <section id="bottom-panel-semantics" class="viz-semantics-region" role="tabpanel" aria-labelledby="bottom-tab-semantics" hidden>
+              <div class="viz-semantics-tabs" role="tablist" aria-label="Semantic and runtime views">
+                <button class="viz-tab viz-semantic-tab" data-kind="structure" role="tab" type="button" aria-selected="false" title="Call-by-Structure">
+                  <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-structure" /></svg><span class="viz-tab-label">Call-by-Structure</span>
+                </button>
+                <button class="viz-tab viz-semantic-tab" data-kind="value" role="tab" type="button" aria-selected="false" title="Call-by-Value">
+                  <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-value" /></svg><span class="viz-tab-label">Call-by-Value</span>
+                </button>
+                <button class="viz-tab viz-semantic-tab" data-kind="machine" role="tab" type="button" aria-selected="false" title="Step the program on the Model A CESK machine — Control · Environment · Store · Kontinuation, over an activation-frame stack">
+                  <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-machine" /></svg><span class="viz-tab-label">CESK</span>
+                </button>
+                <button class="viz-tab viz-semantic-tab" data-kind="compare" role="tab" type="button" aria-selected="false" title="Step the same program under Model A and Model B in lockstep">
+                  <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-compare" /></svg><span class="viz-tab-label">A vs B</span>
+                </button>
+                <button class="viz-tab viz-semantic-tab" data-kind="subst" role="tab" type="button" aria-selected="false" title="Rewrite the println expression step by step (substitution semantics)">
+                  <svg class="app-icon viz-tab-icon" aria-hidden="true"><use href="#icon-rewrite" /></svg><span class="viz-tab-label">Rewrite</span>
+                </button>
+              </div>
+              <div class="viz-semantics-body">
+                <div class="viz-host" data-kind="structure"></div>
+                <div class="viz-host" data-kind="value"></div>
+                <div class="viz-host viz-host-machine" data-kind="machine">
               <div class="stepper-layout">
                 <div class="stepper-controls" aria-label="Stepper controls">
                   <button id="stepper-load" class="stepper-button is-primary" type="button" title="Build the machine from the current blocks">Load</button>
@@ -360,7 +367,7 @@
                 </div>
               </div>
             </div>
-            <div class="viz-host viz-host-machine" data-kind="compare">
+                <div class="viz-host viz-host-machine" data-kind="compare">
               <div class="stepper-layout">
                 <div class="stepper-controls" aria-label="Lockstep stepper controls">
                   <button id="compare-load" class="stepper-button is-primary" type="button" title="Build both machines from the current blocks">Load</button>
@@ -395,7 +402,7 @@
                 </div>
               </div>
             </div>
-            <div class="viz-host viz-host-machine" data-kind="subst">
+                <div class="viz-host viz-host-machine" data-kind="subst">
               <div class="stepper-layout">
                 <div class="stepper-controls" aria-label="Rewrite stepper controls">
                   <button id="subst-load" class="stepper-button is-primary" type="button" title="Build the rewrite tree from the current blocks">Load</button>
@@ -408,7 +415,9 @@
                 <div id="subst-workspace" class="subst-workspace" aria-label="Rewrite tree"></div>
               </div>
             </div>
-            <div id="viz-empty" class="viz-empty">No visualization selected.</div>
+                <div id="viz-empty" class="viz-empty">Choose a method call to inspect its evaluation.</div>
+              </div>
+            </section>
           </div>
         </div>
       </section>

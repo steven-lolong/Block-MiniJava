@@ -23,7 +23,7 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 | Merge example | Add selected example beside current program | Example-load dialog | `example-load-modal`, `example-load-name` | Dialog-native | No | Examples flow | — | No | High: block identity/required-root reconciliation |
 | Cancel dialog | Cancel save, export, example, or About flow | Dialog close/action buttons | Buttons have no IDs; owning dialog IDs above plus `about-modal` | Escape/browser dialog behavior | No | Owning dialog | — | Yes | Medium: `value`-based form/dialog routing |
 | About | Show product and renderer information | Header More menu | `about-button`, `about-modal` | — | No | More menu | Command palette permitted | No | Low |
-| Toggle theme | Switch dark/light application and Blockly themes | Header View menu | `theme-toggle` | — | Yes (`theme.toggle`) | View/Settings | Command palette | Yes | High: reinjects/disposes visualization workspaces and persists theme |
+| Toggle theme | Switch dark/light application and Blockly themes | Header View menu | `theme-toggle` | — | Yes (`theme.toggle`) | View | Command palette | Yes | High: reinjects/disposes visualization workspaces and persists theme |
 | Toggle compact header menu | Open/close header commands at narrow widths | Header hamburger | `menu-toggle`, `main-menu` | Escape closes | No | Header | — | No | High: responsive-only state and ARIA expansion |
 
 ## Activity bar, sidebar, and settings commands
@@ -40,11 +40,11 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 | Add block from toolbox | Instantiate block in main workspace | Dynamic toolbox block button | Dynamic `.toolbox-block`, `data-block-type` | Enter/Space via button semantics | No | Categorized toolbox | — | No | Critical: required blocks, placement, grammar, autosave |
 | Drag block from toolbox | Place a new block at drop coordinates | Toolbox to workspace drag/drop | `blockly-area`; dynamic toolbox button; custom MIME type | — | No | Categorized toolbox | — | No | Critical: behaviorally significant drag data and drop target |
 | Run program | Execute Model A and show output | Header; workspace toolbar | `header-run-program`, `run-program` | Ctrl/Cmd+F5 | Yes (`run.program`) | Header Run | Workspace toolbar and command palette | Yes | Critical: all routes converge on `runProgram` |
-| Open CESK machine | Open Machine bottom tab | Bottom Machine tab | Dynamic `bottom-tab-machine` | Bottom tab arrow navigation | Yes (`analysis.machine`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
-| Compare models | Open Model A/B comparison | Bottom Compare tab | Dynamic `bottom-tab-compare` | Bottom tab arrow navigation | Yes (`analysis.compare`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
-| Open rewrite semantics | Open substitution/rewrite tool | Bottom Rewrite tab | Dynamic `bottom-tab-subst` | Bottom tab arrow navigation | Yes (`analysis.rewrite`) | Bottom Semantics/runtime tools | Command palette | Yes | High |
-| Visualize call-by-structure | Visualize selected or first block | Bottom tab; eligible block context menu | Dynamic `bottom-tab-structure` | Bottom tab arrow navigation | No | Bottom Semantics/runtime tools | Block context menu | Yes | Critical: selected-block semantics and Blockly rendering |
-| Visualize call-by-value | Visualize selected or first block | Bottom tab; eligible block context menu | Dynamic `bottom-tab-value` | Bottom tab arrow navigation | No | Bottom Semantics/runtime tools | Block context menu | Yes | Critical: selected-block semantics and Blockly rendering |
+| Open CESK machine | Open the CESK leaf view | Semantics → CESK | Dynamic `bottom-tab-machine` | Nested-tab arrow navigation | Yes (`analysis.machine`) | Bottom Semantics | Command palette | Yes | High |
+| Compare models | Open Model A/B comparison | Semantics → A vs B | Dynamic `bottom-tab-compare` | Nested-tab arrow navigation | Yes (`analysis.compare`) | Bottom Semantics | Command palette | Yes | High |
+| Open rewrite semantics | Open substitution/rewrite tool | Semantics → Rewrite | Dynamic `bottom-tab-subst` | Nested-tab arrow navigation | Yes (`analysis.rewrite`) | Bottom Semantics | Command palette | Yes | High |
+| Visualize call-by-structure | Visualize selected or first block | Semantics → Call-by-Structure; eligible block context menu | Dynamic `bottom-tab-structure` | Nested-tab arrow navigation | No | Bottom Semantics | Block context menu | Yes | Critical: selected-block semantics and Blockly rendering |
+| Visualize call-by-value | Visualize selected or first block | Semantics → Call-by-Value; eligible block context menu | Dynamic `bottom-tab-value` | Nested-tab arrow navigation | No | Bottom Semantics | Block context menu | Yes | Critical: selected-block semantics and Blockly rendering |
 | Toggle inspector | Show/hide right inspector | View menu; inspector header | `view-toggle-inspector`, `toggle-code-column` | — | Yes (`view.inspector`) | View menu | Inspector-local close and palette | Yes | High |
 | Toggle bottom tools | Show/hide bottom panel | View menu; bottom-panel close | `top-toggle-bottom-panel`, `viz-collapse` | Ctrl/Cmd+J | Yes (`view.bottom`) | View menu | Bottom panel and palette | Yes | High |
 | Set autosave interval | Persist interval from 2–20 minutes | View menu | `autosave-interval`, `autosave-interval-label` | Range-input keys | No | View menu | — | No | High: timer restart and persistence |
@@ -84,7 +84,8 @@ Legend: **Yes** in “Duplicated” means the same action is currently exposed t
 | Toggle bottom panel | Open/close bottom tools | Header menu; bottom-panel close | `top-toggle-bottom-panel`, `viz-collapse`, `viz-dock` | Ctrl/Cmd+J | Yes (`view.bottom`) | View menu | Bottom panel or palette | Yes | Critical: persisted state and maximization reset |
 | Select Problems | Show/refresh type diagnostics | Bottom tab; status bar | dynamic `bottom-tab-problems`, `status-problems-button` | Bottom tab Left/Right/Home/End | Yes (`view.problems`) | Bottom panel / Problems | Status bar and palette | Yes | High |
 | Select Output | Show latest run/semantic output | Bottom tab; Run opens it implicitly | dynamic `bottom-tab-output`, `bottom-program-output` | Bottom tab navigation | No | Bottom panel / Output | Run result may focus it | Yes | Medium |
-| Select semantic/runtime tab | Switch among Structure, Value, Machine, Compare, Rewrite | Bottom tab strip | dynamic `bottom-tab-{structure,value,machine,compare,subst}` | Left/Right/Home/End | Machine/Compare/Rewrite only | Bottom panel / Semantics and runtime | Command palette | Yes | High: IDs and ARIA are generated at initialization |
+| Select Semantics | Reveal the semantic/runtime region and restore its last selected leaf view | Bottom primary tab strip | `bottom-tab-semantics`, `bottom-panel-semantics` | Primary-tab Left/Right/Home/End | No; leaf tools retain their existing entries | Bottom panel / Semantics | — | No | High: parent selection is derived from the active leaf kind and must not replace it in persistence |
+| Select semantic/runtime view | Switch among Call-by-Structure, Call-by-Value, CESK, A vs B, and Rewrite | Secondary tab row inside Semantics | dynamic `bottom-tab-{structure,value,machine,compare,subst}` | Secondary-tab Left/Right/Home/End | Machine/Compare/Rewrite only | Bottom panel / Semantics | Command palette and block context menu where applicable | Yes | High: leaf IDs, ARIA, component lifecycle, and persisted kind remain unchanged |
 | Re-run/reset active tool | Re-render reduction or reset active machine/compare/rewrite | Bottom toolbar | `viz-rerun` | — | No | Bottom semantic tool toolbar | Command palette | No | High: behavior depends on active tab |
 | Arrange reduction blocks | Lay out Structure/Value visualization by evaluation order | Bottom toolbar, only workspace visualizations | `viz-arrange` | — | No | Bottom semantic tool toolbar | Workspace context menu permitted | No | High: custom renderer workspace |
 | Maximize/restore bottom tools | Toggle bottom panel maximization | Bottom toolbar | `viz-maximize` | — | No | Bottom panel | View menu/palette | No | High: `bottom-maximized` state and resize coordination |
@@ -130,7 +131,7 @@ retaining every prior shortcut and contextual route:
 | View | Sidebar, inspector, bottom tools, perspective, theme, autosave interval | Contextual panel controls, `view.*`, `perspective.*`, `theme.toggle`, Ctrl/Cmd+J |
 | More | Command palette, About | Ctrl/Cmd+Shift+P and F1 for the palette |
 | Status | Show Problems | Problems bottom tab and `view.problems` |
-| Workspace/inspector/bottom panels | Undo, Redo, zoom/reset/Fit, Copy, Print, panel maximize/close, semantic and runtime controls | Existing palette entries, shortcuts, tabs, and Blockly context menus recorded above |
+| Workspace/inspector/bottom panels | Undo, Redo, zoom/Fit, Copy, Print, panel maximize/close, Problems/Output/Semantics navigation, and semantic/runtime controls | Existing palette entries, shortcuts, nested semantic tabs, and Blockly context menus recorded above |
 
 The renderer name and internal implementation details are no longer present in
 normal status chrome. Perspective selection and the autosave interval live in
@@ -148,7 +149,22 @@ The following duplication can be reduced later without deleting reachability, af
 - View owns the bottom-panel toggle and `Ctrl/Cmd+J`; the workspace toolbar contains no output control.
 - View owns inspector recovery; the workspace toolbar contains no inspector control.
 - Perspectives and the autosave interval remain in View and the command palette retains perspective/theme commands.
-- Machine, Compare, Rewrite, Structure, and Value remain reachable through bottom tabs, context menus where applicable, and the command palette.
+- CESK, A vs B, Rewrite, Call-by-Structure, and Call-by-Value remain reachable through the Semantics secondary tabs, context menus where applicable, and the command palette.
 - Fit, zoom, undo, and redo keep their Blockly-backed behavior while the toolbar removes the nonessential zoom-reset readout.
 
 No duplicate is authorized for removal by this inventory. Any future removal must first prove keyboard, responsive, and command-palette reachability.
+
+## View location mapping after inspector and bottom-panel organization
+
+| Previous visible view | New conceptual location | Preserved identity |
+|---|---|---|
+| Editable Code | Right inspector → Code | `tab-code`, `panel-code`, `generated-code`, runtime-created editor IDs |
+| Typing | Right inspector → Types | `tab-typing`, `panel-typing`, typing and print IDs |
+| Outline | Right inspector → Outline | `tab-outline`, `panel-outline`, `program-outline` |
+| Problems | Bottom panel → Problems | `bottom-tab-problems`, `bottom-panel-problems`, diagnostics IDs |
+| Output | Bottom panel → Output | `bottom-tab-output`, `bottom-panel-output`, `bottom-program-output` |
+| Call-by-Structure | Bottom panel → Semantics → Call-by-Structure | `bottom-tab-structure`, `bottom-panel-structure` |
+| Call-by-Value | Bottom panel → Semantics → Call-by-Value | `bottom-tab-value`, `bottom-panel-value` |
+| CESK | Bottom panel → Semantics → CESK | `bottom-tab-machine`, `bottom-panel-machine`, all `stepper-*` IDs |
+| A vs B | Bottom panel → Semantics → A vs B | `bottom-tab-compare`, `bottom-panel-compare`, all `compare-*` IDs |
+| Rewrite | Bottom panel → Semantics → Rewrite | `bottom-tab-subst`, `bottom-panel-subst`, all `subst-*` IDs |

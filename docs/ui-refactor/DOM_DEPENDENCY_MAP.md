@@ -28,14 +28,14 @@ All literal IDs below are queried by `getElementById`/`byId`, observed, or suppl
 | Resizers | `sidebar-resizer`, `code-resizer`, `viz-resizer` | Must preserve exactly | Pointer and keyboard resize roots; responsive CSS also targets them. |
 | Workspace toolbar | `workspace-undo`, `workspace-redo`, `workspace-zoom-out`, `workspace-zoom-in`, `workspace-fit`, `run-program` | Must preserve exactly | The quiet toolbar's complete command set; all controls call the existing Blockly/run handlers. |
 | Inspector controls | `copy-code`, `print-typing`, `toggle-code-maximize`, `toggle-code-column`, `code-scrim` | May move but must retain identity | Direct handlers, tab-dependent visibility, maximization, and drawer close. |
-| Inspector content | `panel-code`, `generated-code`, `panel-typing`, `typing-method-select`, `typing-gamma`, `typing-tree`, `typing-print-title`, `typing-print-meta`, `program-outline` | Must preserve exactly | Editor installation, code generation fallback, typing render/print, and dynamic outline render. |
+| Inspector content | `panel-code`, `generated-code`, `panel-typing`, `panel-outline`, `typing-method-select`, `typing-gamma`, `typing-tree`, `typing-print-title`, `typing-print-meta`, `program-outline` | Must preserve exactly | Editor installation, code generation fallback, typing render/print, and dynamic outline render. |
 | Status | `status-block-count`, `status-problems-button`, `status-problems-count`, `autosave-status` | Must preserve exactly | Live workspace metrics and diagnostics status. |
-| Bottom shell/actions | `top-toggle-bottom-panel`, `viz-dock-info`, `viz-rerun`, `viz-arrange`, `viz-maximize`, `viz-collapse`, `viz-empty` | May move but must retain identity | Bottom state/action binding and active-tool description. |
+| Bottom shell/actions | `top-toggle-bottom-panel`, `bottom-tab-semantics`, `bottom-panel-semantics`, `viz-dock-info`, `viz-rerun`, `viz-arrange`, `viz-maximize`, `viz-collapse`, `viz-empty` | May move but must retain identity | Bottom state/action binding, three-region navigation, semantic parent state, and active-tool description. |
 | Problems/output | `bottom-problems-count`, `bottom-problems-list`, `bottom-program-output` | Must preserve exactly | Diagnostics counters/list and program/stepper console mirroring. These are queried through both literal and array-driven helper calls. |
 | Machine controls/content | `stepper-load`, `stepper-back`, `stepper-step`, `stepper-play`, `stepper-gc`, `stepper-gc-auto-enabled`, `stepper-gc-threshold`, `stepper-status`, `stepper-arrows`, `stepper-control`, `stepper-frames`, `stepper-heap`, `stepper-kont`, `stepper-output` | Must preserve exactly | Direct semantic-control bindings and dynamic visualization roots. |
 | Compare controls/content | `compare-load`, `compare-back`, `compare-step`, `compare-play`, `compare-status`, `compare-status-a`, `compare-status-b`, `compare-frames-a`, `compare-frames-b`, `compare-heap-a`, `compare-output-a`, `compare-output-b` | Must preserve exactly | Direct bindings plus IDs passed through render helpers. There is intentionally no `compare-heap-b` because Model B is storeless. |
 | Rewrite controls/content | `subst-load`, `subst-back`, `subst-step`, `subst-play`, `subst-status`, `subst-correspondence`, `subst-workspace` | Must preserve exactly | Direct semantic-control bindings and Blockly injection host. |
-| Dynamically assigned bottom IDs | `bottom-tab-{problems,output,structure,value,machine,compare,subst}` and `bottom-panel-{problems,output,structure,value,machine,compare,subst}` | Must preserve exactly | `initVisualizationPanel` assigns these IDs and wires their reciprocal ARIA relationships. |
+| Dynamically assigned bottom leaf IDs | `bottom-tab-{problems,output,structure,value,machine,compare,subst}` and `bottom-panel-{problems,output,structure,value,machine,compare,subst}` | Must preserve exactly | `initVisualizationPanel` assigns these IDs and wires their reciprocal ARIA relationships. The static Semantics parent does not replace any leaf identity. |
 | Editor-generated IDs | `generated-code-editor`, `code-editor-status` | May rename after updating references and tests | Created by `codeEditor.ts`; coupled primarily to labels/styles and editor tests rather than static HTML. Preserve during the current refactor. |
 
 Static IDs such as `activity-blocks`, `activity-search`, `tab-code`, `tab-typing`, and `tab-outline` are not looked up by their ID in TypeScript, but they are ARIA targets, stable automation hooks, or explicitly part of the current DOM contract. Classify them as **May move but must retain identity**, not presentation-only.
@@ -81,7 +81,7 @@ Static IDs such as `activity-blocks`, `activity-search`, `tab-code`, `tab-typing
 | `.workspace-footer` | Temporarily detach/restore status bar for printing | Must preserve exactly |
 | `.command-palette-option` | Palette roving selection | Must preserve exactly |
 | `.examples-item-label` | Fill dynamic example label | May rename after updating references and tests |
-| `.viz-tab[data-kind]`, `.viz-host[data-kind]` | Resolve active bottom tab/panel | Must preserve exactly |
+| `.viz-tab[data-kind]`, `.viz-host[data-kind]` | Resolve active bottom leaf tab/panel across the primary and nested tablists | Must preserve exactly |
 | `.stepper-panel-body`, `.stepper-panels` | Scroll preservation and resize observation | Must preserve exactly |
 | `.stepper-heap-box`, `.stepper-frame.is-top` | Reference lookup and current-frame animation | Must preserve exactly |
 | `.typ-row:not(.is-open) .typ-row-tree`, `.typ-rule`, `.typ-row-rule`, `.typ-judgement`, `.typ-row-judgement`, `.typ-row-tree > .typ-node` | Measure and prepare printable derivation | Must preserve exactly |
@@ -119,7 +119,8 @@ The toolbox drag MIME value `application/x-block-minijava-block` is not a DOM at
 | Examples controller | `examples-button[aria-controls="examples-panel"]`; `aria-expanded` mirrors `.examples-open` | Must preserve exactly |
 | Palette controller/dialog | Trigger controls `command-palette-overlay`; dialog labelled by `command-palette-title`; listbox/results expose option roles and `aria-selected` | Must preserve exactly |
 | Inspector tabs | `tab-code` → `panel-code`, `tab-typing` → `panel-typing`, `tab-outline` → `panel-outline`; panels point back with `aria-labelledby` | Must preserve exactly |
-| Bottom tabs | Runtime-generated `bottom-tab-{kind}[aria-controls="bottom-panel-{kind}"]`; panel points back via `aria-labelledby` | Must preserve exactly |
+| Bottom primary tabs | `bottom-tab-problems` → `bottom-panel-problems`, `bottom-tab-output` → `bottom-panel-output`, and `bottom-tab-semantics` → `bottom-panel-semantics` | Must preserve exactly |
+| Bottom semantic tabs | Runtime-generated `bottom-tab-{structure,value,machine,compare,subst}[aria-controls="bottom-panel-{kind}"]`; each nested panel points back via `aria-labelledby` | Must preserve exactly |
 | Toolbox categories | Dynamic header `aria-controls` generated list ID and updates `aria-expanded` | Must preserve exactly |
 | Typing rows | Dynamic toggle updates `aria-expanded` | Must preserve exactly |
 | Activity/sidebar | Activity buttons update `aria-pressed`; sidebar views update `aria-hidden` | Must preserve exactly |
@@ -128,7 +129,7 @@ The toolbox drag MIME value `application/x-block-minijava-block` is not a DOM at
 | Dialog labels | `about-modal`, save/export/example dialogs point to their title IDs | Must preserve exactly |
 | Live regions | Loaded file, autosave, bottom info/problems/output, stepper/compare/rewrite status/correspondence retain `aria-live` behavior | May move but must retain identity |
 
-Roving keyboard focus is implemented for inspector tabs and bottom tabs with Left/Right/Home/End. Palette results use Up/Down/Enter/Escape. These are behavioral relationships even where ARIA does not encode the full mapping.
+Roving keyboard focus is implemented independently for inspector tabs, the three primary bottom tabs, and the five nested Semantics tabs with Left/Right/Home/End. Palette results use Up/Down/Enter/Escape. The two bottom tablists must not be flattened into one focus sequence.
 
 ## Event roots and delegated/dynamic behavior
 
@@ -162,7 +163,7 @@ The responsive drawer and resize implementations are explicitly frozen until reg
 | Perspective | Activity/sidebar | Inspector | Bottom | Classification |
 |---|---|---|---|---|
 | `edit` | Blocks, visible | Visible, Code, not maximized | Closed | Must preserve exactly |
-| `debug` | Blocks, visible | Visible, Outline, not maximized | Open on Machine | Must preserve exactly |
+| `debug` | Blocks, visible | Visible, Outline, not maximized | Open on Semantics → CESK (`machine`) | Must preserve exactly |
 | `types` | Blocks, visible | Visible, Outline, not maximized | Open on Problems; diagnostics refreshed | Must preserve exactly |
 | `presentation` | Sidebar hidden | Hidden, maximization cleared | Closed | Must preserve exactly |
 | `custom` | Records manual visibility/layout divergence | Existing current arrangement | Existing current arrangement | Must preserve exactly |
@@ -184,7 +185,7 @@ Perspective identity is reflected by `body[data-perspective]`, `body.presentatio
 | `block-minijava.layout.perspective` | Named perspective or `custom` | `app.ts` | Must preserve exactly |
 | `block-minijava.layout.bottom.open` | Boolean string | `visualizationPanel.ts` | Must preserve exactly |
 | `block-minijava.layout.bottom.height` | Bottom height in px | `visualizationPanel.ts` | Must preserve exactly |
-| `block-minijava.layout.bottom.tab` | Active bottom kind | `visualizationPanel.ts` | Must preserve exactly |
+| `block-minijava.layout.bottom.tab` | Active leaf kind: `problems`, `output`, `structure`, `value`, `machine`, `compare`, or `subst` | `visualizationPanel.ts` | Must preserve exactly; never store the conceptual `semantics` parent. The selected Semantics leaf is restored from this value. |
 | `block-minijava.gc.autoEnabled` | Boolean string | `stepperPanel.ts` | Must preserve exactly |
 | `block-minijava.gc.threshold` | Positive allocation count | `stepperPanel.ts` | Must preserve exactly |
 
@@ -197,7 +198,7 @@ Removal or weakening of these selector families changes behavior, not merely app
 | `body.code-hidden ...`, `body.toolbox-hidden ...`, and their combined `.ide-layout` rules | Removes panel columns/resizers and exposes recovery buttons | Must preserve exactly |
 | `body.code-maximized ...`, `body.bottom-maximized ...`, `body.presentation-mode ...` | Replaces major grid regions and hides competing surfaces | Must preserve exactly |
 | `body.mobile-sidebar-open ...`, `body.mobile-code-open ...`, `.panel-scrim` rules under 1100 px | Responsive drawers and scrims | Must preserve exactly |
-| `#viz-dock[data-open="true"]`, `.viz-host[data-active="true"]`, `.viz-tab[aria-selected="true"]` | Opens panel and displays/selects one tool | Must preserve exactly |
+| `#viz-dock[data-open="true"]`, `#bottom-panel-semantics`, `.viz-host[data-active="true"]`, `.viz-tab[aria-selected="true"]` | Opens the dock, selects one conceptual region, and displays exactly one leaf tool | Must preserve exactly |
 | `.sidebar-view.is-active`, `.inspector-panel.is-active`, `.inspector-tab.is-active`, `.activity-item.is-active` | Shows the blocks/search activity and inspector selection | Must preserve exactly |
 | `.command-palette-overlay[hidden]`, `body.command-palette-open`, `.command-palette-option.is-selected` | Palette visibility, page scroll/state, selected result | Must preserve exactly |
 | `.examples-panel.examples-open`, `.main-menu.menu-open` | Menu visibility at their responsive contexts | Must preserve exactly |

@@ -1,6 +1,6 @@
 # Block-MiniJava stylesheet map
 
-Status: current after stylesheet consolidation. This document describes the production cascade loaded by `src/assets/js/block_minijava.ts` and the boundaries that later visual work must respect.
+Status: current after the conservative workbench cleanup. This document describes the production cascade loaded by `src/assets/js/block_minijava.ts` and the boundaries that later visual work must respect.
 
 ## Effective import order
 
@@ -8,8 +8,8 @@ There are no application stylesheet `<link>` elements in `src/index.html`. Webpa
 
 | Order | File | Approximate size | Authoritative responsibility |
 |---:|---|---:|---|
-| 1 | `src/assets/css/tokens.css` | 284 lines | Design tokens, dark/light theme values, runtime dimension contracts, and temporary compatibility aliases. |
-| 2 | `src/assets/css/workbench.css` | 2,276 lines | Global reset/utilities, application shell, header, activity/sidebar, workspace, inspector shell, dialogs, bottom-panel shell, status bar, command palette, and responsive behavior. |
+| 1 | `src/assets/css/tokens.css` | 217 lines | Design tokens, dark/light theme values, runtime dimension contracts, and the few aliases still consumed by domain views. |
+| 2 | `src/assets/css/workbench.css` | 2,231 lines | Global reset/utilities, application shell, header, activity/sidebar, workspace, inspector shell, dialogs, bottom-panel shell, status bar, command palette, and responsive behavior. |
 | 3 | `src/assets/css/domain.css` | 918 lines | Typing derivations and print layout, CESK/runtime views, comparison and rewrite views, and domain-state animation. |
 | 4 | `src/assets/css/codeEditor.css` | 163 lines | Generated/editable MiniJava text, output text, textarea/highlight alignment, line numbers, editor status, and syntax tokens. |
 
@@ -19,7 +19,7 @@ The order follows dependency rather than override intent: tokens first, shell st
 
 ### `tokens.css`: the single token authority
 
-This file defines application-shell theme colors and global scales. The deliberate exception is Blockly block rendering: `src/core/renderer/theme.ts` owns the seven block-family palettes and the complete block-type classification. `tokens.css` mirrors each family primary as `--grammar-*` so the custom HTML toolbox uses the same category accents. `:root` owns theme-independent geometry, typography, spacing, motion, elevation, z-index, panel-size references, and breakpoint references. `body[data-theme="dark"]` and `body[data-theme="light"]` own theme values.
+This file defines application-shell theme colors and global scales. The deliberate exception is Blockly block rendering: `src/core/renderer/theme.ts` owns the seven block-family palettes and the complete block-type classification. `tokens.css` mirrors each family primary as `--grammar-*` so the custom HTML toolbox uses the same category accents. `:root` owns theme-independent geometry, typography, spacing, motion, elevation, z-index, and panel-size references. `body[data-theme="dark"]` and `body[data-theme="light"]` own theme values.
 
 The file also preserves three runtime-written variables as compatibility contracts:
 
@@ -88,19 +88,16 @@ No legacy stylesheet remains in the import chain, and `workbench.css` no longer 
 | State | `--state-success`, `--state-warning`, `--state-error`, `--state-info`, `--state-execution`, `--state-execution-strong` |
 | Syntax | `--syntax-keyword`, `--syntax-type`, `--syntax-number`, `--syntax-string`, `--syntax-identifier`, `--syntax-operator`, `--syntax-comment`, `--syntax-builtin`, `--syntax-method`, `--syntax-punctuation` |
 | Grammar/toolbox | Seven family tokens: `--grammar-structure`, `--grammar-declaration`, `--grammar-type`, `--grammar-statement`, `--grammar-expression`, `--grammar-value`, and `--grammar-runtime`; these mirror the renderer-owned primary palette for toolbox accents |
-| Typography | `--font-family-ui`, `--font-family-code`, six font sizes, four allowed font weights, and compact/default/relaxed/code line heights |
-| Spacing | `--space-0` through `--space-12` for the recurring 0–24 px scale |
-| Controls/icons | Compact/default/comfortable control heights, shared control padding, and small/medium/large icon sizes |
+| Typography | `--font-family-ui`, `--font-family-code`, five font sizes, four allowed font weights, and compact/default/relaxed/code line heights |
+| Spacing | `--space-1` through `--space-10` for recurring shell spacing |
+| Controls/icons | Compact/default/comfortable control heights, shared compact/default padding, and small/medium icon sizes |
 | Shape/elevation | Radius, shadow, and motion tokens |
-| Panels | Semantic header/activity/sidebar/inspector/bottom/status/toolbar/tab dimensions plus resizer size |
-| Layers | Base, workspace, content, interaction, visualization, header, scrim, drawer, menu, bottom-panel, and modal layers |
-| Breakpoint references | Header compact, panel compact, drawer, menu, mobile, phone, and runtime compact/stack references |
-
-CSS custom properties cannot be used in media-query conditions, so media queries retain literal breakpoint values. The reference tokens document the contract; the literals and coupled TypeScript queries must be changed together.
+| Panels | Semantic header/activity/sidebar/inspector/bottom/status/toolbar/tab dimensions |
+| Layers | Workspace, interaction, header, scrim, drawer, menu, bottom-panel, and modal layers |
 
 ### Compatibility aliases
 
-`tokens.css` still maps established names such as `--ide-*` colors, `--bg`, `--panel`, `--aquamarine`, and `--token-*` to canonical tokens. These aliases protect external/Blockly integrations and any overlooked dynamic consumer. Production shell, domain, and editor declarations now use canonical semantic tokens; aliases may be removed only after a repository-wide and browser-runtime usage audit.
+The only aliases retained are `--font-code`, `--radius-panel`, `--ide-border`, `--ide-text`, `--ide-accent`, `--bg`, `--panel`, `--surface`, `--border`, `--text`, `--muted`, `--copper`, and `--aquamarine`. Repository-wide usage shows that specialized domain and print styles still consume them. New shell and editor work uses canonical tokens; remove an alias only while migrating each remaining consumer.
 
 ## Duplicate selectors and removed conflicts
 
@@ -187,9 +184,9 @@ the former character-based `.icon-*::before` rules without adding a runtime
 dependency. The existing `.icon`, `icon-menu`, and `icon-close` classes remain
 on the compact-menu SVG because `app.ts` still synchronizes those state classes.
 
-Controls use the `Primary`, `Secondary`, `Quiet`, and `Destructive` hierarchy:
-the existing primary run/stepper actions map to the primary treatment, regular
-stepper actions map to secondary, and familiar icon controls remain quiet.
+Controls use primary, secondary, and destructive treatments; familiar
+icon-only controls remain quiet. The existing Run and stepper primary actions
+use the primary treatment, while regular stepper actions use secondary.
 All icon-only controls keep their `aria-label` and `title`; semantic stepper
 actions use visible text labels.
 
@@ -212,7 +209,7 @@ The retired 980 and 580 px legacy shell queries no longer exist.
 
 ## Candidate consolidation and follow-up work
 
-1. Remove compatibility aliases only after confirming no runtime, Blockly, embedded, or downstream consumer reads them.
+1. Migrate the remaining domain-view consumers before removing their compatibility aliases.
 2. Split `workbench.css` into shell submodules only if import order remains explicit and selector ownership stays non-overlapping; line count alone is not a reason to split it.
 3. Add a browser print regression before simplifying `printing-typing` rules further.
 4. Tokenize remaining component geometry selectively when a later visual change actually needs it.
@@ -224,5 +221,5 @@ The retired 980 and 580 px legacy shell queries no longer exist.
 
 - Production build parses and bundles all four stylesheets.
 - UI smoke tests cover themes, perspectives, drawers, visibility, resizers, persistence, bottom-panel behavior, shortcuts, command palette, views, and duplicate IDs.
-- Stored visual baselines cover 1440 × 900 light/dark plus major perspectives, 1024 × 768, 768 × 1024, and 390 × 844.
-- The consolidation matches all current visual baselines exactly; no baseline update was required.
+- Stored visual baselines cover 1920 × 1080, 1440 × 900, 1280 × 800, 1024 × 768, 768 × 1024, and 390 × 844 across the intended themes and perspectives.
+- The cleanup is checked against the approved visual baselines; it does not add a visual direction or a stylesheet override layer.

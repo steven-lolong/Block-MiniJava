@@ -2,8 +2,8 @@
  * Authoritative design tokens for the Block-MiniJava workbench.
  *
  * Component styles consume the semantic names in this file. The --ide-* size
- * variables and the aliases at the end are compatibility contracts for the
- * existing resize, persistence, Blockly, and domain-view implementations.
+ * variables are runtime contracts for the resize and persistence code. A small
+ * set of aliases remains for specialized domain-view styles that still use it.
  */
 
 :root {
@@ -17,7 +17,6 @@
   --font-size-md: 13px;
   --font-size-base: 14px;
   --font-size-lg: 16px;
-  --font-size-xl: 20px;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
@@ -28,7 +27,6 @@
   --line-height-code: 21px;
 
   /* Spacing */
-  --space-0: 0;
   --space-1: 2px;
   --space-2: 4px;
   --space-3: 6px;
@@ -38,7 +36,6 @@
   --space-7: 14px;
   --space-8: 16px;
   --space-10: 20px;
-  --space-12: 24px;
 
   /* Controls and icons */
   --control-height-compact: 28px;
@@ -46,17 +43,12 @@
   --control-height-comfortable: 36px;
   --control-padding-compact: 0 var(--space-3);
   --control-padding-default: 0 var(--space-4);
-  --control-padding-comfortable: 0 var(--space-5);
   --icon-size-sm: 12px;
   --icon-size-md: 16px;
-  --icon-size-lg: 20px;
 
   /* Shape, motion, and elevation */
   --radius-none: 0;
-  --radius-sm: 2px;
   --radius-control: 4px;
-  --radius-dialog: 5px;
-  --radius-round: 999px;
   --shadow-none: none;
   --shadow-menu: 0 10px 28px rgb(0 0 0 / 24%);
   --shadow-drawer-start: 8px 0 24px rgb(0 0 0 / 24%);
@@ -90,14 +82,9 @@
   --panel-header-height: var(--header-height);
   --panel-toolbar-height: 36px;
   --panel-tab-height: 32px;
-  --resize-handle-size: 4px;
-
   /* Layering */
-  --layer-base: 0;
   --layer-workspace: 1;
-  --layer-content: 3;
   --layer-interaction: 4;
-  --layer-visualization: 6;
   --layer-header: 100;
   --layer-scrim: 30;
   --layer-drawer: 35;
@@ -106,16 +93,6 @@
   --layer-bottom-panel: 120;
   --layer-modal: 1000;
 
-  /* Breakpoint references. Media queries retain literal values because CSS
-     custom properties are not valid in media-query conditions. */
-  --breakpoint-header-compact: 1480px;
-  --breakpoint-panel-compact: 1260px;
-  --breakpoint-drawer: 1100px;
-  --breakpoint-menu: 900px;
-  --breakpoint-mobile: 700px;
-  --breakpoint-phone: 480px;
-  --breakpoint-runtime-compact: 1180px;
-  --breakpoint-runtime-stack: 920px;
 }
 
 body[data-theme="dark"] {
@@ -220,65 +197,21 @@ body[data-theme="light"] {
   --syntax-punctuation: #68727f;
 }
 
-/* Compatibility aliases for behavior and specialized domain views. New shell
- * and editor rules must use the semantic tokens above. */
+/* Compatibility aliases retained by specialized domain views. New shell and
+ * editor rules use the semantic tokens above. */
 body[data-theme] {
-  --font-ui: var(--font-family-ui);
   --font-code: var(--font-family-code);
-  --toolbox-width: var(--ide-primary-sidebar-width);
-  --code-width: var(--ide-code-panel-width);
-  --viz-height: var(--ide-bottom-panel-height);
   --radius-panel: var(--radius-none);
-  --shadow-panel: var(--shadow-none);
-  --transition: var(--motion-fast);
-
-  --ide-shell-bg: var(--surface-app);
-  --ide-activity-bg: var(--surface-activity);
-  --ide-sidebar-bg: var(--surface-sidebar);
-  --ide-panel-bg: var(--surface-raised);
-  --ide-surface-raised: var(--surface-hover);
-  --ide-workspace-bg: var(--surface-workspace);
-  --ide-toolbar-bg: var(--surface-recessed);
-  --ide-header-bg: var(--surface-raised);
   --ide-border: var(--border-default);
-  --ide-border-strong: var(--border-strong);
   --ide-text: var(--text-primary);
-  --ide-text-muted: var(--text-secondary);
-  --ide-text-disabled: var(--text-muted);
   --ide-accent: var(--accent-primary);
-  --ide-accent-hover: var(--accent-hover);
-  --ide-success: var(--state-success);
-  --ide-warning: var(--state-warning);
-  --ide-error: var(--state-error);
-  --ide-info: var(--state-info);
 
   --bg: var(--surface-app);
-  --bg-strong: var(--surface-workspace);
   --panel: var(--surface-raised);
-  --panel-soft: var(--surface-recessed);
-  --panel-elevated: var(--surface-hover);
   --surface: var(--surface-control);
   --border: var(--border-default);
   --text: var(--text-primary);
   --muted: var(--text-secondary);
-  --muted-strong: var(--text-emphasis);
   --copper: var(--state-execution);
-  --copper-strong: var(--state-execution-strong);
   --aquamarine: var(--accent-primary);
-  --aquamarine-strong: var(--accent-hover);
-  --gold: var(--state-warning);
-  --danger: var(--state-error);
-  --code-bg: var(--surface-code);
-  --bg-grid: var(--workspace-grid);
-
-  --token-keyword: var(--syntax-keyword);
-  --token-type: var(--syntax-type);
-  --token-number: var(--syntax-number);
-  --token-string: var(--syntax-string);
-  --token-identifier: var(--syntax-identifier);
-  --token-operator: var(--syntax-operator);
-  --token-comment: var(--syntax-comment);
-  --token-builtin: var(--syntax-builtin);
-  --token-method: var(--syntax-method);
-  --token-punctuation: var(--syntax-punctuation);
 }

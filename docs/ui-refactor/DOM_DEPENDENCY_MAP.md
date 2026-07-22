@@ -222,3 +222,19 @@ The highest-confidence breakages are:
 8. Print-state selectors on `printing-typing` and the typing tree.
 
 Presentation-only wrapper selectors can be consolidated later, but only after verifying that they are not an ancestor in one of the stateful compound selectors above.
+
+## Cleanup boundary
+
+The cleanup removed no static ID, behaviorally significant `data-*` attribute,
+ARIA relationship, test hook, command-palette command, or dynamic render root.
+Repository-wide source searches established that the removed activity badge,
+bottom activity-group wrapper, quiet-button selector, disabled panel-card
+accent pseudo-element, and seven unused SVG symbols had no non-stylesheet or
+dynamic consumer. Empty runtime, toolbox, diagnostics, and code hosts remain:
+they are populated by the render roots listed above and are not decorative
+containers.
+
+The inline SVG sprite contains only symbols referenced by static markup or by
+the explicit `iconMarkup`/`setIconUse` call sites. The math turnstile in the
+typing toolbar is retained as MiniJava derivation notation, not as an
+application-control glyph.

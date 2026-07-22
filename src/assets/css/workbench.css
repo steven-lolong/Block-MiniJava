@@ -1,8 +1,6 @@
 /* Authoritative application-shell stylesheet. Tokens live in tokens.css;
  * domain visualizations and editable-code mechanics have separate owners. */
 
-/* Structural and behavior-coupled shell rules migrated from the former legacy stylesheet. */
-
 html,
 #app {
   width: 100%;
@@ -662,7 +660,6 @@ kbd {
   background: var(--surface-hover);
 }
 
-.button-quiet,
 .icon-button,
 .text-button {
   border-color: transparent;
@@ -805,10 +802,6 @@ kbd {
   flex-direction: column;
 }
 
-.activity-group-bottom {
-  margin-top: auto;
-}
-
 .activity-item {
   position: relative;
   width: var(--panel-activity-width);
@@ -859,41 +852,8 @@ kbd {
   transform: translateY(-50%);
 }
 
-.activity-badge {
-  position: absolute;
-  right: 5px;
-  bottom: 6px;
-  min-width: 15px;
-  height: 15px;
-  border: 1px solid var(--surface-activity);
-  border-radius: 8px;
-  padding: 0 3px;
-  background: var(--state-error);
-  color: var(--text-on-state);
-  font-size: var(--font-size-xs);
-  line-height: 14px;
-  text-align: center;
-}
-
 .ide-layout {
   grid-area: editor-area;
-  position: relative;
-  height: 100%;
-  min-height: 0;
-  display: grid;
-  grid-template-areas: "primary-sidebar sidebar-resizer workspace code-resizer inspector";
-  grid-template-columns: var(--panel-sidebar-width) 4px minmax(320px, 1fr) 4px var(--panel-inspector-width);
-  grid-template-rows: minmax(0, 1fr);
-  gap: 0;
-  padding: 0;
-  background: var(--surface-workspace);
-  overflow: hidden;
-  transition: grid-template-columns var(--motion-fast);
-}
-
-body.toolbox-hidden .ide-layout,
-body.code-hidden .ide-layout,
-body.toolbox-hidden.code-hidden .ide-layout {
   position: relative;
   height: 100%;
   min-height: 0;
@@ -920,15 +880,7 @@ body.toolbox-hidden.code-hidden .ide-layout {
   grid-template-columns: 0 0 minmax(320px, 1fr) 0 0;
 }
 .sidebar-resizer { grid-area: sidebar-resizer; }
-.code-resizer {
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  cursor: col-resize;
-  touch-action: none;
-  transition: background var(--motion-fast), opacity var(--motion-fast); grid-area: code-resizer; }
+.code-resizer { grid-area: code-resizer; }
 
 .panel-card {
   position: relative;
@@ -940,16 +892,6 @@ body.toolbox-hidden.code-hidden .ide-layout {
   background: var(--surface-raised);
   box-shadow: none;
   backdrop-filter: none;
-}
-
-.panel-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto;
-  height: 3px;
-  background: linear-gradient(90deg, var(--state-execution), var(--accent-primary), var(--state-warning));
-  z-index: 2;
-  display: none;
 }
 
 .toolbox-column {

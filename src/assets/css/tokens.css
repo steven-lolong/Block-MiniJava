@@ -73,14 +73,6 @@
   --surface-modal-backdrop: rgb(0 0 0 / 58%);
   --surface-drawer-scrim: rgb(7 9 13 / 42%);
 
-  /* Toolbox grammar families; Blockly renderer mappings remain untouched. */
-  --grammar-program: var(--state-execution);
-  --grammar-declaration: var(--state-warning);
-  --grammar-type: #6fae72;
-  --grammar-statement: var(--state-execution-strong);
-  --grammar-expression: #688dc8;
-  --grammar-value: var(--accent-primary);
-
   /* Runtime-owned layout variables. Do not rename: TypeScript writes these. */
   --ide-activity-bar-width: 50px;
   --ide-primary-sidebar-width: 270px;
@@ -156,6 +148,15 @@ body[data-theme="dark"] {
   --state-execution: #d8895f;
   --state-execution-strong: #ee9b6c;
 
+  /* Broad grammar colors shared by the custom toolbox and Blockly theme. */
+  --grammar-structure: #80505a;
+  --grammar-declaration: #685b7a;
+  --grammar-type: #3d6d5a;
+  --grammar-statement: #80602f;
+  --grammar-expression: #455f7f;
+  --grammar-value: #5c713e;
+  --grammar-runtime: #585e68;
+
   /* Generated-code syntax is semantic and independent from Blockly colors. */
   --syntax-keyword: #ff9d76;
   --syntax-type: #7ee2d2;
@@ -198,6 +199,14 @@ body[data-theme="light"] {
   --state-info: #256cb7;
   --state-execution: #ad5f37;
   --state-execution-strong: #934925;
+
+  --grammar-structure: #754650;
+  --grammar-declaration: #5e5074;
+  --grammar-type: #346252;
+  --grammar-statement: #75552a;
+  --grammar-expression: #3a5878;
+  --grammar-value: #526638;
+  --grammar-runtime: #515761;
 
   --syntax-keyword: #a54c2e;
   --syntax-type: #08766d;

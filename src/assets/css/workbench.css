@@ -112,17 +112,17 @@ body.toolbox-hidden #show-toolbox-button {
   text-align: center;
 }
 
-.toolbox-category[data-category="program"] { --category-color: var(--state-execution); }
+.toolbox-category[data-category="program"] { --category-color: var(--grammar-structure); }
 
-.toolbox-category[data-category="declarations"] { --category-color: var(--state-warning); }
+.toolbox-category[data-category="declarations"] { --category-color: var(--grammar-declaration); }
 
 .toolbox-category[data-category="types"] { --category-color: var(--grammar-type); }
 
-.toolbox-category[data-category="statements"] { --category-color: var(--state-execution-strong); }
+.toolbox-category[data-category="statements"] { --category-color: var(--grammar-statement); }
 
 .toolbox-category[data-category="expressions"] { --category-color: var(--grammar-expression); }
 
-.toolbox-category[data-category="values"] { --category-color: var(--accent-primary); }
+.toolbox-category[data-category="values"] { --category-color: var(--grammar-value); }
 
 .category-left {
   display: inline-flex;

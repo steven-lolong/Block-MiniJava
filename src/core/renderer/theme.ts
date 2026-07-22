@@ -1,5 +1,174 @@
 import * as Blockly from 'blockly';
-import { MINI_JAVA_BLOCK_TYPES, MiniJavaBlockType, miniJavaBlockStyle } from '../blocks/minijavaBlocks';
+
+export const MINI_JAVA_BLOCK_TYPES = [
+  'mj_goal',
+  'mj_main_class',
+  'mj_class_declaration',
+  'mj_var_declaration',
+  'mj_method_declaration',
+  'mj_formal_parameter',
+  'mj_type_int_array',
+  'mj_type_boolean',
+  'mj_type_int',
+  'mj_type_string',
+  'mj_type_identifier',
+  'mj_statement_block',
+  'mj_statement_if',
+  'mj_statement_while',
+  'mj_statement_print',
+  'mj_statement_assign',
+  'mj_statement_array_assign',
+  'mj_expr_arith',
+  'mj_expr_compare',
+  'mj_expr_logic',
+  'mj_expr_array_lookup',
+  'mj_expr_array_length',
+  'mj_expr_char_at',
+  'mj_expr_concat',
+  'mj_expr_str_length',
+  'mj_expr_method_call',
+  'mj_argument_item',
+  'mj_expr_integer',
+  'mj_expr_string',
+  'mj_expr_boolean',
+  'mj_expr_identifier',
+  'mj_expr_this',
+  'mj_expr_new_int_array',
+  'mj_expr_new_object',
+  'mj_expr_not',
+  'mj_expr_parens',
+  'mj_value_object',
+  'mj_value_null',
+  'mj_viz_description'
+] as const;
+
+export type MiniJavaBlockType = typeof MINI_JAVA_BLOCK_TYPES[number];
+
+export const MINI_JAVA_BLOCK_COLOR_CATEGORIES = [
+  'structure',
+  'declaration',
+  'type',
+  'statement',
+  'expression',
+  'value',
+  'runtime'
+] as const;
+
+export type MiniJavaBlockColorCategory = typeof MINI_JAVA_BLOCK_COLOR_CATEGORIES[number];
+export type MiniJavaThemeMode = 'dark' | 'light';
+
+/**
+ * The sole block-type-to-color-family mapping. Connector checks and BMJ-Thrasos
+ * shapes remain independent, finer-grained grammar signals.
+ */
+export const MINI_JAVA_BLOCK_COLOR_CATEGORY: Readonly<Record<MiniJavaBlockType, MiniJavaBlockColorCategory>> = {
+  mj_goal: 'structure',
+  mj_main_class: 'structure',
+  mj_class_declaration: 'structure',
+  mj_var_declaration: 'declaration',
+  mj_method_declaration: 'declaration',
+  mj_formal_parameter: 'declaration',
+  mj_type_int_array: 'type',
+  mj_type_boolean: 'type',
+  mj_type_int: 'type',
+  mj_type_string: 'type',
+  mj_type_identifier: 'type',
+  mj_statement_block: 'statement',
+  mj_statement_if: 'statement',
+  mj_statement_while: 'statement',
+  mj_statement_print: 'statement',
+  mj_statement_assign: 'statement',
+  mj_statement_array_assign: 'statement',
+  mj_expr_arith: 'expression',
+  mj_expr_compare: 'expression',
+  mj_expr_logic: 'expression',
+  mj_expr_array_lookup: 'expression',
+  mj_expr_array_length: 'expression',
+  mj_expr_char_at: 'expression',
+  mj_expr_concat: 'expression',
+  mj_expr_str_length: 'expression',
+  mj_expr_method_call: 'expression',
+  mj_argument_item: 'expression',
+  mj_expr_integer: 'value',
+  mj_expr_string: 'value',
+  mj_expr_boolean: 'value',
+  mj_expr_identifier: 'value',
+  mj_expr_this: 'value',
+  mj_expr_new_int_array: 'value',
+  mj_expr_new_object: 'value',
+  mj_expr_not: 'expression',
+  mj_expr_parens: 'expression',
+  mj_value_object: 'runtime',
+  mj_value_null: 'runtime',
+  mj_viz_description: 'runtime'
+};
+
+export const MINI_JAVA_BLOCK_STYLE_BY_CATEGORY: Readonly<Record<MiniJavaBlockColorCategory, string>> = {
+  structure: 'mj_grammar_structure_blocks',
+  declaration: 'mj_grammar_declaration_blocks',
+  type: 'mj_grammar_type_blocks',
+  statement: 'mj_grammar_statement_blocks',
+  expression: 'mj_grammar_expression_blocks',
+  value: 'mj_grammar_value_blocks',
+  runtime: 'mj_grammar_runtime_blocks'
+};
+
+export function miniJavaBlockStyle(type: MiniJavaBlockType): string {
+  return MINI_JAVA_BLOCK_STYLE_BY_CATEGORY[MINI_JAVA_BLOCK_COLOR_CATEGORY[type]];
+}
+
+export type MiniJavaBlockPaletteEntry = Readonly<{
+  semanticToken: `grammar.${MiniJavaBlockColorCategory}`;
+  colourPrimary: string;
+  colourSecondary: string;
+  colourTertiary: string;
+}>;
+
+function mixHex(left: string, right: string, rightWeight: number): string {
+  const channel = (hex: string, offset: number): number => Number.parseInt(hex.slice(offset, offset + 2), 16);
+  const mixed = [1, 3, 5].map((offset) =>
+    Math.round(channel(left, offset) * (1 - rightWeight) + channel(right, offset) * rightWeight)
+      .toString(16)
+      .padStart(2, '0')
+  );
+  return `#${mixed.join('')}`;
+}
+
+function categoryPalette(
+  category: MiniJavaBlockColorCategory,
+  colourPrimary: string
+): MiniJavaBlockPaletteEntry {
+  return {
+    semanticToken: `grammar.${category}`,
+    colourPrimary,
+    colourSecondary: mixHex(colourPrimary, '#ffffff', 0.12),
+    colourTertiary: mixHex(colourPrimary, '#000000', 0.24)
+  };
+}
+
+/** Restrained, theme-specific fills; white Blockly label text remains >= 4.5:1. */
+export const MINI_JAVA_BLOCK_PALETTES: Readonly<
+  Record<MiniJavaThemeMode, Readonly<Record<MiniJavaBlockColorCategory, MiniJavaBlockPaletteEntry>>>
+> = {
+  dark: {
+    structure: categoryPalette('structure', '#80505a'),
+    declaration: categoryPalette('declaration', '#685b7a'),
+    type: categoryPalette('type', '#3d6d5a'),
+    statement: categoryPalette('statement', '#80602f'),
+    expression: categoryPalette('expression', '#455f7f'),
+    value: categoryPalette('value', '#5c713e'),
+    runtime: categoryPalette('runtime', '#585e68')
+  },
+  light: {
+    structure: categoryPalette('structure', '#754650'),
+    declaration: categoryPalette('declaration', '#5e5074'),
+    type: categoryPalette('type', '#346252'),
+    statement: categoryPalette('statement', '#75552a'),
+    expression: categoryPalette('expression', '#3a5878'),
+    value: categoryPalette('value', '#526638'),
+    runtime: categoryPalette('runtime', '#515761')
+  }
+};
 
 export const COPPER_AQUAMARINE_DARK = {
   bg: '#171a20',
@@ -31,99 +200,15 @@ export const COPPER_AQUAMARINE_LIGHT = {
   green: '#507f4f'
 };
 
-const DARK_BLOCK_COLOURS: Record<MiniJavaBlockType, string> = {
-  mj_goal: '#ff7a45',
-  mj_main_class: '#ffb000',
-  mj_class_declaration: '#d785ff',
-  mj_var_declaration: '#42e6b8',
-  mj_method_declaration: '#36c9ff',
-  mj_formal_parameter: '#82f56b',
-  mj_type_int_array: '#5ee0ff',
-  mj_type_boolean: '#52f27f',
-  mj_type_int: '#ffd166',
-  mj_type_string: '#f9a8d4',
-  mj_type_identifier: '#a2f5c8',
-  mj_statement_block: '#ff8a65',
-  mj_statement_if: '#ff5c8a',
-  mj_statement_while: '#f59e0b',
-  mj_statement_print: '#4dd0e1',
-  mj_statement_assign: '#f97316',
-  mj_statement_array_assign: '#eab308',
-  mj_expr_arith: '#22d3ee',
-  mj_expr_compare: '#60a5fa',
-  mj_expr_logic: '#34d399',
-  mj_expr_array_lookup: '#2dd4bf',
-  mj_expr_array_length: '#38bdf8',
-  mj_expr_char_at: '#fb923c',
-  mj_expr_concat: '#e879f9',
-  mj_expr_str_length: '#fbbf24',
-  mj_expr_method_call: '#c084fc',
-  mj_argument_item: '#facc15',
-  mj_expr_integer: '#fde047',
-  mj_expr_string: '#fda4af',
-  mj_expr_boolean: '#4ade80',
-  mj_expr_identifier: '#5eead4',
-  mj_expr_this: '#93c5fd',
-  mj_expr_new_int_array: '#6ee7b7',
-  mj_expr_new_object: '#f0abfc',
-  mj_expr_not: '#f43f5e',
-  mj_expr_parens: '#cbd5e1',
-  mj_value_object: '#79ead7',
-  mj_value_null: '#94a3b8',
-  mj_viz_description: '#64748b'
-};
-
-const LIGHT_BLOCK_COLOURS: Record<MiniJavaBlockType, string> = {
-  mj_goal: '#b8431d',
-  mj_main_class: '#b86e00',
-  mj_class_declaration: '#7c3aed',
-  mj_var_declaration: '#087f5b',
-  mj_method_declaration: '#0369a1',
-  mj_formal_parameter: '#2f7d32',
-  mj_type_int_array: '#007a9a',
-  mj_type_boolean: '#15803d',
-  mj_type_int: '#a16207',
-  mj_type_string: '#be185d',
-  mj_type_identifier: '#0f766e',
-  mj_statement_block: '#c2410c',
-  mj_statement_if: '#be123c',
-  mj_statement_while: '#b45309',
-  mj_statement_print: '#0e7490',
-  mj_statement_assign: '#ea580c',
-  mj_statement_array_assign: '#a16207',
-  mj_expr_arith: '#0891b2',
-  mj_expr_compare: '#2563eb',
-  mj_expr_logic: '#047857',
-  mj_expr_array_lookup: '#0d9488',
-  mj_expr_array_length: '#0284c7',
-  mj_expr_char_at: '#c2410c',
-  mj_expr_concat: '#a21caf',
-  mj_expr_str_length: '#b45309',
-  mj_expr_method_call: '#9333ea',
-  mj_argument_item: '#a16207',
-  mj_expr_integer: '#854d0e',
-  mj_expr_string: '#be123c',
-  mj_expr_boolean: '#16a34a',
-  mj_expr_identifier: '#0f766e',
-  mj_expr_this: '#1d4ed8',
-  mj_expr_new_int_array: '#059669',
-  mj_expr_new_object: '#a21caf',
-  mj_expr_not: '#be123c',
-  mj_expr_parens: '#475569',
-  mj_value_object: '#0b6f66',
-  mj_value_null: '#64748b',
-  mj_viz_description: '#64748b'
-};
-
 function miniJavaBlockStyles(mode: 'dark' | 'light'): Record<string, Blockly.Theme.BlockStyle> {
-  const colours = mode === 'dark' ? DARK_BLOCK_COLOURS : LIGHT_BLOCK_COLOURS;
+  const palette = MINI_JAVA_BLOCK_PALETTES[mode];
   return Object.fromEntries(
-    MINI_JAVA_BLOCK_TYPES.map((type) => [
-      miniJavaBlockStyle(type),
+    MINI_JAVA_BLOCK_COLOR_CATEGORIES.map((category) => [
+      MINI_JAVA_BLOCK_STYLE_BY_CATEGORY[category],
       {
-        colourPrimary: colours[type],
-        colourSecondary: colours[type],
-        colourTertiary: colours[type],
+        colourPrimary: palette[category].colourPrimary,
+        colourSecondary: palette[category].colourSecondary,
+        colourTertiary: palette[category].colourTertiary,
         hat: ''
       }
     ])
@@ -132,6 +217,7 @@ function miniJavaBlockStyles(mode: 'dark' | 'light'): Record<string, Blockly.The
 
 export function createBlocklyTheme(mode: 'dark' | 'light'): Blockly.Theme {
   const p = mode === 'dark' ? COPPER_AQUAMARINE_DARK : COPPER_AQUAMARINE_LIGHT;
+  const grammar = MINI_JAVA_BLOCK_PALETTES[mode];
   return Blockly.Theme.defineTheme(`copper-aquamarine-${mode}`, {
     name: `copper-aquamarine-${mode}`,
     base: Blockly.Themes.Classic,
@@ -146,13 +232,14 @@ export function createBlocklyTheme(mode: 'dark' | 'light'): Blockly.Theme {
       procedure_blocks: { colourPrimary: p.gold }
     },
     categoryStyles: {
-      program_category: { colour: p.copper },
-      class_category: { colour: p.copperStrong },
-      declaration_category: { colour: p.gold },
-      type_category: { colour: p.green },
-      statement_category: { colour: p.copper },
-      expression_category: { colour: p.aquamarine },
-      value_category: { colour: p.aquamarineStrong }
+      program_category: { colour: grammar.structure.colourPrimary },
+      class_category: { colour: grammar.structure.colourPrimary },
+      declaration_category: { colour: grammar.declaration.colourPrimary },
+      type_category: { colour: grammar.type.colourPrimary },
+      statement_category: { colour: grammar.statement.colourPrimary },
+      expression_category: { colour: grammar.expression.colourPrimary },
+      value_category: { colour: grammar.value.colourPrimary },
+      runtime_category: { colour: grammar.runtime.colourPrimary }
     },
     componentStyles: {
       workspaceBackgroundColour: p.bg,

@@ -135,6 +135,82 @@ test('blocks-only sidebar and quiet workspace toolbar preserve editing workflows
   expectNoUncaughtErrors(errors);
 });
 
+test('grammatical block families integrate with both themes and preserve Blockly visual states', async ({ page }) => {
+  const errors = await openFreshApp(page);
+  await page.locator('#examples-button').click();
+  await page.locator('#examples-panel [role="menuitem"]').filter({ hasText: 'Simple Sum' }).evaluate((item) =>
+    (item as HTMLButtonElement).click()
+  );
+  await page.locator('#example-load-modal button[value="replace"]').click();
+  await expect(page.locator('#loaded-file-label')).toContainText('Simple Sum.bml');
+
+  const blockColors = () => page.evaluate(() => {
+    const workspace = (window as any).Blockly.getMainWorkspace();
+    return Object.fromEntries(workspace.getAllBlocks(false).map((block: any) => [block.type, {
+      color: block.getColour(),
+      style: block.getStyleName()
+    }]));
+  });
+
+  const dark = await blockColors();
+  expect(dark.mj_goal).toEqual({ color: '#80505a', style: 'mj_grammar_structure_blocks' });
+  expect(dark.mj_method_declaration).toEqual({ color: '#685b7a', style: 'mj_grammar_declaration_blocks' });
+  expect(dark.mj_type_int).toEqual({ color: '#3d6d5a', style: 'mj_grammar_type_blocks' });
+  expect(dark.mj_statement_print).toEqual({ color: '#80602f', style: 'mj_grammar_statement_blocks' });
+  expect(dark.mj_expr_arith).toEqual({ color: '#455f7f', style: 'mj_grammar_expression_blocks' });
+  expect(dark.mj_expr_integer).toEqual({ color: '#5c713e', style: 'mj_grammar_value_blocks' });
+  const darkToolbox = await page.locator('#toolbox-content .toolbox-category').evaluateAll((categories) =>
+    Object.fromEntries(categories.map((category) => [
+      (category as HTMLElement).dataset.category,
+      getComputedStyle(category).getPropertyValue('--category-color').trim()
+    ]))
+  );
+  expect(darkToolbox).toEqual({
+    program: '#80505a', declarations: '#685b7a', types: '#3d6d5a',
+    statements: '#80602f', expressions: '#455f7f', values: '#5c713e'
+  });
+
+  const states = await page.evaluate(() => {
+    const blockly = (window as any).Blockly;
+    const block = blockly.getMainWorkspace().getBlocksByType('mj_method_declaration')[0];
+    const root = block.getSvgRoot();
+    block.addSelect();
+    const selected = root.classList.contains('blocklySelected');
+    block.setHighlighted(true);
+    const highlighted = root.classList.contains('blocklyHighlighted');
+    block.setDisabledReason(true, 'block-color-test');
+    const disabled = root.classList.contains('blocklyDisabled');
+    block.setWarningText('Color-independent warning', 'block-color-test');
+    const warning = Boolean(root.querySelector('.blocklyIconGroup'));
+    block.setWarningText(null, 'block-color-test');
+    block.setDisabledReason(false, 'block-color-test');
+    block.setHighlighted(false);
+    block.removeSelect();
+    return { selected, highlighted, disabled, warning };
+  });
+  expect(states).toEqual({ selected: true, highlighted: true, disabled: true, warning: true });
+
+  await toggleTheme(page);
+  const light = await blockColors();
+  expect(light.mj_goal).toEqual({ color: '#754650', style: 'mj_grammar_structure_blocks' });
+  expect(light.mj_method_declaration).toEqual({ color: '#5e5074', style: 'mj_grammar_declaration_blocks' });
+  expect(light.mj_type_int).toEqual({ color: '#346252', style: 'mj_grammar_type_blocks' });
+  expect(light.mj_statement_print).toEqual({ color: '#75552a', style: 'mj_grammar_statement_blocks' });
+  expect(light.mj_expr_arith).toEqual({ color: '#3a5878', style: 'mj_grammar_expression_blocks' });
+  expect(light.mj_expr_integer).toEqual({ color: '#526638', style: 'mj_grammar_value_blocks' });
+  const lightToolbox = await page.locator('#toolbox-content .toolbox-category').evaluateAll((categories) =>
+    Object.fromEntries(categories.map((category) => [
+      (category as HTMLElement).dataset.category,
+      getComputedStyle(category).getPropertyValue('--category-color').trim()
+    ]))
+  );
+  expect(lightToolbox).toEqual({
+    program: '#754650', declarations: '#5e5074', types: '#346252',
+    statements: '#75552a', expressions: '#3a5878', values: '#526638'
+  });
+  expectNoUncaughtErrors(errors);
+});
+
 test('primary Run opens Output and command palette exposes registered commands', async ({ page }) => {
   const errors = await openFreshApp(page);
   await page.locator('#header-run-program').click();

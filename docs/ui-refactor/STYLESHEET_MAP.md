@@ -8,9 +8,9 @@ There are no application stylesheet `<link>` elements in `src/index.html`. Webpa
 
 | Order | File | Approximate size | Authoritative responsibility |
 |---:|---|---:|---|
-| 1 | `src/assets/css/tokens.css` | 272 lines | Design tokens, dark/light theme values, runtime dimension contracts, and temporary compatibility aliases. |
-| 2 | `src/assets/css/workbench.css` | 2,420 lines | Global reset/utilities, application shell, header, activity/sidebar, workspace, inspector shell, dialogs, bottom-panel shell, status bar, command palette, and responsive behavior. |
-| 3 | `src/assets/css/domain.css` | 923 lines | Typing derivations and print layout, CESK/runtime views, comparison and rewrite views, and domain-state animation. |
+| 1 | `src/assets/css/tokens.css` | 284 lines | Design tokens, dark/light theme values, runtime dimension contracts, and temporary compatibility aliases. |
+| 2 | `src/assets/css/workbench.css` | 2,276 lines | Global reset/utilities, application shell, header, activity/sidebar, workspace, inspector shell, dialogs, bottom-panel shell, status bar, command palette, and responsive behavior. |
+| 3 | `src/assets/css/domain.css` | 918 lines | Typing derivations and print layout, CESK/runtime views, comparison and rewrite views, and domain-state animation. |
 | 4 | `src/assets/css/codeEditor.css` | 163 lines | Generated/editable MiniJava text, output text, textarea/highlight alignment, line numbers, editor status, and syntax tokens. |
 
 The order follows dependency rather than override intent: tokens first, shell structure next, specialized domain content next, and exact editor-layer metrics last. No stylesheet is a generic “skin” over another stylesheet.
@@ -19,7 +19,7 @@ The order follows dependency rather than override intent: tokens first, shell st
 
 ### `tokens.css`: the single token authority
 
-Only this file defines application theme colors and global scales. `:root` owns theme-independent geometry, typography, spacing, motion, elevation, z-index, panel-size references, and breakpoint references. `body[data-theme="dark"]` and `body[data-theme="light"]` own theme values.
+This file defines application-shell theme colors and global scales. The deliberate exception is Blockly block rendering: `src/core/renderer/theme.ts` owns the seven block-family palettes and the complete block-type classification. `tokens.css` mirrors each family primary as `--grammar-*` so the custom HTML toolbox uses the same category accents. `:root` owns theme-independent geometry, typography, spacing, motion, elevation, z-index, panel-size references, and breakpoint references. `body[data-theme="dark"]` and `body[data-theme="light"]` own theme values.
 
 The file also preserves three runtime-written variables as compatibility contracts:
 
@@ -87,7 +87,7 @@ No legacy stylesheet remains in the import chain, and `workbench.css` no longer 
 | Product/focus | `--accent-primary`, `--accent-hover`, `--selection`, `--focus-ring`, `--focus-outline`, `--focus-offset` |
 | State | `--state-success`, `--state-warning`, `--state-error`, `--state-info`, `--state-execution`, `--state-execution-strong` |
 | Syntax | `--syntax-keyword`, `--syntax-type`, `--syntax-number`, `--syntax-string`, `--syntax-identifier`, `--syntax-operator`, `--syntax-comment`, `--syntax-builtin`, `--syntax-method`, `--syntax-punctuation` |
-| Grammar/toolbox | Six category-family tokens from `--grammar-program` through `--grammar-value`; Blockly renderer color mappings are unchanged |
+| Grammar/toolbox | Seven family tokens: `--grammar-structure`, `--grammar-declaration`, `--grammar-type`, `--grammar-statement`, `--grammar-expression`, `--grammar-value`, and `--grammar-runtime`; these mirror the renderer-owned primary palette for toolbox accents |
 | Typography | `--font-family-ui`, `--font-family-code`, six font sizes, four allowed font weights, and compact/default/relaxed/code line heights |
 | Spacing | `--space-0` through `--space-12` for the recurring 0–24 px scale |
 | Controls/icons | Compact/default/comfortable control heights, shared control padding, and small/medium/large icon sizes |
@@ -152,7 +152,7 @@ There are 14 remaining declarations, all in `workbench.css`:
 - `workbench.css` and `codeEditor.css` contain no hard-coded color literals.
 - `domain.css` keeps seven explicit black/white/neutral literals inside `@media print`; paper/ink output is intentionally independent of the active screen theme.
 - Runtime heap/reference hues continue to use `hsl(var(--loc-hue) ...)`. `--loc-hue` is generated per runtime location and is a semantic identity mechanism, not decoration.
-- Blockly renderer and block color mappings were not changed.
+- Blockly block colors use seven renderer-owned grammatical families. The complete mapping and contrast record is `BLOCK_COLOR_CLASSIFICATION.md`; connector shapes and connection checks remain unchanged.
 
 ## Spacing and geometry
 

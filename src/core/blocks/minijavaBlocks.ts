@@ -1,5 +1,13 @@
 import * as Blockly from 'blockly';
 import { MINI_JAVA_RESERVED_WORDS } from '../parser/minijavaTextParser';
+import { miniJavaBlockStyle } from '../renderer/theme';
+
+export {
+  MINI_JAVA_BLOCK_TYPES,
+  MINI_JAVA_BLOCK_COLOR_CATEGORY,
+  miniJavaBlockStyle
+} from '../renderer/theme';
+export type { MiniJavaBlockType, MiniJavaBlockColorCategory } from '../renderer/theme';
 
 export type ToolboxBlock = {
   type: string;
@@ -15,54 +23,6 @@ export type ToolboxCategory = {
 };
 
 export const MINI_JAVA_REQUIRED_BLOCK_TYPES = ['mj_goal', 'mj_main_class'] as const;
-
-export const MINI_JAVA_BLOCK_TYPES = [
-  'mj_goal',
-  'mj_main_class',
-  'mj_class_declaration',
-  'mj_var_declaration',
-  'mj_method_declaration',
-  'mj_formal_parameter',
-  'mj_type_int_array',
-  'mj_type_boolean',
-  'mj_type_int',
-  'mj_type_string',
-  'mj_type_identifier',
-  'mj_statement_block',
-  'mj_statement_if',
-  'mj_statement_while',
-  'mj_statement_print',
-  'mj_statement_assign',
-  'mj_statement_array_assign',
-  'mj_expr_arith',
-  'mj_expr_compare',
-  'mj_expr_logic',
-  'mj_expr_array_lookup',
-  'mj_expr_array_length',
-  'mj_expr_char_at',
-  'mj_expr_concat',
-  'mj_expr_str_length',
-  'mj_expr_method_call',
-  'mj_argument_item',
-  'mj_expr_integer',
-  'mj_expr_string',
-  'mj_expr_boolean',
-  'mj_expr_identifier',
-  'mj_expr_this',
-  'mj_expr_new_int_array',
-  'mj_expr_new_object',
-  'mj_expr_not',
-  'mj_expr_parens',
-  'mj_value_object',
-  'mj_value_null',
-  'mj_viz_description'
-] as const;
-
-export type MiniJavaBlockType = typeof MINI_JAVA_BLOCK_TYPES[number];
-
-export function miniJavaBlockStyle(type: MiniJavaBlockType): string {
-  return `${type}_blocks`;
-}
 
 export const MINI_JAVA_CATEGORIES: ToolboxCategory[] = [
   {

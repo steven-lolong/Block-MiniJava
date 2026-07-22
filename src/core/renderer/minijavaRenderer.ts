@@ -8,7 +8,7 @@ type Shape = Blockly.blockRendering.PuzzleTab | Blockly.blockRendering.Notch | B
 
 type Point = readonly [number, number];
 
-const HORIZONTAL_NON_TERMINALS = [
+export const MINI_JAVA_HORIZONTAL_CONNECTOR_SHAPES = [
   'Goal',
   'MainClass',
   'ClassDeclaration',
@@ -21,7 +21,7 @@ const HORIZONTAL_NON_TERMINALS = [
   'Identifier'
 ] as const;
 
-const VERTICAL_NON_TERMINALS = [
+export const MINI_JAVA_VERTICAL_CONNECTOR_SHAPES = [
   'ClassDeclaration',
   'VarDeclaration',
   'MethodDeclaration',
@@ -30,7 +30,7 @@ const VERTICAL_NON_TERMINALS = [
   'ExpressionArg'
 ] as const;
 
-const BLOCK_NON_TERMINAL: Record<string, string> = {
+export const MINI_JAVA_BLOCK_CONNECTOR_SHAPE: Readonly<Record<string, string>> = {
   mj_goal: 'Goal',
   mj_main_class: 'MainClass',
   mj_class_declaration: 'ClassDeclaration',
@@ -101,7 +101,7 @@ function primaryCheck(connection: Blockly.RenderedConnection): string | null {
   const checks = connection.getCheck() ?? connection.targetConnection?.getCheck() ?? null;
   if (checks?.length) return checks[0];
   const sourceBlock = connection.getSourceBlock();
-  return BLOCK_NON_TERMINAL[sourceBlock.type] ?? null;
+  return MINI_JAVA_BLOCK_CONNECTOR_SHAPE[sourceBlock.type] ?? null;
 }
 
 /**
@@ -195,7 +195,7 @@ class MiniJavaConstantProvider extends Blockly.blockRendering.ConstantProvider {
       ])
     ];
 
-    return Object.fromEntries(HORIZONTAL_NON_TERMINALS.map((name, index) => [name, shapes[index]]));
+    return Object.fromEntries(MINI_JAVA_HORIZONTAL_CONNECTOR_SHAPES.map((name, index) => [name, shapes[index]]));
   }
 
   private makeVerticalShapes(): Record<string, Notch> {

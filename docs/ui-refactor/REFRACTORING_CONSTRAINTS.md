@@ -46,6 +46,9 @@ The following are non-negotiable.
 - Preserve the renderer's ten horizontal grammatical connector families: `Goal`, `MainClass`, `ClassDeclaration`, `VarDeclaration`, `MethodDeclaration`, `FormalParameter`, `Type`, `Statement`, `Expression`, and `Identifier`.
 - Preserve the six implemented vertical connector families: `ClassDeclaration`, `VarDeclaration`, `MethodDeclaration`, `Statement`, `FormalParameter`, and `ExpressionArg`. Their distinct shapes and grammatical meanings must not be normalized to one generic notch.
 - Connection compatibility continues to be enforced by Blockly check metadata; connector geometry is a visual grammar cue, not a substitute for those checks.
+- Preserve the renderer-owned seven-family color classification documented in `BLOCK_COLOR_CLASSIFICATION.md`: Structure, Declarations, Types, Statements, Expressions, Values and literals, and Runtime or semantic-only. Every registered MiniJava block must resolve through the explicit mapping in `theme.ts`; no block may receive an arbitrary Blockly fallback.
+- Color communicates only the broad family. Labels, tooltips, connection checks, and BMJ-Thrasos connector geometry remain the non-color grammatical indicators.
+- Preserve Blockly's selected, disabled, highlighted/executing, warning, error, shadow, and insertion-marker treatments as state layers over the family fill.
 - Preserve the main-workspace grid/zoom/move configuration until a dedicated behavior and usability change is approved. The grid may be visually subdued or removed only if snapping and navigation behavior are explicitly retained or intentionally revised under tests.
 
 ### Application behavior invariants
@@ -70,7 +73,7 @@ The following are non-negotiable.
 - Do not introduce React, Vue, Angular, another UI framework, or a parallel component/runtime abstraction.
 - Do not change the responsive drawer or resize implementation until it is covered by regression tests.
 - Do not perform unrelated code cleanup while implementing the visual refactor.
-- Production HTML, UI TypeScript, and shell CSS may change only within the active information-architecture phase. Blockly definitions, block colors, renderer geometry, language semantics, and unrelated panels remain out of scope.
+- Production HTML, UI TypeScript, shell CSS, block colors, and renderer code may change only within the explicitly active refactor phase. Renderer geometry, language semantics, and unrelated panels remain out of scope unless separately approved and tested.
 
 ## 3. Stable elements and selectors
 
@@ -323,7 +326,7 @@ The completed refactor is accepted only when all of the following are true.
 - Code, Types, and Outline remain the only inspector views. Problems, Output, and Semantics remain the only primary bottom views; Call-by-Structure, Call-by-Value, CESK, A vs B, and Rewrite remain available and functional as Semantics leaf views.
 - CESK, comparison, rewrite, GC, arrangement, re-run, Back, Step, Play/Pause, stale-state, output mirroring, and panel maximization behaviors are preserved.
 - Screenshot download remains available.
-- `bmj-thrasos`, all block definitions/checks, connector shapes, renderer alignment, parser/generator/type/semantic behavior, and serialized workspace compatibility remain unchanged unless separately approved and tested.
+- `bmj-thrasos`, all block structures/checks, connector shapes, renderer alignment, parser/generator/type/semantic behavior, and serialized workspace compatibility remain unchanged unless separately approved and tested. The approved block-color phase may change only renderer theme styles and the explicit block-to-color-family mapping.
 
 ### Compatibility and accessibility
 

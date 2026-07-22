@@ -47,22 +47,11 @@
     </svg>
     <div id="app" class="app-shell" data-ide-region="shell">
       <header class="app-header" data-ide-region="application-header" aria-label="Application header">
-        <div class="brand-zone">
-          <a class="brand-banner" href="#" aria-label="Block-MiniJava">
-            <img src="assets/images/only-logo.png" alt="" />
-            <h1 class="brand-name">Block-MiniJava</h1>
-          </a>
-          <div class="project-status">
-            <div class="project-name">Project.java</div>
-            <div class="project-context">Block program</div>
-          </div>
-        </div>
-
         <div class="header-command-zone">
           <nav id="main-menu" class="main-menu ide-command-toolbar" data-ide-region="command-toolbar" aria-label="Main menu">
             <div class="global-menu">
               <button id="file-menu-button" class="menu-button global-menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="file-menu">
-                <span class="menu-label">File</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+                <svg class="app-icon" aria-hidden="true"><use href="#icon-open" /></svg><span class="menu-label">File</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
               </button>
               <div id="file-menu" class="global-menu-panel" role="menu" aria-label="File" hidden>
                 <button id="new-workspace" class="global-menu-item" type="button" role="menuitem" title="New workspace">
@@ -86,14 +75,14 @@
 
             <div class="examples-menu-wrapper global-menu">
               <button id="examples-button" class="menu-button" type="button" title="Load an example program" aria-haspopup="menu" aria-expanded="false" aria-controls="examples-panel">
-                <span class="menu-label">Examples</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+                <svg class="app-icon" aria-hidden="true"><use href="#icon-examples" /></svg><span class="menu-label">Examples</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
               </button>
               <div id="examples-panel" class="examples-panel" role="menu" aria-label="Example programs"></div>
             </div>
 
             <div class="global-menu">
               <button id="view-menu-button" class="menu-button global-menu-trigger" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="view-menu">
-                <span class="menu-label">View</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+                <svg class="app-icon" aria-hidden="true"><use href="#icon-arrange" /></svg><span class="menu-label">View</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
               </button>
               <div id="view-menu" class="global-menu-panel global-menu-panel-end" role="dialog" aria-label="View settings" hidden>
                 <button id="view-toggle-sidebar" class="global-menu-item" type="button" aria-pressed="true">
@@ -133,7 +122,7 @@
 
             <div class="global-menu">
               <button id="more-menu-button" class="menu-button global-menu-trigger" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="more-menu">
-                <span class="menu-label">More</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
+                <svg class="app-icon" aria-hidden="true"><use href="#icon-menu" /></svg><span class="menu-label">More</span><svg class="app-icon menu-caret" aria-hidden="true"><use href="#icon-chevron-down" /></svg>
               </button>
               <div id="more-menu" class="global-menu-panel global-menu-panel-end" role="menu" aria-label="More" hidden>
                 <button id="command-palette-trigger" class="global-menu-item" type="button" role="menuitem" aria-haspopup="dialog" aria-controls="command-palette-overlay" title="Open Command Palette (Ctrl+Shift+P)">
@@ -148,6 +137,13 @@
           <button id="menu-toggle" class="menu-button hamburger menu-toggle-button" type="button" aria-label="Toggle menu" aria-controls="main-menu" aria-expanded="false" title="Menu">
             <svg class="app-icon icon icon-menu" aria-hidden="true"><use href="#icon-menu" /></svg><span class="menu-label">Menu</span>
           </button>
+        </div>
+
+        <div class="brand-zone">
+          <a class="brand-banner" href="#" aria-label="Block-MiniJava">
+            <img src="assets/images/only-logo.png" alt="" />
+            <h1 class="brand-name">Block-MiniJava</h1>
+          </a>
         </div>
 
         <input id="load-file-input" type="file" accept=".bml,.json,.java,.txt,application/json,text/x-java-source,text/plain" hidden />
@@ -415,6 +411,7 @@
 
       <footer class="workspace-footer ide-status-bar" data-ide-region="status-bar" aria-label="IDE status">
         <div class="status-group">
+          <span id="status-file-name" class="status-item status-file-name" aria-label="Current file: Project.java" title="Project.java">Project.java</span>
           <span class="status-item status-block-count-item"><svg class="app-icon status-icon" aria-hidden="true"><use href="#icon-blocks" /></svg><span id="status-block-count">0 blocks</span></span>
           <button id="status-problems-button" class="status-item status-button" type="button" title="Show Problems"><svg class="app-icon status-icon status-problem-icon" aria-hidden="true"><use href="#icon-problems" /></svg><span id="status-problems-count">0 Problems</span></button>
         </div>

@@ -41,7 +41,11 @@ test('loads without uncaught browser errors and has no duplicate IDs', async ({ 
 test('header menus and compact status preserve global command reachability', async ({ page }) => {
   const errors = await openFreshApp(page);
   await expect(page.locator('.brand-name')).toHaveText('Block-MiniJava');
-  await expect(page.locator('.project-name')).toBeVisible();
+  await expect(page.locator('.project-name')).toHaveCount(0);
+  await expect(page.locator('#status-file-name')).toHaveText('Project.java');
+  const menuBounds = await page.locator('#main-menu').boundingBox();
+  const brandBounds = await page.locator('.brand-zone').boundingBox();
+  expect(menuBounds?.x).toBeLessThan(brandBounds?.x || Number.POSITIVE_INFINITY);
   for (const label of ['File', 'Examples', 'View', 'More']) {
     await expect(page.getByRole('button', { name: new RegExp(`^${label}`) }).first()).toBeVisible();
   }
@@ -64,6 +68,10 @@ test('header menus and compact status preserve global command reachability', asy
   await page.keyboard.press('Escape');
 
   await openHeaderMenu(page, 'view');
+  const viewMenuBounds = await page.locator('#view-menu').boundingBox();
+  const viewport = page.viewportSize();
+  expect(viewMenuBounds?.x).toBeGreaterThanOrEqual(0);
+  expect((viewMenuBounds?.x || 0) + (viewMenuBounds?.width || 0)).toBeLessThanOrEqual(viewport?.width || Number.POSITIVE_INFINITY);
   for (const id of ['view-toggle-sidebar', 'view-toggle-inspector', 'top-toggle-bottom-panel', 'perspective-select', 'theme-toggle', 'autosave-interval']) {
     await expect(page.locator(`#${id}`)).toBeVisible();
   }
@@ -202,6 +210,7 @@ test('grammatical block families integrate with both themes and preserve Blockly
   await page.locator('#examples-panel [role="menuitem"]').filter({ hasText: 'Simple Sum' }).click();
   await page.locator('#example-load-modal button[value="replace"]').click();
   await expect(page.locator('#loaded-file-label')).toContainText('Simple Sum.bml');
+  await expect(page.locator('#status-file-name')).toContainText('Simple Sum.bml');
 
   const blockColors = () => page.evaluate(() => {
     const workspace = (window as any).Blockly.getMainWorkspace();
@@ -620,6 +629,9 @@ test('mobile sidebar and inspector drawers open and close with their scrims', as
   await expect(page.locator('#header-run-program')).toHaveCount(0);
   await page.locator('#view-menu-button').click();
   await expect(page.locator('#view-menu')).toBeVisible();
+  const compactViewMenuBounds = await page.locator('#view-menu').boundingBox();
+  expect(compactViewMenuBounds?.x).toBeGreaterThanOrEqual(0);
+  expect((compactViewMenuBounds?.x || 0) + (compactViewMenuBounds?.width || 0)).toBeLessThanOrEqual(390);
   await page.keyboard.press('Escape');
   await expect(page.locator('#view-menu-button')).toBeFocused();
   await page.keyboard.press('Escape');

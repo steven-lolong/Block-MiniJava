@@ -359,7 +359,7 @@ select:focus-visible,
   z-index: var(--layer-header);
   min-height: var(--panel-header-height);
   height: var(--panel-header-height);
-  grid-template-columns: minmax(250px, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-4);
   padding: 0 var(--space-4);
   border-bottom: 1px solid var(--border-default);
@@ -374,6 +374,7 @@ select:focus-visible,
   min-width: 0;
   gap: var(--space-4);
   height: 100%;
+  justify-self: end;
 }
 
 .brand-banner {
@@ -400,29 +401,6 @@ select:focus-visible,
   letter-spacing: 0.01em;
 }
 
-.project-status {
-  min-width: 0;
-  padding-left: 9px;
-  border-left: 1px solid var(--border-default);
-  line-height: 1.15;
-}
-
-.project-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 112px;
-  color: var(--text-primary);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-}
-
-.project-context {
-  margin-top: var(--space-1);
-  color: var(--text-secondary);
-  font-size: var(--font-size-xs);
-}
-
 kbd {
   border: 1px solid var(--border-strong);
   border-radius: 3px;
@@ -437,7 +415,7 @@ kbd {
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: var(--space-3);
 }
 
@@ -485,6 +463,16 @@ kbd {
 .global-menu-panel-end {
   right: 0;
   left: auto;
+}
+
+/* The header menu now starts at the left edge. Align the View settings panel
+ * from its trigger's left edge so its wider contents never extend past the
+ * viewport's left side. Compact menus use their fixed drawer positioning. */
+@media (min-width: 901px) {
+  #view-menu {
+    right: auto;
+    left: 0;
+  }
 }
 
 .global-menu-item {
@@ -1693,6 +1681,12 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   color: var(--state-error);
 }
 
+.status-file-name {
+  max-width: min(24vw, 280px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .autosave-status {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1893,7 +1887,7 @@ body.bottom-maximized .viz-dock[data-open="true"] {
 /* Keep the primary global menu labels visible on standard laptop widths. */
 @media (max-width: 1480px) {
   .app-header {
-    grid-template-columns: minmax(220px, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
   }
 }
 
@@ -2008,10 +2002,6 @@ body.bottom-maximized .viz-dock[data-open="true"] {
     padding: 0 var(--space-3);
   }
 
-  .project-status {
-    display: none;
-  }
-
   .brand-banner img {
     width: 25px;
     height: 25px;
@@ -2028,7 +2018,7 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   .main-menu {
     position: absolute;
     top: calc(100% + 1px);
-    right: 6px;
+    left: 6px;
     width: min(360px, calc(100vw - 12px));
     display: none;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2190,6 +2180,10 @@ body.bottom-maximized .viz-dock[data-open="true"] {
 
   .autosave-status {
     max-width: 42vw;
+  }
+
+  .status-file-name {
+    max-width: 25vw;
   }
 
   .command-palette-overlay {

@@ -74,7 +74,7 @@ Static IDs such as `activity-blocks`, `activity-search`, `tab-code`, `tab-typing
 | `.sidebar-view[data-activity-view]` | Blocks/search toolbox host | Must preserve exactly |
 | `.inspector-tab`, `.inspector-panel` | Bind tabs, manage roving focus, activate panel | Must preserve exactly |
 | `.ide-layout` | Measure available layout during inspector resize | Must preserve exactly |
-| `.project-name` | Mirror loaded filename into header identity | May move but must retain identity |
+| `#status-file-name` | Mirror loaded filename into the status bar | Must preserve ID, accessible name, and project-label observer updates |
 | `.toolbar-glyph` | Change maximize/restore glyph | May rename after updating references and tests |
 | `.icon`, `.menu-label` | Change compact-menu icon/label when present | May rename after updating references and tests |
 | `.code-view` | Code editor installation host | Must preserve exactly |

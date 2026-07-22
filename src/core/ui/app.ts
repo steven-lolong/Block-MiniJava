@@ -202,8 +202,11 @@ function storedBoolean(key: string, fallback: boolean): boolean {
 
 function updateProjectIdentity(): void {
   const fileLabel = byId<HTMLDivElement>('loaded-file-label').textContent?.trim();
-  const projectName = document.querySelector<HTMLElement>('.project-name');
-  if (projectName) projectName.textContent = fileLabel || 'Project.java';
+  const projectName = fileLabel || 'Project.java';
+  const statusFileName = byId<HTMLElement>('status-file-name');
+  statusFileName.textContent = projectName;
+  statusFileName.title = projectName;
+  statusFileName.setAttribute('aria-label', `Current file: ${projectName}`);
 }
 
 function workspaceFileDisplayName(): string {

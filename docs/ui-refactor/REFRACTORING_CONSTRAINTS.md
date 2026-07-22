@@ -226,7 +226,7 @@ The stylesheet chain is now separated by responsibility: `tokens.css`, `workbenc
 - At 1260 px and below: docked sidebar/inspector widths are capped and the workspace icon is hidden.
 - At 1100 px and below: the left sidebar and right inspector become absolute-positioned drawers over the workspace. Side resizers are disabled and removed from keyboard navigation. `mobile-sidebar-open` and `mobile-code-open` control drawer display; `sidebar-scrim`, `code-scrim`, and Escape close only those transient states and restore focus to the opener. Persistent visibility (`toolbox-hidden`/`code-hidden`) remains distinct from transient drawer-open state. The inspector drawer must remain above its own scrim.
 - When a Problem is located at drawer widths, the sidebar closes so the selected block is visible.
-- At 900 px and below: the perspective picker and project context are hidden, the command center becomes icon-only, and header actions move into the `main-menu.menu-open` hamburger surface.
+- At 900 px and below: the perspective picker is hidden, the command center becomes icon-only, and header actions move into the `main-menu.menu-open` hamburger surface. The current file remains available in the status bar.
 - At 700 px and below: workspace controls compact into 44 px minimum touch targets, the bottom panel becomes a fixed drawer above the status bar, both bottom tab rows retain their visible domain labels and scroll horizontally when needed, status content reduces, and the initial workspace zooms to fit after startup.
 - At 480 px and below: header/status/zoom controls compact further and the menu becomes one column.
 - At 920 px and below, stepper and comparison columns stack to one column.

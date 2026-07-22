@@ -40,12 +40,12 @@ test('loads without uncaught browser errors and has no duplicate IDs', async ({ 
 
 test('header menus and compact status preserve global command reachability', async ({ page }) => {
   const errors = await openFreshApp(page);
-  await expect(page.locator('.brand-name')).toHaveText('Block-MiniJava');
+  await expect(page.locator('.brand-name')).toHaveText('B-MJ');
   await expect(page.locator('.project-name')).toHaveCount(0);
   await expect(page.locator('#status-file-name')).toHaveText('Project.java');
   const menuBounds = await page.locator('#main-menu').boundingBox();
   const brandBounds = await page.locator('.brand-zone').boundingBox();
-  expect(menuBounds?.x).toBeLessThan(brandBounds?.x || Number.POSITIVE_INFINITY);
+  expect(brandBounds?.x).toBeLessThan(menuBounds?.x || Number.POSITIVE_INFINITY);
   for (const label of ['File', 'Examples', 'View', 'More']) {
     await expect(page.getByRole('button', { name: new RegExp(`^${label}`) }).first()).toBeVisible();
   }

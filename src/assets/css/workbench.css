@@ -374,7 +374,7 @@ select:focus-visible,
   min-width: 0;
   gap: var(--space-4);
   height: 100%;
-  justify-self: end;
+  justify-self: start;
 }
 
 .brand-banner {
@@ -1995,7 +1995,7 @@ body.bottom-maximized .viz-dock[data-open="true"] {
   .app-header {
     position: relative;
     top: auto;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     min-height: var(--panel-header-height);
     height: var(--panel-header-height);
     gap: 5px;

@@ -1416,7 +1416,7 @@ function initCommandPalette(): void {
     { id: 'perspective.types', category: 'Perspective', label: 'Switch to Type Analysis Perspective', run: () => applyPerspective('types') },
     { id: 'perspective.presentation', category: 'Perspective', label: 'Switch to Presentation Perspective', run: () => applyPerspective('presentation') },
     { id: 'theme.toggle', category: 'Preferences', label: 'Toggle Color Theme', run: () => applyTheme(currentTheme === 'dark' ? 'light' : 'dark') },
-    { id: 'help.about', category: 'Help', label: 'About Block-MiniJava', run: openAboutDialog }
+    { id: 'help.about', category: 'Help', label: 'About B-MJ', run: openAboutDialog }
   ];
   installCommandPalette(commands);
 }

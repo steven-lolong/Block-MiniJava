@@ -424,6 +424,7 @@
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -776,6 +777,7 @@ body[data-theme="light"] .stepper-arrowhead {
   width: 100%;
   border-collapse: collapse;
   font: var(--font-size-md)/var(--line-height-relaxed) var(--font-family-code);
+  font-variant-numeric: tabular-nums;
 }
 
 .stepper-locals td {
@@ -803,6 +805,7 @@ body[data-theme="light"] .stepper-arrowhead {
   background: hsl(var(--loc-hue) 62% 34%);
   color: var(--text-on-state);
   font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
 

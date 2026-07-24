@@ -16,6 +16,7 @@ import {
 } from '../semantics/minijavaSubstitution';
 import { injectMachine, step as machineStep } from '../semantics/minijavaMachine';
 import { mirrorProgramOutput } from './programConsole';
+import { bindDockStepKeys } from './dockKeyboard';
 
 const PLAY_INTERVAL_MS = 700;
 const MAX_HISTORY = 2000;
@@ -156,11 +157,36 @@ function renderStatus(): void {
   corr.textContent = agreement;
 }
 
+const STEP_TITLE = 'One rewrite step (→ / .)';
+const PLAY_TITLE = 'Rewrite automatically (Space)';
+const BACK_TITLE = 'Undo one rewrite (← / ,)';
+
+/** Why Step/Play can't fire right now — shown as their disabled title
+ * (interaction contract, brief §5: a disabled control states its reason). */
+function stepDisabledReason(): string {
+  if (!current) return 'Press Load to build the rewrite tree first';
+  if (stale) return 'Program changed — press Reload';
+  if (current.status === 'error') return 'Stuck — press Back or Reload';
+  if (current.status === 'done') return 'Finished — nothing left to rewrite';
+  return STEP_TITLE;
+}
+
 function renderButtons(): void {
   const canStep = !!current && !stale && current.status === 'running';
-  byId<HTMLButtonElement>('subst-step').disabled = !canStep;
-  byId<HTMLButtonElement>('subst-play').disabled = !canStep && playTimer === null;
-  byId<HTMLButtonElement>('subst-back').disabled = history.length === 0 || stale;
+  const stepButton = byId<HTMLButtonElement>('subst-step');
+  const playButton = byId<HTMLButtonElement>('subst-play');
+  const backButton = byId<HTMLButtonElement>('subst-back');
+
+  stepButton.disabled = !canStep;
+  stepButton.title = canStep ? STEP_TITLE : stepDisabledReason();
+
+  const canPlay = canStep || playTimer !== null;
+  playButton.disabled = !canPlay;
+  playButton.title = canPlay ? PLAY_TITLE : stepDisabledReason();
+
+  const canBack = history.length > 0 && !stale;
+  backButton.disabled = !canBack;
+  backButton.title = canBack ? BACK_TITLE : 'At the start — no earlier rewrite to return to';
 }
 
 function renderTree(): void {
@@ -289,6 +315,12 @@ export function initSubstPanel(getter: GetWorkspace): void {
   byId<HTMLButtonElement>('subst-step').addEventListener('click', stepOnce);
   byId<HTMLButtonElement>('subst-back').addEventListener('click', stepBack);
   byId<HTMLButtonElement>('subst-play').addEventListener('click', togglePlay);
+  bindDockStepKeys(byId<HTMLElement>('viz-dock'), 'subst', {
+    load: loadSubstitution,
+    step: stepOnce,
+    back: stepBack,
+    togglePlay
+  });
   attachWorkspaceListener();
   renderStatus();
   renderButtons();

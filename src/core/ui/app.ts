@@ -78,12 +78,18 @@ type Perspective = 'edit' | 'debug' | 'types' | 'presentation' | 'custom';
 const ACTIVITY_KINDS: ActivityKind[] = ['blocks', 'search'];
 const PERSPECTIVES: Perspective[] = ['edit', 'debug', 'types', 'presentation', 'custom'];
 
+// One representative icon per grammar category, distinct from the block-item
+// icon below it and from unrelated semantics-tab icons (structure/value/
+// rewrite already mean "Call-by-Structure"/"Call-by-Value"/substitution
+// rewriter elsewhere in the dock — reusing them here would say two different
+// things with one glyph). Values keeps the diamond deliberately: a literal is
+// a value, so the overlap with Call-by-Value's icon is apt, not accidental.
 const CATEGORY_ICON: Record<string, string> = {
-  program: 'blocks',
-  declarations: 'structure',
-  types: 'code',
-  statements: 'structure',
-  expressions: 'rewrite',
+  program: 'cat-program',
+  declarations: 'cat-declaration',
+  types: 'cat-type',
+  statements: 'cat-statement',
+  expressions: 'cat-expression',
   values: 'value'
 };
 

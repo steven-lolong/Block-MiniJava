@@ -20,6 +20,7 @@ import {
   type MachineValue
 } from '../semantics/minijavaMachine';
 import { mirrorProgramOutput } from './programConsole';
+import { bindDockStepKeys } from './dockKeyboard';
 
 const PLAY_INTERVAL_MS = 600;
 const MAX_HISTORY = 5000;
@@ -45,12 +46,48 @@ function locHue(loc: number): number {
   return (loc * 67) % 360;
 }
 
+/** Scrolls Model A's heap panel to a box and flashes it — the same affordance
+ * the CESK tab gives its Ref chips (audit U7: a chip must mean the same thing
+ * in every stepper). */
+function revealHeapBox(loc: number): void {
+  const box = document.querySelector<HTMLElement>(`#compare-heap-a .stepper-heap-box[data-heap-loc="${loc}"]`);
+  if (!box) return;
+  box.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  box.classList.remove('is-changed');
+  void box.offsetWidth; // restart the flash animation
+  box.classList.add('is-changed');
+}
+
+/** Selects and centers a program block in the main workspace — mirrors
+ * stepperPanel's locateProvenance so a frame/heap row means the same thing
+ * in both tabs. */
+function locateProvenance(blockId: string | null): void {
+  if (!blockId || stale) return;
+  const ws = getWorkspace();
+  if (!ws) return;
+  const block = ws.getBlockById(blockId) as Blockly.BlockSvg | null;
+  if (!block) return;
+  ws.centerOnBlock(blockId);
+  Blockly.common.setSelected(block);
+}
+
 function valueChip(value: MachineValue): HTMLElement {
   const chip = document.createElement('span');
   if (value.tag === 'Ref') {
     chip.className = 'stepper-ref';
     chip.style.setProperty('--loc-hue', String(locHue(value.loc)));
+    chip.dataset.refLoc = String(value.loc);
     chip.textContent = `#${value.loc}`;
+    chip.title = 'Show heap object #' + value.loc;
+    chip.tabIndex = 0;
+    chip.setAttribute('role', 'button');
+    chip.addEventListener('click', () => revealHeapBox(value.loc));
+    chip.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        revealHeapBox(value.loc);
+      }
+    });
   } else if (value.tag === 'Obj' || value.tag === 'Arr') {
     chip.className = 'stepper-struct';
     chip.textContent = formatMachineValue(value);
@@ -155,7 +192,11 @@ function renderFrames(hostId: string, state: MachineState | null): void {
     const title = document.createElement('div');
     title.className = 'stepper-frame-title';
     const name = document.createElement('span');
+    name.className = 'stepper-provenance';
     name.textContent = frame.method;
+    name.title = frame.callBlockId ? 'Show the call that pushed this frame' : 'Show the main class block';
+    const provenanceId = frame.callBlockId ?? frame.blockId;
+    name.addEventListener('click', () => locateProvenance(provenanceId));
     title.appendChild(name);
     card.appendChild(title);
 
@@ -183,7 +224,7 @@ function renderHeap(state: MachineState | null): void {
   host.innerHTML = '';
   if (!state) return;
   if (state.heap.size === 0) {
-    host.appendChild(hint('empty'));
+    host.appendChild(hint('No heap yet — Model A allocates a cell on the first new.'));
     return;
   }
   const effect = state.lastEffect;
@@ -191,14 +232,17 @@ function renderHeap(state: MachineState | null): void {
     const box = document.createElement('div');
     box.className = 'stepper-heap-box';
     box.style.setProperty('--loc-hue', String(locHue(loc)));
+    box.dataset.heapLoc = String(loc);
     if (effect?.kind === 'new' && effect.loc === loc) box.classList.add('is-changed');
     if ((effect?.kind === 'field-write' || effect?.kind === 'arr-write') && effect.loc === loc) {
       box.classList.add('is-write-target');
     }
 
     const title = document.createElement('div');
-    title.className = 'stepper-heap-title';
+    title.className = 'stepper-heap-title stepper-provenance';
     title.textContent = obj.tag === 'Obj' ? `#${loc} · ${obj.className}` : `#${loc} · int[${obj.elems.length}]`;
+    title.title = 'Show the new block that allocated this object';
+    title.addEventListener('click', () => locateProvenance(obj.blockId));
     box.appendChild(title);
 
     const table = document.createElement('table');
@@ -250,11 +294,34 @@ function renderStatus(): void {
   status.textContent = `lockstep · ${history.length} step(s)`;
 }
 
+const STEP_TITLE = 'One step on both machines (→ / .)';
+const PLAY_TITLE = 'Step both automatically (Space)';
+const BACK_TITLE = 'Undo one lockstep step (← / ,)';
+
+/** Why Step/Play can't fire right now (interaction contract, brief §5). */
+function stepDisabledReason(): string {
+  if (!stateA || !stateB) return 'Press Load to build both machines first';
+  if (stale) return 'Program changed — press Reload';
+  if (stateA.status !== 'running' && stateB.status !== 'running') return 'Both finished — nothing left to step';
+  return STEP_TITLE;
+}
+
 function renderButtons(): void {
   const canStep = !stale && !!stateA && !!stateB && (stateA.status === 'running' || stateB.status === 'running');
-  byId<HTMLButtonElement>('compare-step').disabled = !canStep;
-  byId<HTMLButtonElement>('compare-play').disabled = !canStep && playTimer === null;
-  byId<HTMLButtonElement>('compare-back').disabled = history.length === 0 || stale;
+  const stepButton = byId<HTMLButtonElement>('compare-step');
+  const playButton = byId<HTMLButtonElement>('compare-play');
+  const backButton = byId<HTMLButtonElement>('compare-back');
+
+  stepButton.disabled = !canStep;
+  stepButton.title = canStep ? STEP_TITLE : stepDisabledReason();
+
+  const canPlay = canStep || playTimer !== null;
+  playButton.disabled = !canPlay;
+  playButton.title = canPlay ? PLAY_TITLE : stepDisabledReason();
+
+  const canBack = history.length > 0 && !stale;
+  backButton.disabled = !canBack;
+  backButton.title = canBack ? BACK_TITLE : 'At the start — no earlier step to return to';
 }
 
 function renderAll(): void {
@@ -359,6 +426,12 @@ export function initComparePanel(getter: GetWorkspace): void {
   byId<HTMLButtonElement>('compare-step').addEventListener('click', stepBoth);
   byId<HTMLButtonElement>('compare-back').addEventListener('click', stepBack);
   byId<HTMLButtonElement>('compare-play').addEventListener('click', togglePlay);
+  bindDockStepKeys(byId<HTMLElement>('viz-dock'), 'compare', {
+    load: loadBoth,
+    step: stepBoth,
+    back: stepBack,
+    togglePlay
+  });
   attachWorkspaceListener();
   renderAll();
 }

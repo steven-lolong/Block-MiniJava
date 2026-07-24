@@ -31,7 +31,8 @@ class Counter {
 
 const ids = ['stepper-control', 'stepper-frames', 'stepper-heap', 'stepper-kont'];
 document.body.innerHTML =
-  `<button id="stepper-load"></button><button id="stepper-back"></button>
+  `<div id="viz-dock"><div class="viz-host" data-kind="machine" aria-hidden="true"></div></div>
+   <button id="stepper-load"></button><button id="stepper-back"></button>
    <button id="stepper-step"></button><button id="stepper-play"></button>
    <button id="stepper-gc"></button>
    <input id="stepper-gc-auto-enabled" type="checkbox" /><input id="stepper-gc-threshold" type="number" value="50" />

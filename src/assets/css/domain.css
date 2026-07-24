@@ -424,6 +424,7 @@
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -670,17 +671,38 @@ body[data-theme="light"] .stepper-arrowhead {
   }
 }
 
-/* GC sweep: literally greyed out and faded, then the box disappears on the
+/* GC survivor: the reachable/retired pair (design brief §1 roles 5-6). Mark
+   phase already said "the collector touched this" in copper; a surviving
+   object gets its own signal here in --state-success green — "proven
+   reachable" — so a student can tell "collector looked at it" apart from
+   "collector confirmed it's still needed." */
+
+.stepper-heap-box.is-gc-survived {
+  animation: stepper-gc-survive-glow 700ms ease-out;
+}
+
+@keyframes stepper-gc-survive-glow {
+  from {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-success) 55%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* GC sweep: greyed out, faded, and tinted with --state-retired (the address
+   is gone for good — retired, never reused), then the box disappears on the
    next full render once the swept heap is committed. Duration must match
    GC_SWEEP_FADE_MS in stepperPanel.ts — that's when the commit actually
    happens, so a mismatch would either cut the fade short or hold on an
    already-committed empty state. */
 
 .stepper-heap-box.is-gc-swept {
-  transition: opacity 450ms ease-in, filter 450ms ease-in, transform 450ms ease-in;
+  transition: opacity 450ms ease-in, filter 450ms ease-in, transform 450ms ease-in, border-color 450ms ease-in;
   opacity: 0.15;
   filter: grayscale(1);
   transform: scale(0.94);
+  border-color: var(--state-retired);
 }
 
 .stepper-panel {
@@ -755,6 +777,7 @@ body[data-theme="light"] .stepper-arrowhead {
   width: 100%;
   border-collapse: collapse;
   font: var(--font-size-md)/var(--line-height-relaxed) var(--font-family-code);
+  font-variant-numeric: tabular-nums;
 }
 
 .stepper-locals td {
@@ -782,6 +805,7 @@ body[data-theme="light"] .stepper-arrowhead {
   background: hsl(var(--loc-hue) 62% 34%);
   color: var(--text-on-state);
   font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
 
@@ -835,6 +859,43 @@ body[data-theme="light"] .stepper-ref {
   to {
     background-color: transparent;
   }
+}
+
+/* Persistent change marker (audit U11): the flash above fades to nothing in
+   700ms, but "which slot changed on the last step" should survive longer
+   than that — e.g. while paused looking at the state. A gutter dot in the
+   same mutation-gold holds for as long as the row stays the last-effect row,
+   i.e. until the next step moves it. */
+.stepper-locals tr.is-changed td:first-child {
+  position: relative;
+}
+
+.stepper-locals tr.is-changed td:first-child::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--state-warning);
+  transform: translateY(-50%);
+}
+
+/* Bidirectional linking (audit U4). Selecting a program block highlights the
+   machine rows whose provenance is that block; hovering a Ref chip or heap
+   box emphasizes every element sharing its address. Both ride the same
+   per-Loc hue the arrows already use, so "linked" reads as "more of the same
+   color," not an unrelated highlight language. */
+.is-linked-from-block {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+  border-radius: var(--radius-control);
+}
+
+.is-loc-emphasized {
+  outline: 2px solid hsl(var(--loc-hue) 70% 60%);
+  outline-offset: 1px;
 }
 
 /* -- Rewrite (substitution) view -------------------------------------------- */
@@ -914,5 +975,39 @@ body[data-theme="light"] .stepper-ref {
 
   .stepper-panel-body {
     overflow: visible;
+  }
+}
+
+/* Motion policy, reduced-motion branch (design brief §4). workbench.css's
+   blanket rule collapses every animation/transition to ~0ms — correct for a
+   plain `transition` (the swept-cell fade simply jumps to its end state and
+   holds it, which already reads as "instant grey then gone") but wrong for a
+   `@keyframes` animation with the default fill-mode: those revert to the
+   un-animated base style the instant they finish, so a 700ms glow collapsed
+   to 0.01ms is not "instant" — it is invisible, erasing exactly the signal
+   these exist for. Each glow gets its held (non-animated) end state here
+   instead, so the semantic content survives even though the motion doesn't. */
+@media (prefers-reduced-motion: reduce) {
+  .stepper-arrow.is-pulse {
+    animation: none;
+  }
+
+  .is-changed {
+    animation: none;
+  }
+
+  .stepper-heap-box.is-write-target {
+    animation: none;
+    box-shadow: 0 0 0 3px hsl(var(--loc-hue) 60% 52% / 0.55);
+  }
+
+  .stepper-heap-box.is-gc-marked {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-execution-strong) 65%, transparent);
+  }
+
+  .stepper-heap-box.is-gc-survived {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-success) 55%, transparent);
   }
 }

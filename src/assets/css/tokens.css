@@ -122,14 +122,24 @@ body[data-theme="dark"] {
   --state-error: #f05d5e;
   --state-info: #58a6ff;
   --state-execution-strong: #ee9b6c;
+  /* Reachable is --state-success itself (the mark phase proving a cell live is
+     a positive result, not a distinct hue). Retired is its own token: an
+     address that will never be reused again, once the sweep removes it. */
+  --state-retired: #5b636f;
 
-  /* Broad grammar colors shared by the custom toolbox and Blockly theme. */
+  /* Broad grammar colors shared by the custom toolbox and Blockly theme.
+     Canonical values are authored in src/core/renderer/theme.ts
+     (MINI_JAVA_BLOCK_PALETTES) — Blockly paints block SVGs from that object,
+     not from CSS custom properties. These seven are the CSS mirror consumed
+     by the HTML toolbox category swatches (workbench.css); test/run_block_colors.js
+     asserts the two never drift apart. */
   --grammar-structure: #80505a;
   --grammar-declaration: #685b7a;
   --grammar-type: #3d6d5a;
   --grammar-statement: #80602f;
   --grammar-expression: #455f7f;
   --grammar-value: #5c713e;
+  --grammar-runtime: #585e68;
 
   /* Generated-code syntax is semantic and independent from Blockly colors. */
   --syntax-keyword: #ff9d76;
@@ -171,6 +181,7 @@ body[data-theme="light"] {
   --state-error: #c73f43;
   --state-info: #256cb7;
   --state-execution-strong: #934925;
+  --state-retired: #8a929c;
 
   --grammar-structure: #754650;
   --grammar-declaration: #5e5074;
@@ -178,6 +189,7 @@ body[data-theme="light"] {
   --grammar-statement: #75552a;
   --grammar-expression: #3a5878;
   --grammar-value: #526638;
+  --grammar-runtime: #515761;
 
   --syntax-keyword: #a54c2e;
   --syntax-type: #08766d;

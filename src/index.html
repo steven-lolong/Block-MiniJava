@@ -315,11 +315,11 @@
                 <div class="viz-host viz-host-machine" data-kind="machine">
               <div class="stepper-layout">
                 <div class="stepper-controls" aria-label="Stepper controls">
-                  <button id="stepper-load" class="stepper-button is-primary" type="button" title="Build the machine from the current blocks">Load</button>
-                  <button id="stepper-back" class="stepper-button" type="button" title="Undo one machine step">Back</button>
-                  <button id="stepper-step" class="stepper-button" type="button" title="One machine step">Step</button>
-                  <button id="stepper-play" class="stepper-button" type="button" title="Step automatically">Play</button>
-                  <button id="stepper-gc" class="stepper-button" type="button" title="Mark and sweep the heap now">Run GC</button>
+                  <button id="stepper-load" class="stepper-button is-primary" type="button" title="Build the machine from the current blocks (R)">Load</button>
+                  <button id="stepper-back" class="stepper-button" type="button" title="Undo one machine step (← / ,)">Back</button>
+                  <button id="stepper-step" class="stepper-button" type="button" title="One machine step (→ / .)">Step</button>
+                  <button id="stepper-play" class="stepper-button" type="button" title="Step automatically (Space)">Play</button>
+                  <button id="stepper-gc" class="stepper-button" type="button" title="Mark and sweep the heap now (G)">Run GC</button>
                   <label class="stepper-gc-auto" title="Automatically run GC after an allocation once the heap exceeds this many objects">
                     <input id="stepper-gc-auto-enabled" type="checkbox" />
                     Auto GC over
@@ -356,10 +356,10 @@
                 <div class="viz-host viz-host-machine" data-kind="compare">
               <div class="stepper-layout">
                 <div class="stepper-controls" aria-label="Lockstep stepper controls">
-                  <button id="compare-load" class="stepper-button is-primary" type="button" title="Build both machines from the current blocks">Load</button>
-                  <button id="compare-back" class="stepper-button" type="button" title="Undo one lockstep step">Back</button>
-                  <button id="compare-step" class="stepper-button" type="button" title="One step on both machines">Step</button>
-                  <button id="compare-play" class="stepper-button" type="button" title="Step both automatically">Play</button>
+                  <button id="compare-load" class="stepper-button is-primary" type="button" title="Build both machines from the current blocks (R)">Load</button>
+                  <button id="compare-back" class="stepper-button" type="button" title="Undo one lockstep step (← / ,)">Back</button>
+                  <button id="compare-step" class="stepper-button" type="button" title="One step on both machines (→ / .)">Step</button>
+                  <button id="compare-play" class="stepper-button" type="button" title="Step both automatically (Space)">Play</button>
                   <span id="compare-status" class="stepper-status" aria-live="polite"></span>
                 </div>
                 <div class="compare-columns">
@@ -391,10 +391,10 @@
                 <div class="viz-host viz-host-machine" data-kind="subst">
               <div class="stepper-layout">
                 <div class="stepper-controls" aria-label="Rewrite stepper controls">
-                  <button id="subst-load" class="stepper-button is-primary" type="button" title="Build the rewrite tree from the current blocks">Load</button>
-                  <button id="subst-back" class="stepper-button" type="button" title="Undo one rewrite">Back</button>
-                  <button id="subst-step" class="stepper-button" type="button" title="One rewrite step">Step</button>
-                  <button id="subst-play" class="stepper-button" type="button" title="Rewrite automatically">Play</button>
+                  <button id="subst-load" class="stepper-button is-primary" type="button" title="Build the rewrite tree from the current blocks (R)">Load</button>
+                  <button id="subst-back" class="stepper-button" type="button" title="Undo one rewrite (← / ,)">Back</button>
+                  <button id="subst-step" class="stepper-button" type="button" title="One rewrite step (→ / .)">Step</button>
+                  <button id="subst-play" class="stepper-button" type="button" title="Rewrite automatically (Space)">Play</button>
                   <span id="subst-correspondence" class="subst-correspondence" aria-live="polite"></span>
                   <span id="subst-status" class="stepper-status" aria-live="polite"></span>
                 </div>
@@ -446,8 +446,8 @@
           </button>
         </div>
         <div class="about-body">
-          <p>B-MJ combines grammar-aware blocks with editable MiniJava source, type information, program structure, diagnostics, and output.</p>
-          <p>Its semantic tools include Call-by-Structure, Call-by-Value, CESK execution, model comparison, rewrite semantics, and mark-and-sweep garbage collection. Workspaces use <code>.bml</code>; MiniJava source can be opened or exported.</p>
+          <p>B-MJ is a laboratory for Java's reference model. Build a MiniJava program as blocks, then step it on a heap machine to watch references, frames, and garbage collection as they happen.</p>
+          <p>Its steppers include Call-by-Structure, Call-by-Value, CESK execution, an A-vs-B model comparison, and a substitution rewriter. Workspaces use <code>.bml</code>; MiniJava source can be opened or exported.</p>
         </div>
         <div class="about-footer">
           <p>Copyright &copy; 2024-2026 <a href="https://l-workshop.my.id/" target="_blank">L-Workshop</a>. All rights reserved.</p>

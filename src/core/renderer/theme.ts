@@ -146,7 +146,16 @@ function categoryPalette(
   };
 }
 
-/** Restrained, theme-specific fills; white Blockly label text remains >= 4.5:1. */
+/**
+ * Restrained, theme-specific fills; white Blockly label text remains >= 4.5:1.
+ *
+ * Canonical source for these seven hexes — Blockly paints block SVGs straight
+ * from this object, not from a CSS cascade, so the values must exist as plain
+ * data here. The `--grammar-*` custom properties in tokens.css are a mirror
+ * consumed by the HTML toolbox category swatches (workbench.css); edit here
+ * first and carry the same hex into tokens.css. test/run_block_colors.js
+ * parses tokens.css and asserts the two stay identical.
+ */
 export const MINI_JAVA_BLOCK_PALETTES: Readonly<
   Record<MiniJavaThemeMode, Readonly<Record<MiniJavaBlockColorCategory, MiniJavaBlockPaletteEntry>>>
 > = {

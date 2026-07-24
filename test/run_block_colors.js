@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+const fs = require('fs');
+const path = require('path');
+
 const {
   blockColorContract,
   blockSerializationRoundTrips,
@@ -76,6 +79,33 @@ for (const mode of ['dark', 'light']) {
   check(`${mode} adjacent category colors are not near-duplicates`,
     primaryColors.every((color, index) => primaryColors.slice(index + 1)
       .every((other) => rgbDistance(color, other) >= 20)));
+}
+
+// theme.ts (MINI_JAVA_BLOCK_PALETTES) is the authored source for the seven
+// grammar hexes; tokens.css's --grammar-* custom properties are a hand-kept
+// mirror consumed by the HTML toolbox swatches. Parse the CSS text and assert
+// the two never drift apart, rather than trusting a second copy by hand.
+const tokensCssPath = path.resolve(__dirname, '../src/assets/css/tokens.css');
+const tokensCssText = fs.readFileSync(tokensCssPath, 'utf8');
+const themeBlockPattern = /body\[data-theme="(dark|light)"\]\s*{([^}]*)}/g;
+const cssGrammarByMode = {};
+let themeBlockMatch;
+while ((themeBlockMatch = themeBlockPattern.exec(tokensCssText)) !== null) {
+  const [, mode, body] = themeBlockMatch;
+  const grammar = {};
+  const grammarLinePattern = /--grammar-([a-z]+):\s*(#[0-9a-fA-F]{6});/g;
+  let grammarLineMatch;
+  while ((grammarLineMatch = grammarLinePattern.exec(body)) !== null) {
+    grammar[grammarLineMatch[1]] = grammarLineMatch[2];
+  }
+  cssGrammarByMode[mode] = grammar;
+}
+for (const mode of ['dark', 'light']) {
+  for (const category of contract.categories) {
+    check(`tokens.css --grammar-${category} (${mode}) matches theme.ts`,
+      cssGrammarByMode[mode]?.[category] === contract.palettes[mode][category].colourPrimary,
+      `css=${cssGrammarByMode[mode]?.[category]} theme.ts=${contract.palettes[mode][category].colourPrimary}`);
+  }
 }
 
 const expectedHorizontal = [

@@ -326,6 +326,21 @@ select:focus-visible,
   border: 0 !important;
 }
 
+/* Utility type role: addresses and counters (design brief §2). Fixed-width
+   digits so #3 -> #10 -> #128 and step 9 -> step 10 don't jitter column width
+   while Play is ticking; tracked caps read as a label, not prose. */
+.tabular-face {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: 0.04em;
+}
+
+.tabular-face.tabular-caps {
+  text-transform: uppercase;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
 .app-shell {
   display: grid;
   min-width: 320px;
@@ -1602,16 +1617,29 @@ body.code-maximized .code-column {
   height: 100%;
 }
 
-body.bottom-maximized .app-shell {
+/* Maximizing Problems/Output has nothing in the workspace to protect, so it
+   still occludes it outright. A live stepper (machine/compare/subst) keeps
+   the redex highlight it shares with the workspace visible instead — its
+   "maximize" caps the dock at 70vh rather than hiding .ide-workbench (layout
+   law, design brief §3: the two surfaces stay co-visible while stepping). */
+body.bottom-maximized:not([data-viz-stepper-active="true"]) .app-shell {
   grid-template-rows: var(--panel-header-height) 0 minmax(0, 1fr) var(--panel-status-height);
 }
 
-body.bottom-maximized .ide-workbench {
+body.bottom-maximized:not([data-viz-stepper-active="true"]) .ide-workbench {
   visibility: hidden;
 }
 
-body.bottom-maximized .viz-dock[data-open="true"] {
+body.bottom-maximized:not([data-viz-stepper-active="true"]) .viz-dock[data-open="true"] {
   height: auto;
+}
+
+body.bottom-maximized[data-viz-stepper-active="true"] .app-shell {
+  grid-template-rows: var(--panel-header-height) minmax(140px, 1fr) minmax(0, 70vh) var(--panel-status-height);
+}
+
+body.bottom-maximized[data-viz-stepper-active="true"] .viz-dock[data-open="true"] {
+  height: 100%;
 }
 
 /* Compact status bar */

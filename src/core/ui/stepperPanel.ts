@@ -26,6 +26,7 @@ import {
 import { markPhase, type Address } from '../semantics/reachability';
 import { sweep } from '../semantics/gc';
 import { mirrorProgramOutput } from './programConsole';
+import { bindDockStepKeys } from './dockKeyboard';
 
 const PLAY_INTERVAL_MS = 550;
 const MAX_HISTORY = 5000;
@@ -77,7 +78,15 @@ function valueChip(value: MachineValue): HTMLElement {
     chip.dataset.refLoc = String(value.loc);
     chip.textContent = `#${value.loc}`;
     chip.title = `Show heap object #${value.loc}`;
+    chip.tabIndex = 0;
+    chip.setAttribute('role', 'button');
     chip.addEventListener('click', () => revealHeapBox(value.loc));
+    chip.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        revealHeapBox(value.loc);
+      }
+    });
   } else {
     chip.className = value.tag === 'Null' ? 'stepper-null' : 'stepper-scalar';
     chip.textContent = formatMachineValue(value);
@@ -116,6 +125,28 @@ function hint(text: string): HTMLElement {
   return el;
 }
 
+/** Whether `block` is already visible in the workspace's own scroll surface,
+ * by comparing screen rects the same way `visibleRect` does for arrows below
+ * — no Blockly viewport-metrics math, just DOM geometry. */
+function isBlockOnscreen(block: Blockly.BlockSvg): boolean {
+  const container = document.getElementById('blockly-div');
+  // Headless (test) blocks have no getSvgRoot; treat "can't tell" as
+  // offscreen so callers fall back to the old unconditional-center behavior.
+  if (!container || typeof block.getSvgRoot !== 'function') return false;
+  const root = block.getSvgRoot();
+  if (!root) return false;
+  const blockRect = root.getBoundingClientRect();
+  if (blockRect.width === 0 && blockRect.height === 0) return false;
+  const bounds = container.getBoundingClientRect();
+  const margin = 24;
+  return (
+    blockRect.right > bounds.left + margin &&
+    blockRect.left < bounds.right - margin &&
+    blockRect.bottom > bounds.top + margin &&
+    blockRect.top < bounds.bottom - margin
+  );
+}
+
 function setHighlight(blockId: string | null): void {
   const workspace = getWorkspace();
   if (!workspace) return;
@@ -126,10 +157,78 @@ function setHighlight(blockId: string | null): void {
     const block = workspace.getBlockById(blockId) as Blockly.BlockSvg | null;
     if (block) {
       block.setHighlighted(true);
-      workspace.centerOnBlock?.(blockId);
+      // Pan only when the redex has scrolled out of view (audit U6) — panning
+      // on every step regardless fights a student who is manually looking
+      // around the program.
+      if (!isBlockOnscreen(block)) workspace.centerOnBlock?.(blockId);
     }
   }
   highlightedBlockId = blockId;
+}
+
+/* -- Bidirectional linking (audit U4): the machine already highlights the
+   redex block it is reducing; these two add the other directions — selecting
+   a program block highlights the machine rows that mention it, and hovering
+   a Ref chip or heap box emphasizes every element sharing its address. */
+
+let linkedBlockId: string | null = null;
+
+function clearWorkspaceLink(): void {
+  if (!linkedBlockId) return;
+  for (const el of document.querySelectorAll(`[data-block-id="${CSS.escape(linkedBlockId)}"]`)) {
+    el.classList.remove('is-linked-from-block');
+  }
+  linkedBlockId = null;
+}
+
+/** Selecting a block in the main workspace highlights every machine-panel
+ * element whose provenance is that block (its control card, frame title,
+ * kont entry, or heap allocation site). */
+function linkFromWorkspaceSelection(blockId: string | null): void {
+  clearWorkspaceLink();
+  if (!blockId) return;
+  const matches = document.querySelectorAll<HTMLElement>(
+    `#stepper-control [data-block-id="${CSS.escape(blockId)}"], ` +
+      `#stepper-frames [data-block-id="${CSS.escape(blockId)}"], ` +
+      `#stepper-kont [data-block-id="${CSS.escape(blockId)}"], ` +
+      `#stepper-heap [data-block-id="${CSS.escape(blockId)}"]`
+  );
+  if (matches.length === 0) return;
+  linkedBlockId = blockId;
+  matches.forEach((el, index) => {
+    el.classList.add('is-linked-from-block');
+    if (index === 0) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
+}
+
+let emphasizedLoc: number | null = null;
+
+function locElementsFor(loc: number): NodeListOf<HTMLElement> {
+  return document.querySelectorAll<HTMLElement>(
+    `.stepper-panels [data-ref-loc="${loc}"], .stepper-panels [data-heap-loc="${loc}"]`
+  );
+}
+
+/** Hovering a Ref chip or a heap box emphasizes every element sharing that
+ * address, everywhere in the machine — one hue, but the highlight makes "same
+ * object" legible beyond color alone. */
+function emphasizeLoc(loc: number | null): void {
+  if (loc === emphasizedLoc) return;
+  if (emphasizedLoc !== null) {
+    for (const el of locElementsFor(emphasizedLoc)) el.classList.remove('is-loc-emphasized');
+  }
+  emphasizedLoc = loc;
+  if (loc !== null) {
+    for (const el of locElementsFor(loc)) el.classList.add('is-loc-emphasized');
+  }
+}
+
+function locFromEventTarget(target: EventTarget | null): number | null {
+  if (!(target instanceof HTMLElement)) return null;
+  const el = target.closest<HTMLElement>('[data-ref-loc],[data-heap-loc]');
+  if (!el) return null;
+  const raw = el.dataset.refLoc ?? el.dataset.heapLoc;
+  return raw !== undefined ? Number(raw) : null;
 }
 
 function stopPlay(): void {
@@ -146,6 +245,7 @@ function markStale(): void {
   stopPlay();
   stopGCAnimation();
   setHighlight(null);
+  clearWorkspaceLink();
   renderAll();
 }
 
@@ -155,6 +255,11 @@ function attachWorkspaceListener(): void {
   if (!workspace) return;
   listening = true;
   workspace.addChangeListener((event) => {
+    if (event.type === Blockly.Events.SELECTED) {
+      const selected = event as unknown as { newElementId?: string | null };
+      if (current && !stale) linkFromWorkspaceSelection(selected.newElementId ?? null);
+      return;
+    }
     if (!current || stale) return;
     if (
       event.type === Blockly.Events.BLOCK_CREATE ||
@@ -207,13 +312,55 @@ function renderStatus(): void {
   status.textContent = `step ${current.stepCount}${current.lastRule ? ` · ${current.lastRule}` : ''}`;
 }
 
+const STEP_TITLE = 'One machine step (→ / .)';
+const PLAY_TITLE = 'Step automatically (Space)';
+const BACK_TITLE = 'Undo one machine step (← / ,)';
+const GC_TITLE = 'Mark and sweep the heap now (G)';
+
+/** Why Step/Play can't fire right now (interaction contract, brief §5). */
+function stepDisabledReason(): string {
+  if (!current) return 'Press Load to build the machine first';
+  if (stale) return 'Program changed — press Load to restart';
+  if (gcAnimation) return 'Collection in progress';
+  if (current.status === 'error') return 'Stuck — press Back or Load';
+  if (current.status === 'done') return 'Finished — nothing left to step';
+  return STEP_TITLE;
+}
+
+function gcDisabledReason(): string {
+  if (!current) return 'Press Load first';
+  if (stale) return 'Program changed — press Load to restart';
+  if (gcAnimation) return 'Collection in progress';
+  if (current.heap.size === 0) return 'Heap is empty — nothing to collect';
+  return GC_TITLE;
+}
+
 function renderButtons(): void {
   const canStep = !!current && !stale && current.status === 'running' && !gcAnimation;
   const canGC = !!current && !stale && current.heap.size > 0 && !gcAnimation;
-  byId<HTMLButtonElement>('stepper-step').disabled = !canStep;
-  byId<HTMLButtonElement>('stepper-play').disabled = !canStep && playTimer === null;
-  byId<HTMLButtonElement>('stepper-back').disabled = history.length === 0 || stale || !!gcAnimation;
-  byId<HTMLButtonElement>('stepper-gc').disabled = !canGC;
+
+  const stepButton = byId<HTMLButtonElement>('stepper-step');
+  const playButton = byId<HTMLButtonElement>('stepper-play');
+  const backButton = byId<HTMLButtonElement>('stepper-back');
+  const gcButton = byId<HTMLButtonElement>('stepper-gc');
+
+  stepButton.disabled = !canStep;
+  stepButton.title = canStep ? STEP_TITLE : stepDisabledReason();
+
+  const canPlay = canStep || playTimer !== null;
+  playButton.disabled = !canPlay;
+  playButton.title = canPlay ? PLAY_TITLE : stepDisabledReason();
+
+  const canBack = history.length > 0 && !stale && !gcAnimation;
+  backButton.disabled = !canBack;
+  backButton.title = canBack
+    ? BACK_TITLE
+    : gcAnimation
+      ? 'Collection in progress'
+      : 'At the start — no earlier step to return to';
+
+  gcButton.disabled = !canGC;
+  gcButton.title = canGC ? GC_TITLE : gcDisabledReason();
 }
 
 /** Short readable text for a program block, for the Control card. */
@@ -245,6 +392,7 @@ function renderControl(): void {
   if (control.tag === 'Stmt' || control.tag === 'Expr') {
     const text = document.createElement('div');
     text.className = 'stepper-control-text stepper-provenance';
+    text.dataset.blockId = control.block.id;
     text.textContent = blockText(control.block);
     text.title = 'Show this block in the program';
     text.addEventListener('click', () => locateProvenance(control.block.id));
@@ -327,6 +475,7 @@ function renderKont(): void {
 
     const title = document.createElement('div');
     title.className = 'stepper-kont-frame-title stepper-provenance';
+    title.dataset.blockId = frame.callBlockId ?? frame.blockId;
     title.textContent = frame.method;
     title.title = 'Show this frame’s method';
     title.addEventListener('click', () => locateProvenance(frame.callBlockId ?? frame.blockId));
@@ -349,6 +498,7 @@ function renderKont(): void {
       }
       if (blockId) {
         row.classList.add('stepper-provenance');
+        row.dataset.blockId = blockId;
         row.title = 'Show the block waiting on this value';
         row.addEventListener('click', () => locateProvenance(blockId));
       }
@@ -368,7 +518,7 @@ function renderFrames(): void {
   const host = byId<HTMLDivElement>('stepper-frames');
   host.innerHTML = '';
   if (!current) {
-    host.appendChild(hint('The call stack will appear here.'));
+    host.appendChild(hint('Each method call pushes a frame here; the top frame is the one running now.'));
     return;
   }
   const effect = current.lastEffect;
@@ -382,9 +532,10 @@ function renderFrames(): void {
     title.className = 'stepper-frame-title';
     const name = document.createElement('span');
     name.className = 'stepper-provenance';
+    const provenanceId = frame.callBlockId ?? frame.blockId;
+    name.dataset.blockId = provenanceId;
     name.textContent = frame.method;
     name.title = frame.callBlockId ? 'Show the call that pushed this frame' : 'Show the main class block';
-    const provenanceId = frame.callBlockId ?? frame.blockId;
     name.addEventListener('click', () => locateProvenance(provenanceId));
     title.appendChild(name);
     if (frame.self !== null) {
@@ -434,6 +585,7 @@ function renderHeap(): void {
 
     const title = document.createElement('div');
     title.className = 'stepper-heap-title stepper-provenance';
+    title.dataset.blockId = obj.blockId;
     title.textContent = obj.tag === 'Obj' ? `#${loc} · ${obj.className}` : `#${loc} · int[${obj.elems.length}]`;
     title.title = 'Show the new block that allocated this object';
     title.addEventListener('click', () => locateProvenance(obj.blockId));
@@ -485,7 +637,13 @@ function renderAll(): void {
   renderHeap();
   renderKont();
   renderOutput();
-  if (current && !stale) setHighlight(current.status === 'running' ? current.focusBlockId : null);
+  // A stuck machine stays anchored on the offending block (audit U5) — only a
+  // clean finish has nothing left to point at. Mirrors how the type-checker
+  // pins its own warnings to a block instead of clearing the selection.
+  if (current && !stale) {
+    const shouldAnchor = current.status === 'running' || current.status === 'error';
+    setHighlight(shouldAnchor ? current.focusBlockId : null);
+  }
   scheduleArrowRedraw(true);
 }
 
@@ -584,8 +742,11 @@ function drawArrows(pulse: boolean): void {
     head.style.setProperty('--loc-hue', hue);
     svg.appendChild(head);
 
-    // The value travels from the writing frame's chip into the box.
-    if (isWrite && chip.closest('.stepper-frame.is-top')) {
+    // The value travels from the writing frame's chip into the box — motion
+    // that exists only to depict the same signal the box's own glow already
+    // gives, so reduced motion omits the dot and keeps the glow (brief §4).
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (isWrite && !reduceMotion && chip.closest('.stepper-frame.is-top')) {
       const dot = document.createElementNS(SVG_NS, 'circle');
       dot.setAttribute('r', '4.5');
       dot.setAttribute('class', 'stepper-write-dot');
@@ -677,6 +838,13 @@ function finishSweep(marked: Set<Address>): void {
   const sweptAway = [...current!.heap.keys()].filter((loc) => !marked.has(loc));
   for (const loc of sweptAway) {
     document.querySelector<HTMLElement>(`#stepper-heap .stepper-heap-box[data-heap-loc="${loc}"]`)?.classList.add('is-gc-swept');
+  }
+  // The mark-phase glow (copper, is-gc-marked) said "the collector touched
+  // this"; a surviving object gets a second, distinct signal here — "proven
+  // reachable" (green) — so retired and reachable read as the stated pair
+  // (design brief §1 roles 5-6), not just "didn't get swept."
+  for (const loc of marked) {
+    document.querySelector<HTMLElement>(`#stepper-heap .stepper-heap-box[data-heap-loc="${loc}"]`)?.classList.add('is-gc-survived');
   }
   window.setTimeout(() => {
     history.push(current!);
@@ -863,13 +1031,26 @@ export function initStepperPanel(getter: GetWorkspace): void {
   byId<HTMLButtonElement>('stepper-gc').addEventListener('click', startGCAnimation);
   byId<HTMLInputElement>('stepper-gc-auto-enabled').addEventListener('change', updateAutoGcEnabled);
   byId<HTMLInputElement>('stepper-gc-threshold').addEventListener('change', updateGcThreshold);
+  bindDockStepKeys(byId<HTMLElement>('viz-dock'), 'machine', {
+    load: loadMachine,
+    step: stepOnce,
+    back: stepBack,
+    togglePlay,
+    extra: { g: startGCAnimation }
+  });
   loadGcSettings();
   for (const body of Array.from(document.querySelectorAll('.stepper-panel-body'))) {
     body.addEventListener('scroll', () => scheduleArrowRedraw(false), { passive: true });
   }
-  if ('ResizeObserver' in window) {
-    const panels = document.querySelector('.stepper-panels');
-    if (panels) new ResizeObserver(() => scheduleArrowRedraw(false)).observe(panels);
+  const panels = document.querySelector<HTMLElement>('.stepper-panels');
+  if (panels) {
+    if ('ResizeObserver' in window) new ResizeObserver(() => scheduleArrowRedraw(false)).observe(panels);
+    panels.addEventListener('pointerover', (event) => emphasizeLoc(locFromEventTarget(event.target)));
+    panels.addEventListener('pointerout', (event) => {
+      const related = event.relatedTarget;
+      if (related instanceof Node && panels.contains(related)) return;
+      emphasizeLoc(null);
+    });
   }
   attachWorkspaceListener();
   renderAll();

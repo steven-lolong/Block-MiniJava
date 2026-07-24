@@ -326,6 +326,21 @@ select:focus-visible,
   border: 0 !important;
 }
 
+/* Utility type role: addresses and counters (design brief §2). Fixed-width
+   digits so #3 -> #10 -> #128 and step 9 -> step 10 don't jitter column width
+   while Play is ticking; tracked caps read as a label, not prose. */
+.tabular-face {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: 0.04em;
+}
+
+.tabular-face.tabular-caps {
+  text-transform: uppercase;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
 .app-shell {
   display: grid;
   min-width: 320px;

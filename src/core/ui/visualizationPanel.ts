@@ -18,6 +18,11 @@ type SemanticKind = Exclude<VizKind, 'problems' | 'output'>;
 const KINDS: ReductionKind[] = ['structure', 'value'];
 const ALL_KINDS: VizKind[] = ['problems', 'output', 'structure', 'value', 'machine', 'compare', 'subst'];
 const SEMANTIC_KINDS: SemanticKind[] = ['structure', 'value', 'machine', 'compare', 'subst'];
+/** The three live steppers with a redex highlight shared with the main
+ * workspace — distinct from the static structure/value reduction views,
+ * which render into their own workspace and highlight nothing in the main
+ * one. Layout law (brief §3) applies only to these three. */
+const STEPPER_KINDS: SemanticKind[] = ['machine', 'compare', 'subst'];
 const TITLE: Record<VizKind, string> = {
   problems: 'Type-checker diagnostics from the current block program',
   output: 'Output from the most recent program run or semantic stepper',
@@ -141,6 +146,7 @@ function updateToolActions(): void {
 
 function setActive(kind: VizKind): void {
   active = kind;
+  document.body.dataset.vizStepperActive = String(STEPPER_KINDS.includes(kind as SemanticKind));
   const semanticsActive = isSemanticKind(kind);
   if (semanticsActive) lastSemantic = kind;
   for (const k of ALL_KINDS) {

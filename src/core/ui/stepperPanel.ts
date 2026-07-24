@@ -742,8 +742,11 @@ function drawArrows(pulse: boolean): void {
     head.style.setProperty('--loc-hue', hue);
     svg.appendChild(head);
 
-    // The value travels from the writing frame's chip into the box.
-    if (isWrite && chip.closest('.stepper-frame.is-top')) {
+    // The value travels from the writing frame's chip into the box — motion
+    // that exists only to depict the same signal the box's own glow already
+    // gives, so reduced motion omits the dot and keeps the glow (brief §4).
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (isWrite && !reduceMotion && chip.closest('.stepper-frame.is-top')) {
       const dot = document.createElementNS(SVG_NS, 'circle');
       dot.setAttribute('r', '4.5');
       dot.setAttribute('class', 'stepper-write-dot');

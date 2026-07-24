@@ -974,3 +974,37 @@ body[data-theme="light"] .stepper-ref {
     overflow: visible;
   }
 }
+
+/* Motion policy, reduced-motion branch (design brief §4). workbench.css's
+   blanket rule collapses every animation/transition to ~0ms — correct for a
+   plain `transition` (the swept-cell fade simply jumps to its end state and
+   holds it, which already reads as "instant grey then gone") but wrong for a
+   `@keyframes` animation with the default fill-mode: those revert to the
+   un-animated base style the instant they finish, so a 700ms glow collapsed
+   to 0.01ms is not "instant" — it is invisible, erasing exactly the signal
+   these exist for. Each glow gets its held (non-animated) end state here
+   instead, so the semantic content survives even though the motion doesn't. */
+@media (prefers-reduced-motion: reduce) {
+  .stepper-arrow.is-pulse {
+    animation: none;
+  }
+
+  .is-changed {
+    animation: none;
+  }
+
+  .stepper-heap-box.is-write-target {
+    animation: none;
+    box-shadow: 0 0 0 3px hsl(var(--loc-hue) 60% 52% / 0.55);
+  }
+
+  .stepper-heap-box.is-gc-marked {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-execution-strong) 65%, transparent);
+  }
+
+  .stepper-heap-box.is-gc-survived {
+    animation: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--state-success) 55%, transparent);
+  }
+}
